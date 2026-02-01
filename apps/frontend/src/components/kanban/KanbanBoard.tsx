@@ -1,0 +1,243 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { Plus, Filter, Settings, Loader2, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { KanbanColumn } from './KanbanColumn';
+import { KanbanCard } from './KanbanCard';
+import { EntityDetailPanel } from './EntityDetailPanel';
+import { CreateEntityModal } from './CreateEntityModal';
+import {
+  FilterPanel,
+  createEmptyFilters,
+  applyFilters,
+  type FilterState,
+} from './FilterPanel';
+import { useEntityStore } from '@/store/useEntityStore';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import type { Entity, FieldOption } from '@/types';
+
+interface KanbanBoardProps {
+  workspaceId: string;
+}
+
+// Default columns for backwards compatibility
+const DEFAULT_COLUMNS: FieldOption[] = [
+  { id: 'new', label: 'Новые', color: '#3B82F6' },
+  { id: 'in-progress', label: 'В работе', color: '#F59E0B' },
+  { id: 'testing', label: 'Тестирование', color: '#8B5CF6' },
+  { id: 'done', label: 'Готово', color: '#10B981' },
+];
+
+export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
+  const router = useRouter();
+  const [activeCard, setActiveCard] = useState<Entity | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FilterState>(createEmptyFilters);
+
+  const { entities, loading, fetchEntities, fetchUsers, updateStatus } =
+    useEntityStore();
+  const { currentWorkspace, fetchWorkspace } = useWorkspaceStore();
+
+  useEffect(() => {
+    fetchEntities(workspaceId);
+    fetchUsers();
+    fetchWorkspace(workspaceId);
+  }, [workspaceId, fetchEntities, fetchUsers, fetchWorkspace]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
+  // Get status columns from workspace configuration
+  const columns = useMemo(() => {
+    if (!currentWorkspace?.sections) return DEFAULT_COLUMNS;
+
+    // Find the status field in any section
+    for (const section of currentWorkspace.sections) {
+      const statusField = section.fields.find((f) => f.type === 'status');
+      if (statusField?.options && statusField.options.length > 0) {
+        return statusField.options;
+      }
+    }
+
+    return DEFAULT_COLUMNS;
+  }, [currentWorkspace]);
+
+  // Apply filters to entities
+  const filteredEntities = useMemo(() => {
+    return applyFilters(entities, filters);
+  }, [entities, filters]);
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.search) count++;
+    if (filters.assigneeIds.length > 0) count++;
+    if (filters.priorities.length > 0) count++;
+    if (filters.dateFrom || filters.dateTo) count++;
+    for (const values of Object.values(filters.customFilters)) {
+      if (values.length > 0) count++;
+    }
+    return count;
+  }, [filters]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const card = filteredEntities.find((e) => e.id === event.active.id);
+    if (card) setActiveCard(card);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveCard(null);
+
+    if (!over || active.id === over.id) return;
+
+    const overId = over.id as string;
+
+    // Проверяем, является ли overId колонкой (статусом)
+    const isColumn = columns.some((col) => col.id === overId);
+
+    if (isColumn) {
+      // Перетащили на колонку — меняем статус
+      updateStatus(active.id as string, overId);
+    } else {
+      // Перетащили на другую карточку — находим её статус
+      const targetCard = entities.find((e) => e.id === overId);
+      if (targetCard) {
+        updateStatus(active.id as string, targetCard.status);
+      }
+    }
+  };
+
+  const getColumnCards = (statusId: string) =>
+    filteredEntities.filter((e) => e.status === statusId);
+
+  const clearFilters = () => {
+    setFilters(createEmptyFilters());
+  };
+
+  if (loading && entities.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {currentWorkspace && (
+              <span className="text-3xl">{currentWorkspace.icon}</span>
+            )}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {currentWorkspace?.name || 'Загрузка...'}
+              </h2>
+              <p className="text-gray-500 mt-1">
+                {filteredEntities.length === entities.length
+                  ? `${entities.length} заявок`
+                  : `${filteredEntities.length} из ${entities.length} заявок`}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowFilters(true)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                activeFilterCount > 0
+                  ? 'border-primary-300 bg-primary-50 text-primary-700'
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Filter className="w-5 h-5" />
+              <span>Фильтры</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-primary-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+                <span>Сбросить</span>
+              </button>
+            )}
+            <button
+              onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+              <span>Настройки</span>
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Новая заявка</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {columns.map((column) => (
+            <KanbanColumn
+              key={column.id}
+              id={column.id}
+              title={column.label}
+              color={column.color}
+              cards={getColumnCards(column.id)}
+            />
+          ))}
+        </div>
+
+        <DragOverlay>
+          {activeCard ? <KanbanCard entity={activeCard} isDragging /> : null}
+        </DragOverlay>
+      </DndContext>
+
+      <EntityDetailPanel />
+
+      {showCreateModal && (
+        <CreateEntityModal
+          workspaceId={workspaceId}
+          onClose={() => setShowCreateModal(false)}
+        />
+      )}
+
+      {showFilters && (
+        <FilterPanel
+          filters={filters}
+          onFiltersChange={setFilters}
+          onClose={() => setShowFilters(false)}
+        />
+      )}
+    </div>
+  );
+}
