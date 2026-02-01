@@ -11,9 +11,10 @@ import { useEntityStore } from '@/store/useEntityStore';
 interface KanbanCardProps {
   entity: Entity;
   isDragging?: boolean;
+  canEdit?: boolean;
 }
 
-export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
+export function KanbanCard({ entity, isDragging = false, canEdit = true }: KanbanCardProps) {
   const { selectEntity } = useEntityStore();
   const {
     attributes,
@@ -21,7 +22,7 @@ export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
     setNodeRef,
     transform,
     transition,
-  } = useSortable({ id: entity.id });
+  } = useSortable({ id: entity.id, disabled: !canEdit });
 
   const style = {
     transform: CSS.Transform.toString(transform),

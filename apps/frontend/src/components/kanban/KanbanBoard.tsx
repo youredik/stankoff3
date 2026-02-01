@@ -48,11 +48,13 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
   const { entities, loading, fetchEntities, fetchUsers, updateStatus } =
     useEntityStore();
-  const { currentWorkspace, fetchWorkspace } = useWorkspaceStore();
+  const { currentWorkspace, fetchWorkspace, canEdit, currentRole } = useWorkspaceStore();
   const { user } = useAuthStore();
 
-  // Проверка прав администратора
-  const isAdmin = user?.role === 'admin';
+  // Проверка прав: глобальный админ или workspace admin
+  const isAdmin = user?.role === 'admin' || currentRole === 'admin';
+  // Может ли редактировать (editor или admin)
+  const canEditEntities = canEdit();
 
   useEffect(() => {
     fetchEntities(workspaceId);
@@ -107,6 +109,9 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveCard(null);
+
+    // Viewer не может менять статус
+    if (!canEditEntities) return;
 
     if (!over || active.id === over.id) return;
 
@@ -207,13 +212,16 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                 <span>Настройки</span>
               </button>
             )}
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Новая заявка</span>
-            </button>
+            {/* Создание заявки - только для editor+ */}
+            {canEditEntities && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Новая заявка</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -231,6 +239,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
               title={column.label}
               color={column.color}
               cards={getColumnCards(column.id)}
+              canEdit={canEditEntities}
             />
           ))}
         </div>

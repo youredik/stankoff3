@@ -61,6 +61,16 @@ export class WorkspaceController {
     return this.workspaceService.remove(id);
   }
 
+  // Получить роль текущего пользователя в workspace
+  @Get(':id/my-role')
+  async getMyRole(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ): Promise<{ role: WorkspaceRole | null }> {
+    const access = await this.workspaceService.checkAccess(id, user.id, user.role);
+    return { role: access?.role || null };
+  }
+
   // === Управление участниками ===
 
   @Get(':id/members')

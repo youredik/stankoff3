@@ -1,18 +1,24 @@
 'use client';
 
 import { create } from 'zustand';
-import type { Workspace, Field, Section, FieldOption } from '@/types';
+import type { Workspace, Field, Section, FieldOption, WorkspaceRole } from '@/types';
 import { workspacesApi } from '@/lib/api/workspaces';
 
 interface WorkspaceStore {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
+  currentRole: WorkspaceRole | null; // Роль текущего пользователя в текущем workspace
   loading: boolean;
   error: string | null;
 
   fetchWorkspaces: () => Promise<void>;
   fetchWorkspace: (id: string) => Promise<void>;
+  fetchMyRole: (workspaceId: string) => Promise<void>;
   setCurrentWorkspace: (workspace: Workspace | null) => void;
+
+  // Helpers для проверки прав
+  canEdit: () => boolean;
+  canDelete: () => boolean;
 
   // Workspace mutations
   createWorkspace: (data: Partial<Workspace>) => Promise<Workspace>;
@@ -46,6 +52,7 @@ const generateId = () =>
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspaces: [],
   currentWorkspace: null,
+  currentRole: null,
   loading: false,
   error: null,
 
@@ -64,12 +71,35 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     try {
       const workspace = await workspacesApi.getById(id);
       set({ currentWorkspace: workspace, loading: false });
+      // Автоматически получаем роль пользователя
+      get().fetchMyRole(id);
     } catch (err) {
       set({ loading: false, error: (err as Error).message });
     }
   },
 
+  fetchMyRole: async (workspaceId: string) => {
+    try {
+      const { role } = await workspacesApi.getMyRole(workspaceId);
+      set({ currentRole: role });
+    } catch {
+      set({ currentRole: null });
+    }
+  },
+
   setCurrentWorkspace: (workspace) => set({ currentWorkspace: workspace }),
+
+  // Проверка: может ли пользователь редактировать (editor или admin)
+  canEdit: () => {
+    const role = get().currentRole;
+    return role === 'editor' || role === 'admin';
+  },
+
+  // Проверка: может ли пользователь удалять (только admin)
+  canDelete: () => {
+    const role = get().currentRole;
+    return role === 'admin';
+  },
 
   createWorkspace: async (data) => {
     // Данные для отправки на сервер (без id, createdAt, updatedAt — их генерирует бэкенд)

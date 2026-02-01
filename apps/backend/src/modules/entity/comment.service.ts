@@ -31,6 +31,13 @@ export class CommentService {
     private s3Service: S3Service,
   ) {}
 
+  async findOne(id: string): Promise<Comment | null> {
+    return this.commentRepository.findOne({
+      where: { id },
+      relations: ['author'],
+    });
+  }
+
   async findByEntity(entityId: string): Promise<CommentWithUrls[]> {
     const comments = await this.commentRepository.find({
       where: { entityId },

@@ -11,9 +11,10 @@ interface KanbanColumnProps {
   title: string;
   color?: string;
   cards: Entity[];
+  canEdit?: boolean;
 }
 
-export function KanbanColumn({ id, title, color, cards }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, color, cards, canEdit = true }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -51,7 +52,7 @@ export function KanbanColumn({ id, title, color, cards }: KanbanColumnProps) {
             strategy={verticalListSortingStrategy}
           >
             {cards.map((card) => (
-              <KanbanCard key={card.id} entity={card} />
+              <KanbanCard key={card.id} entity={card} canEdit={canEdit} />
             ))}
           </SortableContext>
 

@@ -178,13 +178,15 @@ test.describe('Работа с карточкой заявки', () => {
     await card.click();
     await expect(page.getByText('Комментарии').first()).toBeVisible({ timeout: 3000 });
 
-    // Кликаем на overlay (затемнённый фон)
+    // Кликаем на overlay (затемнённый фон) - ждём стабильности элемента
     const overlay = page.locator('[data-testid="detail-panel-overlay"]');
+    await overlay.waitFor({ state: 'visible' });
+    await page.waitForTimeout(300);
     await overlay.click({ position: { x: 10, y: 10 }, force: true });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(800);
 
     // Панель должна закрыться
-    await expect(page.getByText('Комментарии').first()).not.toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Комментарии').first()).not.toBeVisible({ timeout: 5000 });
   });
 });
 

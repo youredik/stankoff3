@@ -45,11 +45,13 @@ export function EntityDetailPanel() {
     addComment,
   } = useEntityStore();
 
-  const { currentWorkspace } = useWorkspaceStore();
+  const { currentWorkspace, canEdit } = useWorkspaceStore();
   const { user } = useAuthStore();
 
-  // Проверка прав (admin и manager могут назначать исполнителей)
-  const canAssign = user?.role === 'admin' || user?.role === 'manager';
+  // Проверка прав workspace
+  const canEditEntity = canEdit();
+  // Назначение исполнителей: admin, manager или workspace admin/editor
+  const canAssign = user?.role === 'admin' || user?.role === 'manager' || canEditEntity;
 
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
 
@@ -231,10 +233,12 @@ export function EntityDetailPanel() {
                 </div>
               </div>
 
-              {/* Comment editor — pinned to bottom of left column */}
-              <div className="border-t px-8 py-5">
-                <CommentEditor users={users} onSubmit={handleSubmitComment} />
-              </div>
+              {/* Comment editor — pinned to bottom of left column (hidden for viewers) */}
+              {canEditEntity && (
+                <div className="border-t px-8 py-5">
+                  <CommentEditor users={users} onSubmit={handleSubmitComment} />
+                </div>
+              )}
             </div>
 
             {/* Right sidebar: status, assignee, links, meta */}
@@ -248,11 +252,14 @@ export function EntityDetailPanel() {
                   {statuses.map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => updateStatus(selectedEntity.id, s.id)}
-                      className={`text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer ${
+                      onClick={() => canEditEntity && updateStatus(selectedEntity.id, s.id)}
+                      disabled={!canEditEntity}
+                      className={`text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                         selectedEntity.status === s.id
                           ? 'text-white'
-                          : 'text-gray-600 hover:bg-gray-200'
+                          : canEditEntity
+                            ? 'text-gray-600 hover:bg-gray-200 cursor-pointer'
+                            : 'text-gray-400 cursor-default'
                       }`}
                       style={
                         selectedEntity.status === s.id
@@ -306,6 +313,7 @@ export function EntityDetailPanel() {
                 entityId={selectedEntity.id}
                 linkedEntityIds={selectedEntity.linkedEntityIds || []}
                 onUpdate={handleUpdateLinkedEntities}
+                readOnly={!canEditEntity}
               />
 
               {/* Файлы */}

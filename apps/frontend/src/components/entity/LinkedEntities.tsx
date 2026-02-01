@@ -10,6 +10,7 @@ interface LinkedEntitiesProps {
   entityId: string;
   linkedEntityIds: string[];
   onUpdate: (linkedEntityIds: string[]) => void;
+  readOnly?: boolean;
 }
 
 interface LinkedEntityInfo {
@@ -25,6 +26,7 @@ export function LinkedEntities({
   entityId,
   linkedEntityIds,
   onUpdate,
+  readOnly = false,
 }: LinkedEntitiesProps) {
   const [linkedEntities, setLinkedEntities] = useState<LinkedEntityInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -174,13 +176,15 @@ export function LinkedEntities({
           <Link2 className="w-3.5 h-3.5" />
           <span>Связи</span>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-          title="Добавить связь"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+            title="Добавить связь"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {loading && (
@@ -209,13 +213,15 @@ export function LinkedEntities({
                 </div>
                 <p className="text-xs text-gray-700 truncate">{entity.title}</p>
               </div>
-              <button
-                onClick={() => handleRemoveLink(entity.customId)}
-                className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Удалить связь"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => handleRemoveLink(entity.customId)}
+                  className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Удалить связь"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           ))}
         </div>

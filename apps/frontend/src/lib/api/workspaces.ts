@@ -15,6 +15,10 @@ export const workspacesApi = {
 
   delete: (id: string) => apiClient.delete(`/workspaces/${id}`),
 
+  // Получить роль текущего пользователя в workspace
+  getMyRole: (workspaceId: string) =>
+    apiClient.get<{ role: WorkspaceRole | null }>(`/workspaces/${workspaceId}/my-role`).then((r) => r.data),
+
   // Управление участниками
   getMembers: (workspaceId: string) =>
     apiClient.get<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`).then((r) => r.data),
