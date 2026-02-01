@@ -254,6 +254,7 @@ export function EntityDetailPanel() {
                       key={s.id}
                       onClick={() => canEditEntity && updateStatus(selectedEntity.id, s.id)}
                       disabled={!canEditEntity}
+                      title={!canEditEntity ? 'Недостаточно прав для изменения статуса' : undefined}
                       className={`text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                         selectedEntity.status === s.id
                           ? 'text-white'
@@ -300,7 +301,10 @@ export function EntityDetailPanel() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-sm text-gray-700">
+                  <p
+                    className="text-sm text-gray-700"
+                    title="Недостаточно прав для назначения исполнителя"
+                  >
                     {selectedEntity.assignee
                       ? `${selectedEntity.assignee.firstName} ${selectedEntity.assignee.lastName}`
                       : 'Не назначен'}

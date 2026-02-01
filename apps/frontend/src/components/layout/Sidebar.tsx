@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut } from 'lucide-react';
+import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut, Eye } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { Workspace } from '@/types';
@@ -12,9 +12,15 @@ interface SidebarProps {
   onWorkspaceChange: (id: string) => void;
 }
 
+const ROLE_CONFIG = {
+  admin: { label: 'Админ', bg: 'bg-purple-100', text: 'text-purple-700' },
+  editor: { label: 'Редактор', bg: 'bg-blue-100', text: 'text-blue-700' },
+  viewer: { label: 'Просмотр', bg: 'bg-gray-100', text: 'text-gray-600', icon: true },
+} as const;
+
 export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) {
   const router = useRouter();
-  const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace } =
+  const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace, getRoleForWorkspace } =
     useWorkspaceStore();
   const { user, logout } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -123,7 +129,11 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             </div>
           )}
 
-          {workspaces.map((workspace) => (
+          {workspaces.map((workspace) => {
+            const role = getRoleForWorkspace(workspace.id);
+            const roleConfig = role ? ROLE_CONFIG[role] : null;
+
+            return (
             <div
               key={workspace.id}
               className={`group relative flex items-center rounded-lg transition-colors ${
@@ -141,7 +151,16 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                 }`}
               >
                 <span className="text-xl">{workspace.icon}</span>
-                <span className="font-medium truncate">{workspace.name}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium truncate block">{workspace.name}</span>
+                  {/* Бейдж роли */}
+                  {roleConfig && role !== 'admin' && (
+                    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${roleConfig.bg} ${roleConfig.text}`}>
+                      {'icon' in roleConfig && roleConfig.icon && <Eye className="w-2.5 h-2.5" />}
+                      {roleConfig.label}
+                    </span>
+                  )}
+                </div>
                 {selectedWorkspace === workspace.id && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-500" />
                 )}
@@ -187,7 +206,8 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                 </div>
               )}
             </div>
-          ))}
+          );
+          })}
         </div>
 
         {/* Bottom section - только для админов */}

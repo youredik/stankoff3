@@ -25,6 +25,14 @@ export class WorkspaceController {
     return this.workspaceService.findAll(user.id, user.role);
   }
 
+  // Получить роли текущего пользователя во всех workspace
+  @Get('my-roles')
+  async getMyRoles(
+    @CurrentUser() user: User,
+  ): Promise<Record<string, WorkspaceRole>> {
+    return this.workspaceService.getMyRoles(user.id, user.role);
+  }
+
   @Get(':id')
   async findOne(
     @Param('id') id: string,

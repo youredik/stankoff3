@@ -19,6 +19,10 @@ export const workspacesApi = {
   getMyRole: (workspaceId: string) =>
     apiClient.get<{ role: WorkspaceRole | null }>(`/workspaces/${workspaceId}/my-role`).then((r) => r.data),
 
+  // Получить роли текущего пользователя во всех workspaces
+  getMyRoles: () =>
+    apiClient.get<Record<string, WorkspaceRole>>('/workspaces/my-roles').then((r) => r.data),
+
   // Управление участниками
   getMembers: (workspaceId: string) =>
     apiClient.get<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`).then((r) => r.data),

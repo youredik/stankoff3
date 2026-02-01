@@ -88,6 +88,34 @@ export class WorkspaceService {
     await this.workspaceRepository.delete(id);
   }
 
+  // Получить роли пользователя во всех workspaces
+  async getMyRoles(
+    userId: string,
+    userRole: UserRole,
+  ): Promise<Record<string, WorkspaceRole>> {
+    const roles: Record<string, WorkspaceRole> = {};
+
+    // Глобальный admin имеет admin роль во всех workspaces
+    if (userRole === UserRole.ADMIN) {
+      const workspaces = await this.workspaceRepository.find();
+      for (const ws of workspaces) {
+        roles[ws.id] = WorkspaceRole.ADMIN;
+      }
+      return roles;
+    }
+
+    // Остальные — по membership
+    const memberships = await this.memberRepository.find({
+      where: { userId },
+    });
+
+    for (const m of memberships) {
+      roles[m.workspaceId] = m.role;
+    }
+
+    return roles;
+  }
+
   // === Управление участниками ===
 
   async getMembers(workspaceId: string): Promise<WorkspaceMember[]> {

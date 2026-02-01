@@ -10,7 +10,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { Plus, Filter, Settings, Loader2, X } from 'lucide-react';
+import { Plus, Filter, Settings, Loader2, X, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard } from './KanbanCard';
@@ -225,6 +225,14 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           </div>
         </div>
       </div>
+
+      {/* Индикатор режима просмотра */}
+      {!canEditEntities && currentRole && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100 text-gray-600 rounded-lg border border-gray-200">
+          <Eye className="w-4 h-4" />
+          <span className="text-sm">Режим просмотра — вы можете просматривать заявки, но не можете их редактировать</span>
+        </div>
+      )}
 
       <DndContext
         sensors={sensors}

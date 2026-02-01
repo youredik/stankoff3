@@ -62,10 +62,10 @@ Stankoff Portal - это корпоративная система управл�
 - `UserModal.tsx` - Модальное окно создания/редактирования пользователя
 
 **Kanban**
-- `KanbanBoard.tsx` - Основной контейнер с DndContext и фильтрами
+- `KanbanBoard.tsx` - Основной контейнер с DndContext, фильтрами и индикатором режима просмотра
 - `KanbanColumn.tsx` - Droppable колонка статуса (динамические из workspace)
-- `KanbanCard.tsx` - Draggable карточка сущности
-- `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями и вложениями
+- `KanbanCard.tsx` - Draggable карточка сущности (отключается для viewer)
+- `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями, вложениями и tooltips на заблокированных элементах
 - `CreateEntityModal.tsx` - Создание новой сущности
 - `FilterPanel.tsx` - Панель фильтрации по всем полям
 
@@ -82,7 +82,7 @@ Stankoff Portal - это корпоративная система управл�
 
 **Layout**
 - `Header.tsx` - Шапка с поиском и уведомлениями
-- `Sidebar.tsx` - Боковое меню с рабочими местами
+- `Sidebar.tsx` - Боковое меню с рабочими местами и бейджами ролей (viewer/editor)
 - `NotificationPanel.tsx` - Выпадающая панель уведомлений с иконками типов
 
 **UI**
@@ -120,12 +120,21 @@ interface EntityStore {
 interface WorkspaceStore {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
+  currentRole: WorkspaceRole | null;         // Роль пользователя в текущем workspace
+  workspaceRoles: Record<string, WorkspaceRole>; // Роли во всех workspaces
   loading: boolean;
 
   fetchWorkspaces(): Promise<void>;
   fetchWorkspace(id: string): Promise<void>;
+  fetchMyRole(workspaceId: string): Promise<void>;
+  fetchMyRoles(): Promise<void>;              // Получить роли во всех workspaces
   createWorkspace(data: Partial<Workspace>): Promise<Workspace>;
   updateWorkspace(id: string, data: Partial<Workspace>): Promise<void>;
+
+  // Permission helpers
+  canEdit(): boolean;                         // viewer не может редактировать
+  canDelete(): boolean;                       // только admin может удалять
+  getRoleForWorkspace(workspaceId: string): WorkspaceRole | null;
 
   // Workspace Builder mutations
   addSection(name: string): void;
@@ -383,8 +392,15 @@ interface Attachment {
 | PUT | /api/users/:id | Обновить пользователя (admin) |
 | DELETE | /api/users/:id | Удалить пользователя (admin) |
 | GET | /api/workspaces | Список рабочих мест |
-| POST | /api/workspaces | Создать рабочее место |
-| PUT | /api/workspaces/:id | Обновить структуру |
+| GET | /api/workspaces/my-roles | Роли пользователя во всех workspaces |
+| GET | /api/workspaces/:id | Детали рабочего места |
+| GET | /api/workspaces/:id/my-role | Роль пользователя в workspace |
+| GET | /api/workspaces/:id/members | Участники workspace |
+| POST | /api/workspaces | Создать рабочее место (admin) |
+| POST | /api/workspaces/:id/members | Добавить участника (workspace admin) |
+| PUT | /api/workspaces/:id | Обновить структуру (admin) |
+| PUT | /api/workspaces/:id/members/:userId | Изменить роль участника |
+| DELETE | /api/workspaces/:id/members/:userId | Удалить участника |
 | POST | /api/files/upload | Загрузить файл в S3 |
 | GET | /api/files/signed-url/:key | Получить signed URL для ключа |
 | GET | /api/files/download/*path | Скачать файл через прокси (attachment) |

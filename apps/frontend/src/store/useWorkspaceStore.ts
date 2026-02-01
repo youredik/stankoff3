@@ -8,17 +8,20 @@ interface WorkspaceStore {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
   currentRole: WorkspaceRole | null; // Роль текущего пользователя в текущем workspace
+  workspaceRoles: Record<string, WorkspaceRole>; // Роли во всех workspaces
   loading: boolean;
   error: string | null;
 
   fetchWorkspaces: () => Promise<void>;
   fetchWorkspace: (id: string) => Promise<void>;
   fetchMyRole: (workspaceId: string) => Promise<void>;
+  fetchMyRoles: () => Promise<void>;
   setCurrentWorkspace: (workspace: Workspace | null) => void;
 
   // Helpers для проверки прав
   canEdit: () => boolean;
   canDelete: () => boolean;
+  getRoleForWorkspace: (workspaceId: string) => WorkspaceRole | null;
 
   // Workspace mutations
   createWorkspace: (data: Partial<Workspace>) => Promise<Workspace>;
@@ -53,6 +56,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspaces: [],
   currentWorkspace: null,
   currentRole: null,
+  workspaceRoles: {},
   loading: false,
   error: null,
 
@@ -61,6 +65,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     try {
       const workspaces = await workspacesApi.getAll();
       set({ workspaces, loading: false });
+      // Автоматически загружаем роли для всех workspaces
+      get().fetchMyRoles();
     } catch (err) {
       set({ loading: false, error: (err as Error).message });
     }
@@ -87,6 +93,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
   },
 
+  fetchMyRoles: async () => {
+    try {
+      const roles = await workspacesApi.getMyRoles();
+      set({ workspaceRoles: roles });
+    } catch {
+      set({ workspaceRoles: {} });
+    }
+  },
+
   setCurrentWorkspace: (workspace) => set({ currentWorkspace: workspace }),
 
   // Проверка: может ли пользователь редактировать (editor или admin)
@@ -99,6 +114,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   canDelete: () => {
     const role = get().currentRole;
     return role === 'admin';
+  },
+
+  // Получить роль для конкретного workspace
+  getRoleForWorkspace: (workspaceId: string) => {
+    return get().workspaceRoles[workspaceId] || null;
   },
 
   createWorkspace: async (data) => {
