@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { WorkspaceEntity } from '../entity/entity.entity';
+import { WorkspaceMember } from './workspace-member.entity';
 
 @Entity('workspaces')
 export class Workspace {
@@ -44,6 +45,9 @@ export class Workspace {
 
   @OneToMany(() => WorkspaceEntity, (entity) => entity.workspace)
   entities: WorkspaceEntity[];
+
+  @OneToMany(() => WorkspaceMember, (member) => member.workspace)
+  members: WorkspaceMember[];
 
   @CreateDateColumn()
   createdAt: Date;

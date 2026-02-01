@@ -13,6 +13,7 @@ import { SeedService } from './seed.service';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
 import { Workspace } from './modules/workspace/workspace.entity';
+import { WorkspaceMember } from './modules/workspace/workspace-member.entity';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -24,7 +25,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     }),
 
     TypeOrmModule.forRoot(typeOrmConfig),
-    TypeOrmModule.forFeature([User, WorkspaceEntity, Workspace]),
+    TypeOrmModule.forFeature([User, WorkspaceEntity, Workspace, WorkspaceMember]),
 
     WorkspaceModule,
     EntityModule,

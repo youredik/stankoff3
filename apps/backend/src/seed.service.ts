@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { User, UserRole } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
 import { Workspace } from './modules/workspace/workspace.entity';
+import { WorkspaceMember, WorkspaceRole } from './modules/workspace/workspace-member.entity';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -15,6 +16,8 @@ export class SeedService implements OnModuleInit {
     private entityRepository: Repository<WorkspaceEntity>,
     @InjectRepository(Workspace)
     private workspaceRepository: Repository<Workspace>,
+    @InjectRepository(WorkspaceMember)
+    private memberRepository: Repository<WorkspaceMember>,
   ) {}
 
   async onModuleInit() {
@@ -321,9 +324,23 @@ export class SeedService implements OnModuleInit {
       },
     ]);
 
+    // Добавляем участников в workspaces
+    // Admin (users[3]) - глобальный admin, видит всё без членства
+    // Но для наглядности добавим его как admin обоих workspaces
+    await this.memberRepository.save([
+      // Техническая поддержка
+      { workspaceId: techSupport.id, userId: users[0].id, role: WorkspaceRole.EDITOR }, // Иванов
+      { workspaceId: techSupport.id, userId: users[1].id, role: WorkspaceRole.EDITOR }, // Петрова
+      { workspaceId: techSupport.id, userId: users[2].id, role: WorkspaceRole.ADMIN },  // Сидоров (менеджер)
+      // Рекламации
+      { workspaceId: complaints.id, userId: users[1].id, role: WorkspaceRole.VIEWER },  // Петрова - только просмотр
+      { workspaceId: complaints.id, userId: users[2].id, role: WorkspaceRole.ADMIN },   // Сидоров (менеджер)
+    ]);
+
     console.log('✅ Seed data created:');
     console.log('   - 4 users');
     console.log('   - 2 workspaces (Техническая поддержка, Рекламации)');
+    console.log('   - 5 workspace memberships');
     console.log('   - 4 tech support tickets');
     console.log('   - 2 complaints');
   }

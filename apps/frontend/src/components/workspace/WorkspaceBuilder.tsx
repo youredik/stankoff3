@@ -16,13 +16,17 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus, Save, ArrowLeft, Loader2, Pencil } from 'lucide-react';
+import { Plus, Save, ArrowLeft, Loader2, Pencil, Users, Settings2 } from 'lucide-react';
 import { SectionCard } from './SectionCard';
 import { FieldCard } from './FieldCard';
 import { FieldPalette, FIELD_TYPES } from './FieldPalette';
 import { FieldEditor } from './FieldEditor';
+import { WorkspaceMembers } from './WorkspaceMembers';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import type { Field, FieldType, Workspace } from '@/types';
+
+type TabType = 'structure' | 'members';
 
 // Популярные эмодзи для рабочих мест
 const WORKSPACE_ICONS = ['📋', '📁', '🔧', '💼', '📊', '🎯', '📝', '⚙️', '🛠️', '📦', '🚀', '💡', '🔬', '📐', '🎨', '📈'];
@@ -59,6 +63,10 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('structure');
+
+  const { user } = useAuthStore();
+  const isGlobalAdmin = user?.role === 'admin';
 
   // Редактирование названия и иконки
   const [isEditingName, setIsEditingName] = useState(false);
@@ -336,46 +344,82 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
               </div>
             </div>
 
-            <button
-              onClick={handleSave}
-              disabled={saving || !hasChanges}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              <span>Сохранить</span>
-            </button>
-          </div>
-
-          {/* Sections */}
-          <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-            <div className="max-w-3xl mx-auto space-y-4">
-              {currentWorkspace.sections.map((section) => (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  onEditField={(field) =>
-                    setEditingField({ field, sectionId: section.id })
-                  }
-                />
-              ))}
-
+            {activeTab === 'structure' && (
               <button
-                onClick={handleAddSection}
-                className="flex items-center justify-center gap-2 w-full p-4 text-gray-500 hover:text-gray-700 border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-xl transition-colors"
+                onClick={handleSave}
+                disabled={saving || !hasChanges}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Plus className="w-5 h-5" />
-                <span className="font-medium">Добавить секцию</span>
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>Сохранить</span>
               </button>
-            </div>
+            )}
           </div>
+
+          {/* Tabs */}
+          <div className="flex border-b bg-white px-6">
+            <button
+              onClick={() => setActiveTab('structure')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'structure'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Settings2 className="w-4 h-4" />
+              <span>Структура</span>
+            </button>
+            {isGlobalAdmin && (
+              <button
+                onClick={() => setActiveTab('members')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'members'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Участники</span>
+              </button>
+            )}
+          </div>
+
+          {/* Content */}
+          {activeTab === 'structure' ? (
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+              <div className="max-w-3xl mx-auto space-y-4">
+                {currentWorkspace.sections.map((section) => (
+                  <SectionCard
+                    key={section.id}
+                    section={section}
+                    onEditField={(field) =>
+                      setEditingField({ field, sectionId: section.id })
+                    }
+                  />
+                ))}
+
+                <button
+                  onClick={handleAddSection}
+                  className="flex items-center justify-center gap-2 w-full p-4 text-gray-500 hover:text-gray-700 border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-xl transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="font-medium">Добавить секцию</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+              <WorkspaceMembers workspaceId={workspaceId} />
+            </div>
+          )}
         </div>
 
-        {/* Field Palette */}
-        <FieldPalette />
+        {/* Field Palette - only show on structure tab */}
+        {activeTab === 'structure' && <FieldPalette />}
 
         {/* Drag Overlay */}
         <DragOverlay>

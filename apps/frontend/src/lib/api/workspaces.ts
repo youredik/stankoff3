@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { Workspace } from '@/types';
+import type { Workspace, WorkspaceMember, WorkspaceRole } from '@/types';
 
 export const workspacesApi = {
   getAll: () => apiClient.get<Workspace[]>('/workspaces').then((r) => r.data),
@@ -14,4 +14,21 @@ export const workspacesApi = {
     apiClient.put<Workspace>(`/workspaces/${id}`, data).then((r) => r.data),
 
   delete: (id: string) => apiClient.delete(`/workspaces/${id}`),
+
+  // Управление участниками
+  getMembers: (workspaceId: string) =>
+    apiClient.get<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`).then((r) => r.data),
+
+  addMember: (workspaceId: string, userId: string, role?: WorkspaceRole) =>
+    apiClient
+      .post<WorkspaceMember>(`/workspaces/${workspaceId}/members`, { userId, role })
+      .then((r) => r.data),
+
+  updateMemberRole: (workspaceId: string, userId: string, role: WorkspaceRole) =>
+    apiClient
+      .put<WorkspaceMember>(`/workspaces/${workspaceId}/members/${userId}`, { role })
+      .then((r) => r.data),
+
+  removeMember: (workspaceId: string, userId: string) =>
+    apiClient.delete(`/workspaces/${workspaceId}/members/${userId}`),
 };

@@ -42,8 +42,20 @@ export interface Workspace {
   prefix: string; // Префикс для номеров заявок: TP, REK и т.д.
   lastEntityNumber: number; // Последний использованный номер
   sections: Section[];
+  members?: WorkspaceMember[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export type WorkspaceRole = 'viewer' | 'editor' | 'admin';
+
+export interface WorkspaceMember {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  user?: User;
+  role: WorkspaceRole;
+  createdAt: Date;
 }
 
 export interface Entity {
