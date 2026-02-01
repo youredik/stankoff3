@@ -4,6 +4,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { Link2, Calendar } from 'lucide-react';
 import type { Entity } from '@/types';
 import { useEntityStore } from '@/store/useEntityStore';
 
@@ -28,12 +29,32 @@ export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const getPriorityColor = (priority?: string) => {
+  const getPriorityConfig = (priority?: string) => {
     switch(priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'high': return {
+        bg: 'bg-gradient-to-r from-danger-50 to-danger-100',
+        text: 'text-danger-700',
+        border: 'border-danger-200',
+        dot: 'bg-danger-500'
+      };
+      case 'medium': return {
+        bg: 'bg-gradient-to-r from-warning-50 to-warning-100',
+        text: 'text-warning-700',
+        border: 'border-warning-200',
+        dot: 'bg-warning-500'
+      };
+      case 'low': return {
+        bg: 'bg-gradient-to-r from-success-50 to-success-100',
+        text: 'text-success-700',
+        border: 'border-success-200',
+        dot: 'bg-success-500'
+      };
+      default: return {
+        bg: 'bg-gray-50',
+        text: 'text-gray-600',
+        border: 'border-gray-200',
+        dot: 'bg-gray-400'
+      };
     }
   };
 
@@ -46,6 +67,8 @@ export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
     }
   };
 
+  const priorityConfig = getPriorityConfig(entity.priority);
+
   return (
     <div
       ref={setNodeRef}
@@ -55,44 +78,52 @@ export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
       onClick={() => !isDragging && selectEntity(entity.id)}
       data-testid="kanban-card"
       data-entity-id={entity.id}
-      className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md cursor-pointer transition-shadow"
+      className="bg-white p-4 rounded-xl border border-gray-100 shadow-soft hover:shadow-soft-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99]"
     >
-      <div className="flex items-start justify-between mb-2">
-        <span className="text-xs font-mono text-gray-500">{entity.customId}</span>
-        <span className={`px-2 py-1 text-xs font-medium rounded border ${getPriorityColor(entity.priority)}`}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md">
+          {entity.customId}
+        </span>
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full ${priorityConfig.bg} ${priorityConfig.text}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${priorityConfig.dot}`} />
           {getPriorityLabel(entity.priority)}
         </span>
       </div>
-      
-      <h4 className="font-medium text-gray-900 mb-3">{entity.title}</h4>
-      
-      <div className="flex items-center justify-between text-sm text-gray-500">
+
+      {/* Title */}
+      <h4 className="font-medium text-gray-900 mb-3 line-clamp-2">{entity.title}</h4>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {entity.assignee && (
-            <>
-              <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-medium">
+          {entity.assignee ? (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center shadow-sm">
+                <span className="text-white text-[10px] font-semibold">
                   {entity.assignee.firstName[0]}{entity.assignee.lastName[0]}
                 </span>
               </div>
-              <span className="text-xs">
+              <span className="text-xs text-gray-600">
                 {entity.assignee.firstName} {entity.assignee.lastName[0]}.
               </span>
-            </>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">Не назначен</span>
           )}
         </div>
-        <span className="text-xs">
-          {format(entity.createdAt, 'dd.MM.yyyy', { locale: ru })}
-        </span>
+        <div className="flex items-center gap-1 text-xs text-gray-400">
+          <Calendar className="w-3 h-3" />
+          <span>{format(entity.createdAt, 'dd.MM', { locale: ru })}</span>
+        </div>
       </div>
 
+      {/* Links */}
       {entity.linkedEntityIds && entity.linkedEntityIds.length > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-100">
-          <div className="flex items-center gap-2 text-xs text-primary-600">
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-            <span>Связано: {entity.linkedEntityIds[0]}</span>
+          <div className="flex items-center gap-1.5 text-xs text-primary-600">
+            <Link2 className="w-3 h-3" />
+            <span>{entity.linkedEntityIds.length} связанных</span>
           </div>
         </div>
       )}

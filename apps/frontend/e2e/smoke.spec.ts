@@ -52,9 +52,9 @@ test.describe('Workspace', () => {
 
     if (isVisible) {
       await workspaceButtons.click();
-      // Проверяем, что workspace выделен (имеет класс bg-primary-50)
+      // Проверяем, что workspace выделен (имеет градиентный класс primary)
       const parent = page.locator('aside .group').first();
-      await expect(parent).toHaveClass(/bg-primary-50/);
+      await expect(parent).toHaveClass(/primary-50/);
     } else {
       test.skip();
     }
