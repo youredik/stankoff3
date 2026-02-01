@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useAuthStore } from '@/store/useAuthStore';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -38,15 +39,21 @@ function getStatusLabel(statusId: string): string {
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
 
 export function useWebSocket() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+
   useEffect(() => {
-    const socket = io(WS_URL, { transports: ['websocket', 'polling'] });
+    const socket = io(WS_URL, {
+      transports: ['websocket', 'polling'],
+      auth: { token: accessToken },
+    });
 
     socket.on('entity:created', (entity) => {
       const state = useEntityStore.getState();
       const exists = state.entities.find((e) => e.id === entity.id);
       if (!exists) {
+        // Новые сущности добавляем в начало (сортировка по createdAt DESC)
         useEntityStore.setState({
-          entities: [...state.entities, entity],
+          entities: [entity, ...state.entities],
         });
       }
       useNotificationStore.getState().addNotification({
@@ -154,5 +161,5 @@ export function useWebSocket() {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [accessToken]);
 }

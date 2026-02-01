@@ -32,19 +32,19 @@ export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
   const getPriorityConfig = (priority?: string) => {
     switch(priority) {
       case 'high': return {
-        bg: 'bg-gradient-to-r from-danger-50 to-danger-100',
+        bg: 'bg-danger-50',
         text: 'text-danger-700',
         border: 'border-danger-200',
         dot: 'bg-danger-500'
       };
       case 'medium': return {
-        bg: 'bg-gradient-to-r from-warning-50 to-warning-100',
+        bg: 'bg-warning-50',
         text: 'text-warning-700',
         border: 'border-warning-200',
         dot: 'bg-warning-500'
       };
       case 'low': return {
-        bg: 'bg-gradient-to-r from-success-50 to-success-100',
+        bg: 'bg-success-50',
         text: 'text-success-700',
         border: 'border-success-200',
         dot: 'bg-success-500'
@@ -78,7 +78,7 @@ export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
       onClick={() => !isDragging && selectEntity(entity.id)}
       data-testid="kanban-card"
       data-entity-id={entity.id}
-      className="bg-white p-4 rounded-xl border border-gray-100 shadow-soft hover:shadow-soft-lg cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99]"
+      className="bg-white p-4 rounded-lg border border-gray-200 shadow-soft hover:shadow-soft-lg cursor-pointer transition-shadow"
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
@@ -99,8 +99,8 @@ export function KanbanCard({ entity, isDragging = false }: KanbanCardProps) {
         <div className="flex items-center gap-2">
           {entity.assignee ? (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center shadow-sm">
-                <span className="text-white text-[10px] font-semibold">
+              <div className="w-6 h-6 bg-primary-600 rounded flex items-center justify-center">
+                <span className="text-white text-[10px] font-medium">
                   {entity.assignee.firstName[0]}{entity.assignee.lastName[0]}
                 </span>
               </div>

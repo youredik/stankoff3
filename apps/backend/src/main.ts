@@ -1,5 +1,6 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -9,6 +10,9 @@ async function bootstrap() {
       credentials: true,
     },
   });
+
+  // Cookie parser для работы с HttpOnly cookies
+  app.use(cookieParser());
 
   // Глобальная валидация
   app.useGlobalPipes(

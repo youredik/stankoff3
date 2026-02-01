@@ -3,6 +3,7 @@
 import { useDraggable } from '@dnd-kit/core';
 import {
   Type,
+  AlignLeft,
   Hash,
   Calendar,
   List,
@@ -26,6 +27,12 @@ const FIELD_TYPES: FieldTypeConfig[] = [
     label: 'Текст',
     icon: <Type className="w-4 h-4" />,
     description: 'Однострочный текст',
+  },
+  {
+    type: 'textarea',
+    label: 'Многострочный',
+    icon: <AlignLeft className="w-4 h-4" />,
+    description: 'Многострочный текст',
   },
   {
     type: 'number',

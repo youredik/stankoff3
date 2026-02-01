@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsArray } from 'class-validator';
 
 export class UpdateEntityDto {
   @IsString()
@@ -20,4 +20,9 @@ export class UpdateEntityDto {
   @IsObject()
   @IsOptional()
   data?: Record<string, any>;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  linkedEntityIds?: string[];
 }

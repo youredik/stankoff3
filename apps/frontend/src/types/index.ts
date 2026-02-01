@@ -2,6 +2,7 @@
 
 export type FieldType =
   | 'text'
+  | 'textarea'  // Многострочный текст
   | 'number'
   | 'date'
   | 'select'
@@ -38,6 +39,8 @@ export interface Workspace {
   id: string;
   name: string;
   icon: string;
+  prefix: string; // Префикс для номеров заявок: TP, REK и т.д.
+  lastEntityNumber: number; // Последний использованный номер
   sections: Section[];
   createdAt: Date;
   updatedAt: Date;
@@ -74,6 +77,7 @@ export interface User {
   avatar?: string;
   department?: string;
   role: UserRole;
+  isActive: boolean;
 }
 
 export type UserRole = 'admin' | 'manager' | 'employee';
@@ -95,6 +99,21 @@ export interface Attachment {
   size: number;
   url: string;
   mimeType: string;
+  thumbnailUrl?: string;
+  key?: string; // S3 ключ для скачивания через /api/files/download
+}
+
+// Attachment после загрузки (содержит S3 ключи и временные URL для превью)
+export interface UploadedAttachment {
+  id: string;
+  name: string;
+  size: number;
+  key: string;
+  mimeType: string;
+  thumbnailKey?: string;
+  // Временные signed URLs для превью в редакторе
+  url: string;
+  thumbnailUrl?: string;
 }
 
 export interface Notification {

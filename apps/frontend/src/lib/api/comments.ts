@@ -1,5 +1,19 @@
 import { apiClient } from './client';
-import type { Comment, Attachment } from '@/types';
+import type { Comment, UploadedAttachment } from '@/types';
+
+// Backend expects attachments with key/thumbnailKey
+interface CreateCommentData {
+  authorId: string;
+  content: string;
+  attachments?: {
+    id: string;
+    name: string;
+    size: number;
+    key: string;
+    mimeType: string;
+    thumbnailKey?: string;
+  }[];
+}
 
 export const commentsApi = {
   getByEntity: (entityId: string) =>
@@ -9,11 +23,25 @@ export const commentsApi = {
 
   create: (
     entityId: string,
-    data: { authorId: string; content: string; attachments?: Attachment[] }
-  ) =>
-    apiClient
-      .post<Comment>(`/comments/entity/${entityId}`, data)
-      .then((r) => r.data),
+    data: { authorId: string; content: string; attachments?: UploadedAttachment[] }
+  ) => {
+    // Map UploadedAttachment to backend DTO format (remove url/thumbnailUrl)
+    const payload: CreateCommentData = {
+      authorId: data.authorId,
+      content: data.content,
+      attachments: data.attachments?.map((att) => ({
+        id: att.id,
+        name: att.name,
+        size: att.size,
+        key: att.key,
+        mimeType: att.mimeType,
+        thumbnailKey: att.thumbnailKey,
+      })),
+    };
+    return apiClient
+      .post<Comment>(`/comments/entity/${entityId}`, payload)
+      .then((r) => r.data);
+  },
 
   update: (id: string, content: string) =>
     apiClient

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AttachmentDto {
@@ -8,13 +8,18 @@ export class AttachmentDto {
   @IsString()
   name: string;
 
+  @IsNumber()
   size: number;
 
   @IsString()
-  url: string;
+  key: string;
 
   @IsString()
   mimeType: string;
+
+  @IsString()
+  @IsOptional()
+  thumbnailKey?: string;
 }
 
 export class CreateCommentDto {

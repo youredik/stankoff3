@@ -12,6 +12,8 @@ import {
 import { EntityService } from './entity.service';
 import { CreateEntityDto } from './dto/create-entity.dto';
 import { UpdateEntityDto } from './dto/update-entity.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../user/user.entity';
 
 @Controller('entities')
 export class EntityController {
@@ -33,6 +35,7 @@ export class EntityController {
   }
 
   @Put(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   update(@Param('id') id: string, @Body() dto: UpdateEntityDto) {
     return this.entityService.update(id, dto);
   }
@@ -46,6 +49,7 @@ export class EntityController {
   }
 
   @Patch(':id/assignee')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   updateAssignee(
     @Param('id') id: string,
     @Body() body: { assigneeId: string | null },
@@ -53,7 +57,14 @@ export class EntityController {
     return this.entityService.updateAssignee(id, body.assigneeId);
   }
 
+  @Delete('cleanup/test-data')
+  @Roles(UserRole.ADMIN)
+  removeTestData() {
+    return this.entityService.removeTestData();
+  }
+
   @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   remove(@Param('id') id: string) {
     return this.entityService.remove(id);
   }

@@ -14,15 +14,14 @@ import {
   Paperclip,
   X,
   FileText,
-  Image,
   Loader2,
 } from 'lucide-react';
 import { filesApi } from '@/lib/api/files';
-import type { User, Attachment } from '@/types';
+import type { User, UploadedAttachment } from '@/types';
 
 interface CommentEditorProps {
   users: User[];
-  onSubmit: (content: string, attachments?: Attachment[]) => void;
+  onSubmit: (content: string, attachments?: UploadedAttachment[]) => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -43,7 +42,7 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
   } | null>(null);
   const selectedIndexRef = useRef(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -245,22 +244,30 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="flex items-center gap-2 bg-gray-100 rounded px-2 py-1 group"
+              className="relative group"
             >
               {isImageMimeType(attachment.mimeType) ? (
-                <Image className="w-4 h-4 text-gray-500" />
+                <div className="w-16 h-16 rounded overflow-hidden bg-gray-200">
+                  <img
+                    src={attachment.thumbnailUrl || attachment.url}
+                    alt={attachment.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
               ) : (
-                <FileText className="w-4 h-4 text-gray-500" />
+                <div className="flex items-center gap-2 bg-gray-100 rounded px-2 py-1">
+                  <FileText className="w-4 h-4 text-gray-500" />
+                  <span className="text-xs text-gray-700 max-w-[100px] truncate">
+                    {attachment.name}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {formatFileSize(attachment.size)}
+                  </span>
+                </div>
               )}
-              <span className="text-xs text-gray-700 max-w-[100px] truncate">
-                {attachment.name}
-              </span>
-              <span className="text-xs text-gray-400">
-                {formatFileSize(attachment.size)}
-              </span>
               <button
                 onClick={() => handleRemoveAttachment(attachment.id)}
-                className="p-0.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
               </button>

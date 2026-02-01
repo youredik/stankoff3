@@ -19,6 +19,12 @@ export class Workspace {
   @Column()
   icon: string;
 
+  @Column({ default: 'ID' })
+  prefix: string; // Префикс для номеров заявок: TP, REK и т.д.
+
+  @Column({ default: 0 })
+  lastEntityNumber: number; // Последний использованный номер
+
   @Column('jsonb', { default: [] })
   sections: {
     id: string;
@@ -26,7 +32,7 @@ export class Workspace {
     fields: {
       id: string;
       name: string;
-      type: 'text' | 'number' | 'date' | 'select' | 'status' | 'user' | 'file' | 'relation';
+      type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'status' | 'user' | 'file' | 'relation';
       required?: boolean;
       options?: { id: string; label: string; color?: string }[];
       defaultValue?: any;

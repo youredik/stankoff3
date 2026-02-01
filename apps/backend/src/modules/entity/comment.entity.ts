@@ -42,8 +42,9 @@ export class Comment {
     id: string;
     name: string;
     size: number;
-    url: string;
+    key: string;
     mimeType: string;
+    thumbnailKey?: string;
   }[];
 
   @CreateDateColumn()

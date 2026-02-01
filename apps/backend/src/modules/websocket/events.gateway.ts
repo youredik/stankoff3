@@ -6,6 +6,17 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
+
+interface AuthenticatedSocket extends Socket {
+  data: {
+    user?: {
+      sub: string;
+      email: string;
+      role: string;
+    };
+  };
+}
 
 @WebSocketGateway({
   cors: {
@@ -17,12 +28,32 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+  constructor(private jwtService: JwtService) {}
+
+  handleConnection(client: AuthenticatedSocket) {
+    try {
+      // Получаем токен из auth или headers
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization?.split(' ')[1];
+
+      if (token) {
+        const payload = this.jwtService.verify(token);
+        client.data.user = payload;
+        console.log(`Client connected: ${client.id}, user: ${payload.email}`);
+      } else {
+        // Разрешаем анонимные подключения (для обратной совместимости)
+        console.log(`Client connected (anonymous): ${client.id}`);
+      }
+    } catch {
+      // Токен невалидный, но разрешаем подключение (для обратной совместимости)
+      console.log(`Client connected (invalid token): ${client.id}`);
+    }
   }
 
-  handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+  handleDisconnect(client: AuthenticatedSocket) {
+    const userEmail = client.data?.user?.email || 'anonymous';
+    console.log(`Client disconnected: ${client.id}, user: ${userEmail}`);
   }
 
   // Методы для отправки событий

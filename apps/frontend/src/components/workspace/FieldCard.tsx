@@ -7,6 +7,7 @@ import {
   Trash2,
   Settings,
   Type,
+  AlignLeft,
   Hash,
   Calendar,
   List,
@@ -26,6 +27,7 @@ interface FieldCardProps {
 
 const FIELD_ICONS: Record<FieldType, React.ReactNode> = {
   text: <Type className="w-4 h-4" />,
+  textarea: <AlignLeft className="w-4 h-4" />,
   number: <Hash className="w-4 h-4" />,
   date: <Calendar className="w-4 h-4" />,
   select: <List className="w-4 h-4" />,
@@ -37,6 +39,7 @@ const FIELD_ICONS: Record<FieldType, React.ReactNode> = {
 
 const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   text: 'Текст',
+  textarea: 'Многострочный',
   number: 'Число',
   date: 'Дата',
   select: 'Выбор',

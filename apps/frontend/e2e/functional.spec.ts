@@ -156,6 +156,12 @@ test.describe('Работа с карточкой заявки', () => {
     await card.click();
     await expect(page.getByText('Комментарии').first()).toBeVisible({ timeout: 3000 });
 
+    // Кликаем на заголовок внутри модалки чтобы убрать фокус с редактора
+    // Находим h2 в модалке (не в sidebar)
+    const modalTitle = page.locator('.bg-white.rounded-xl h2');
+    await modalTitle.click();
+    await page.waitForTimeout(100);
+
     // Нажимаем Escape
     await page.keyboard.press('Escape');
     await page.waitForTimeout(500);
@@ -172,10 +178,9 @@ test.describe('Работа с карточкой заявки', () => {
     await card.click();
     await expect(page.getByText('Комментарии').first()).toBeVisible({ timeout: 3000 });
 
-    // Кликаем на overlay (затемнённый фон) - overlay имеет z-40, модалка z-50
-    // Нужно кликнуть именно на overlay, а не на модальный контейнер
-    // Используем click на body в углу экрана, где нет модалки
-    await page.mouse.click(5, 5);
+    // Кликаем на overlay (затемнённый фон)
+    const overlay = page.locator('[data-testid="detail-panel-overlay"]');
+    await overlay.click({ position: { x: 10, y: 10 }, force: true });
     await page.waitForTimeout(500);
 
     // Панель должна закрыться
@@ -312,7 +317,7 @@ test.describe('Уведомления', () => {
   test('Кнопка "Прочитать все" работает', async ({ page }) => {
     await page.goto('/');
 
-    const bellButton = page.locator('header button').first();
+    const bellButton = page.locator('[data-testid="notification-bell"]');
     await bellButton.click();
 
     await expect(page.getByText('Уведомления')).toBeVisible({ timeout: 3000 });

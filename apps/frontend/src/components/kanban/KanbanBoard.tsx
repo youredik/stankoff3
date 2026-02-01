@@ -24,6 +24,7 @@ import {
 } from './FilterPanel';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import type { Entity, FieldOption } from '@/types';
 
 interface KanbanBoardProps {
@@ -48,6 +49,10 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const { entities, loading, fetchEntities, fetchUsers, updateStatus } =
     useEntityStore();
   const { currentWorkspace, fetchWorkspace } = useWorkspaceStore();
+  const { user } = useAuthStore();
+
+  // Проверка прав администратора
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     fetchEntities(workspaceId);
@@ -122,8 +127,18 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     }
   };
 
-  const getColumnCards = (statusId: string) =>
-    filteredEntities.filter((e) => e.status === statusId);
+  const getColumnCards = (statusId: string) => {
+    const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    return filteredEntities
+      .filter((e) => e.status === statusId)
+      .sort((a, b) => {
+        // Сначала по приоритету (high > medium > low)
+        const priorityDiff = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
+        if (priorityDiff !== 0) return priorityDiff;
+        // Затем по дате создания (новые сверху)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  };
 
   const clearFilters = () => {
     setFilters(createEmptyFilters());
@@ -159,10 +174,10 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           <div className="flex gap-3">
             <button
               onClick={() => setShowFilters(true)}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors cursor-pointer ${
                 activeFilterCount > 0
                   ? 'border-primary-300 bg-primary-50 text-primary-700'
-                  : 'border-gray-300 hover:bg-gray-50'
+                  : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
               <Filter className="w-5 h-5" />
@@ -176,22 +191,25 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
             {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="flex items-center gap-1 px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
                 <span>Сбросить</span>
               </button>
             )}
-            <button
-              onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Settings className="w-5 h-5" />
-              <span>Настройки</span>
-            </button>
+            {/* Настройки - только для админов */}
+            {isAdmin && (
+              <button
+                onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                <Settings className="w-5 h-5" />
+                <span>Настройки</span>
+              </button>
+            )}
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
             >
               <Plus className="w-5 h-5" />
               <span>Новая заявка</span>

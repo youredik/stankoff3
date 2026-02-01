@@ -118,14 +118,14 @@ export function FilterPanel({
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}
-                className="text-xs text-primary-600 hover:text-primary-700"
+                className="text-xs text-primary-600 hover:text-primary-700 cursor-pointer"
               >
                 Сбросить
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-gray-100 rounded cursor-pointer"
             >
               <X className="w-5 h-5 text-gray-500" />
             </button>
@@ -138,7 +138,7 @@ export function FilterPanel({
           <div>
             <button
               onClick={() => toggleSection('search')}
-              className="flex items-center justify-between w-full text-left"
+              className="flex items-center justify-between w-full text-left cursor-pointer"
             >
               <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                 <Search className="w-4 h-4" />
@@ -167,7 +167,7 @@ export function FilterPanel({
           <div>
             <button
               onClick={() => toggleSection('assignee')}
-              className="flex items-center justify-between w-full text-left"
+              className="flex items-center justify-between w-full text-left cursor-pointer"
             >
               <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                 <User className="w-4 h-4" />
@@ -215,7 +215,7 @@ export function FilterPanel({
           <div>
             <button
               onClick={() => toggleSection('priority')}
-              className="flex items-center justify-between w-full text-left"
+              className="flex items-center justify-between w-full text-left cursor-pointer"
             >
               <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                 <Tag className="w-4 h-4" />
@@ -260,7 +260,7 @@ export function FilterPanel({
           <div>
             <button
               onClick={() => toggleSection('date')}
-              className="flex items-center justify-between w-full text-left"
+              className="flex items-center justify-between w-full text-left cursor-pointer"
             >
               <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                 <Calendar className="w-4 h-4" />
@@ -301,7 +301,7 @@ export function FilterPanel({
             <div key={field.id}>
               <button
                 onClick={() => toggleSection(field.id)}
-                className="flex items-center justify-between w-full text-left"
+                className="flex items-center justify-between w-full text-left cursor-pointer"
               >
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <Tag className="w-4 h-4" />

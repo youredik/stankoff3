@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { Entity, Comment, User, Attachment } from '@/types';
+import type { Entity, Comment, User, UploadedAttachment } from '@/types';
 import { entitiesApi } from '@/lib/api/entities';
 import { commentsApi } from '@/lib/api/comments';
 import { usersApi } from '@/lib/api/users';
+import { useWorkspaceStore } from './useWorkspaceStore';
 
 interface EntityStore {
   entities: Entity[];
@@ -22,7 +23,7 @@ interface EntityStore {
 
   selectEntity: (id: string) => Promise<void>;
   deselectEntity: () => void;
-  addComment: (entityId: string, content: string, attachments?: Attachment[]) => Promise<void>;
+  addComment: (entityId: string, content: string, attachments?: UploadedAttachment[]) => Promise<void>;
   createEntity: (data: {
     workspaceId: string;
     title: string;
@@ -133,7 +134,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
 
   deselectEntity: () => set({ selectedEntity: null, comments: [] }),
 
-  addComment: async (entityId: string, content: string, attachments?: Attachment[]) => {
+  addComment: async (entityId: string, content: string, attachments?: UploadedAttachment[]) => {
     const users = get().users;
     const author = users.find((u) => u.role === 'admin') || users[0];
     if (!author) return;
@@ -143,31 +144,48 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         content,
         attachments,
       });
-      set({ comments: [...get().comments, comment] });
+      // Проверяем, не был ли комментарий уже добавлен через WebSocket
+      const currentComments = get().comments;
+      const exists = currentComments.find((c) => c.id === comment.id);
+      if (!exists) {
+        set({ comments: [...currentComments, comment] });
+      }
     } catch {
       // silent
     }
   },
 
   createEntity: async (data) => {
-    const entities = get().entities;
-    const numbers = entities.map((e) => {
-      const match = e.customId.match(/\d+$/);
-      return match ? parseInt(match[0], 10) : 0;
-    });
-    const maxNum = numbers.length > 0 ? Math.max(...numbers) : 1200;
-    const customId = `TP-${maxNum + 1}`;
     try {
+      // Получаем первый статус из текущего workspace
+      const workspace = useWorkspaceStore.getState().currentWorkspace;
+      let initialStatus = 'new';
+      if (workspace?.sections) {
+        for (const section of workspace.sections) {
+          const statusField = section.fields.find((f) => f.type === 'status');
+          if (statusField?.options && statusField.options.length > 0) {
+            initialStatus = statusField.options[0].id;
+            break;
+          }
+        }
+      }
+
+      // customId генерируется автоматически на сервере
       const entity = await entitiesApi.create({
-        customId,
         workspaceId: data.workspaceId,
         title: data.title,
-        status: 'new',
+        status: initialStatus,
         priority: data.priority,
         assigneeId: data.assigneeId,
         data: {},
-      });
-      set({ entities: [...get().entities, entity] });
+      } as any);
+      // Проверяем, не была ли сущность уже добавлена через WebSocket
+      const currentEntities = get().entities;
+      const exists = currentEntities.find((e) => e.id === entity.id);
+      if (!exists) {
+        // Новые сущности добавляем в начало (сортировка по createdAt DESC)
+        set({ entities: [entity, ...currentEntities] });
+      }
     } catch {
       // silent
     }

@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { User, UserRole } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
 import { Workspace } from './modules/workspace/workspace.entity';
@@ -20,11 +21,14 @@ export class SeedService implements OnModuleInit {
     const userCount = await this.userRepository.count();
     if (userCount > 0) return;
 
+    // Хешируем пароль для всех пользователей
+    const hashedPassword = await bcrypt.hash('password', 10);
+
     // Создаём пользователей
     const users = await this.userRepository.save([
       {
         email: 'ivanov@stankoff.ru',
-        password: 'password',
+        password: hashedPassword,
         firstName: 'Иван',
         lastName: 'Иванов',
         role: UserRole.EMPLOYEE,
@@ -32,7 +36,7 @@ export class SeedService implements OnModuleInit {
       },
       {
         email: 'petrova@stankoff.ru',
-        password: 'password',
+        password: hashedPassword,
         firstName: 'Мария',
         lastName: 'Петрова',
         role: UserRole.EMPLOYEE,
@@ -40,7 +44,7 @@ export class SeedService implements OnModuleInit {
       },
       {
         email: 'sidorov@stankoff.ru',
-        password: 'password',
+        password: hashedPassword,
         firstName: 'Петр',
         lastName: 'Сидоров',
         role: UserRole.MANAGER,
@@ -48,7 +52,7 @@ export class SeedService implements OnModuleInit {
       },
       {
         email: 'admin@stankoff.ru',
-        password: 'password',
+        password: hashedPassword,
         firstName: 'Админ',
         lastName: 'Станкофф',
         role: UserRole.ADMIN,
@@ -60,6 +64,8 @@ export class SeedService implements OnModuleInit {
     const techSupport = await this.workspaceRepository.save({
       name: 'Техническая поддержка',
       icon: '🔧',
+      prefix: 'TP',
+      lastEntityNumber: 1248, // Максимальный номер из seed данных
       sections: [
         {
           id: 'main',
@@ -137,6 +143,8 @@ export class SeedService implements OnModuleInit {
     const complaints = await this.workspaceRepository.save({
       name: 'Рекламации',
       icon: '⚠️',
+      prefix: 'REK',
+      lastEntityNumber: 446, // Максимальный номер из seed данных
       sections: [
         {
           id: 'main',

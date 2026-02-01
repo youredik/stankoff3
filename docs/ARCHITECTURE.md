@@ -46,11 +46,20 @@ Stankoff Portal - это корпоративная система управл�
 ### Frontend (Next.js 16)
 
 #### Страницы (App Router)
-- `/` - Главная страница
-- `/workspace/[id]` - Канбан-доска рабочего места
+- `/` - Редирект на /dashboard
+- `/login` - Страница входа
+- `/dashboard` - Канбан-доска (защищённая)
 - `/workspace/[id]/settings` - Настройки рабочего места (Workspace Builder)
+- `/admin/users` - Управление пользователями (только admin)
 
 #### Компоненты
+
+**Auth**
+- `AuthProvider.tsx` - Защита маршрутов и проверка авторизации
+
+**Admin**
+- `UserList.tsx` - Таблица пользователей с поиском, CRUD операциями
+- `UserModal.tsx` - Модальное окно создания/редактирования пользователя
 
 **Kanban**
 - `KanbanBoard.tsx` - Основной контейнер с DndContext и фильтрами
@@ -77,6 +86,9 @@ Stankoff Portal - это корпоративная система управл�
 
 **UI**
 - `ToastContainer.tsx` - Toast-уведомления с анимациями
+- `MediaLightbox.tsx` - Полноэкранный просмотр изображений с навигацией, зумом и скачиванием
+- `PdfViewer.tsx` - Встроенный просмотр PDF через iframe
+- `AttachmentPreview.tsx` - Универсальный компонент превью вложений с поддержкой изображений, PDF и других файлов
 
 #### Stores (Zustand)
 
@@ -97,7 +109,7 @@ interface EntityStore {
   updateStatus(id: string, status: string): Promise<void>;
   updateAssignee(id: string, assigneeId: string | null): Promise<void>;
   updateLinkedEntities(id: string, linkedEntityIds: string[]): Promise<void>;
-  addComment(entityId: string, content: string, attachments?: Attachment[]): Promise<void>;
+  addComment(entityId: string, content: string, attachments?: UploadedAttachment[]): Promise<void>;
   createEntity(data: CreateEntityData): Promise<void>;
 }
 ```
@@ -149,6 +161,24 @@ interface NotificationStore {
 }
 ```
 
+**useAuthStore**
+```typescript
+interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface AuthActions {
+  login(email: string, password: string): Promise<void>;
+  logout(): Promise<void>;
+  refreshTokens(): Promise<boolean>;
+  checkAuth(): Promise<void>;
+}
+```
+
 #### Hooks
 
 **useWebSocket**
@@ -163,6 +193,29 @@ interface NotificationStore {
 
 #### Модули
 
+**AuthModule**
+JWT аутентификация с Passport.js.
+
+```
+auth/
+├── auth.module.ts
+├── auth.controller.ts       # login, logout, refresh, me
+├── auth.service.ts          # validateUser, login, refreshTokens
+├── strategies/
+│   ├── jwt.strategy.ts      # Проверка access token
+│   └── local.strategy.ts    # Логин по email/password
+├── guards/
+│   ├── jwt-auth.guard.ts    # Глобальный guard
+│   ├── local-auth.guard.ts
+│   └── roles.guard.ts       # RBAC
+├── decorators/
+│   ├── current-user.decorator.ts
+│   ├── roles.decorator.ts
+│   └── public.decorator.ts
+└── dto/
+    └── login.dto.ts
+```
+
 **WorkspaceModule**
 Управление рабочими местами с настраиваемыми полями.
 
@@ -171,7 +224,9 @@ interface Workspace {
   id: string;
   name: string;
   icon: string;
-  sections: Section[];  // Секции с полями
+  prefix: string;           // Префикс для номеров заявок: TP, REK и т.д.
+  lastEntityNumber: number; // Счётчик для автогенерации номеров
+  sections: Section[];      // Секции с полями
   createdAt: Date;
   updatedAt: Date;
 }
@@ -192,7 +247,7 @@ interface FieldOption {
 interface Field {
   id: string;
   name: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'status' | 'user' | 'file' | 'relation';
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'status' | 'user' | 'file' | 'relation';
   required?: boolean;
   options?: FieldOption[];  // Для select и status
   defaultValue?: any;
@@ -202,6 +257,8 @@ interface Field {
 ```
 
 > **Важно:** Поле типа `status` определяет колонки канбан-доски. Каждый вариант статуса (`FieldOption`) становится отдельной колонкой.
+
+> **Автогенерация номеров:** При создании сущности `customId` генерируется автоматически на сервере в формате `{prefix}-{number}` (например, TP-1249, REK-457). Номера гарантированно уникальны благодаря использованию транзакции с пессимистической блокировкой.
 
 **EntityModule**
 Сущности (заявки, рекламации и т.д.) и комментарии.
@@ -268,14 +325,41 @@ emitAssigneeChanged({entityId, entity, assigneeId, previousAssigneeId})  // Пр
 ```
 
 **S3Module**
-Загрузка файлов в Yandex Object Storage.
+Загрузка файлов в приватный Yandex Object Storage с автоматической генерацией превью для изображений и signed URLs для безопасного доступа.
 
 ```typescript
 interface S3Service {
   uploadFile(file: Express.Multer.File, path: string): Promise<string>;
+  uploadFileWithThumbnail(file: Express.Multer.File, path: string): Promise<{key: string; thumbnailKey?: string}>;
   getSignedUrl(key: string, expiresIn?: number): Promise<string>;
+  getSignedUrlsBatch(keys: string[], expiresIn?: number): Promise<Map<string, string>>;
+  getFileStream(key: string): Promise<{stream: NodeJS.ReadableStream; contentType: string; contentLength: number}>;
+}
+
+// Хранится в БД (comment.attachments JSONB)
+interface StoredAttachment {
+  id: string;
+  name: string;
+  size: number;
+  key: string;           // S3 ключ файла
+  mimeType: string;
+  thumbnailKey?: string; // S3 ключ превью для изображений
+}
+
+// Возвращается клиенту (с signed URLs)
+interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+  url: string;           // Signed URL (1 час)
+  mimeType: string;
+  thumbnailUrl?: string; // Signed URL превью
 }
 ```
+
+> **Приватный бакет:** Файлы хранятся в приватном S3-бакете. При загрузке возвращаются временные signed URLs для превью. При запросе комментариев backend генерирует свежие signed URLs (1 час) для каждого вложения. Для скачивания файлов используется прокси-эндпоинт `/api/files/download/*path`, который скрывает S3-инфраструктуру и принудительно возвращает файл как attachment (скачивание, а не открытие в браузере).
+
+> **Генерация превью:** При загрузке изображений автоматически создаётся thumbnail 200x200px в формате JPEG с качеством 80%. Превью сохраняется в `/attachments/thumbnails/`.
 
 #### API Endpoints
 
@@ -288,15 +372,21 @@ interface S3Service {
 | PATCH | /api/entities/:id/status | Изменить статус |
 | PATCH | /api/entities/:id/assignee | Назначить ответственного |
 | DELETE | /api/entities/:id | Удалить |
+| DELETE | /api/entities/cleanup/test-data | Удалить тестовые данные (E2E) |
 | GET | /api/comments/entity/:id | Комментарии сущности |
 | POST | /api/comments/entity/:id | Добавить комментарий |
 | PUT | /api/comments/:id | Редактировать |
 | DELETE | /api/comments/:id | Удалить |
 | GET | /api/users | Список пользователей |
+| POST | /api/users | Создать пользователя (admin) |
+| PUT | /api/users/:id | Обновить пользователя (admin) |
+| DELETE | /api/users/:id | Удалить пользователя (admin) |
 | GET | /api/workspaces | Список рабочих мест |
 | POST | /api/workspaces | Создать рабочее место |
 | PUT | /api/workspaces/:id | Обновить структуру |
 | POST | /api/files/upload | Загрузить файл в S3 |
+| GET | /api/files/signed-url/:key | Получить signed URL для ключа |
+| GET | /api/files/download/*path | Скачать файл через прокси (attachment) |
 
 ## Потоки данных
 
@@ -394,6 +484,8 @@ NotificationPanel показывает в списке
 │ id (uuid, PK)     │
 │ name              │
 │ icon              │
+│ prefix            │  ◄── Префикс номеров (TP, REK)
+│ lastEntityNumber  │  ◄── Счётчик для автогенерации
 │ sections (jsonb)  │◄──────────────────────────┐
 │ createdAt         │                           │
 │ updatedAt         │                           │
@@ -448,17 +540,100 @@ CREATE INDEX idx_comments_entity ON comments(entityId);
 
 ## Безопасность
 
-### Текущая реализация
+### Аутентификация (JWT)
+
+**Backend (AuthModule):**
+- JWT Access Token (15 мин) + Refresh Token (7 дней, HttpOnly cookie)
+- Passport.js с LocalStrategy и JwtStrategy
+- Хеширование паролей через bcrypt
+- Guards: JwtAuthGuard, RolesGuard
+- Декораторы: @Public(), @Roles(), @CurrentUser()
+
+**Frontend:**
+- AuthStore (Zustand) для управления состоянием
+- Axios interceptors для автоматической отправки токена
+- AuthProvider для защиты маршрутов
+- Автоматическое обновление токенов при 401
+
+**API эндпоинты:**
+| Метод | URL | Описание |
+|-------|-----|----------|
+| POST | /api/auth/login | Вход (email, password) |
+| POST | /api/auth/refresh | Обновление токенов |
+| POST | /api/auth/logout | Выход |
+| GET | /api/auth/me | Текущий пользователь |
+
+**WebSocket аутентификация:**
+- Токен передаётся через `socket.handshake.auth.token`
+- Проверка в handleConnection
+
+### Авторизация (RBAC)
+
+**Роли пользователей:**
+| Роль | Описание |
+|------|----------|
+| `admin` | Полный доступ: управление рабочими местами, сущностями, пользователями |
+| `manager` | Управление сущностями: назначение исполнителей, удаление заявок |
+| `employee` | Базовый доступ: просмотр, создание заявок, комментарии |
+
+**Backend - защищённые эндпоинты:**
+
+| Эндпоинт | Разрешённые роли |
+|----------|------------------|
+| `POST /api/workspaces` | admin |
+| `PUT /api/workspaces/:id` | admin |
+| `DELETE /api/workspaces/:id` | admin |
+| `PUT /api/entities/:id` | admin, manager |
+| `PATCH /api/entities/:id/assignee` | admin, manager |
+| `DELETE /api/entities/:id` | admin, manager |
+| `DELETE /api/entities/cleanup/test-data` | admin |
+| `POST /api/users` | admin |
+| `PUT /api/users/:id` | admin |
+| `DELETE /api/users/:id` | admin |
+
+**Глобальные Guards (AppModule):**
+```typescript
+// Порядок важен: сначала JWT, потом Roles
+providers: [
+  { provide: APP_GUARD, useClass: JwtAuthGuard },
+  { provide: APP_GUARD, useClass: RolesGuard },
+]
+```
+
+**Декораторы:**
+```typescript
+@Public()                          // Открытый эндпоинт (без JWT)
+@Roles(UserRole.ADMIN)             // Только admin
+@Roles(UserRole.ADMIN, UserRole.MANAGER)  // admin или manager
+```
+
+**Frontend - скрытие UI элементов:**
+
+| Компонент | Элемент | Видимость |
+|-----------|---------|-----------|
+| Sidebar | Кнопка "Создать рабочее место" | только admin |
+| Sidebar | Меню настроек/удаления workspace | только admin |
+| Sidebar | Раздел "Администрирование" | только admin |
+| KanbanBoard | Кнопка "Настройки" | только admin |
+| EntityDetailPanel | Выпадающий список исполнителя | admin, manager |
+| /admin/users | Вся страница | только admin |
+
+```typescript
+// Пример проверки в компоненте
+const { user } = useAuthStore();
+const isAdmin = user?.role === 'admin';
+const canAssign = user?.role === 'admin' || user?.role === 'manager';
+```
+
+### Дополнительные меры
 - `@Exclude()` на password в User entity
 - `ClassSerializerInterceptor` глобально для фильтрации полей
 - `ValidationPipe` для валидации входящих данных
-- CORS настроен для фронтенда
+- CORS настроен для фронтенда с credentials: true
 
 ### Планируется
 - Keycloak SSO интеграция
-- JWT токены
 - Rate limiting
-- RBAC (Role-Based Access Control)
 
 ## Развёртывание
 

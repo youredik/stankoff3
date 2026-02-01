@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_GUARD } from '@nestjs/core';
 import { typeOrmConfig } from './config/typeorm.config';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { EntityModule } from './modules/entity/entity.module';
@@ -12,6 +13,8 @@ import { SeedService } from './seed.service';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
 import { Workspace } from './modules/workspace/workspace.entity';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 
 @Module({
   imports: [
@@ -30,6 +33,17 @@ import { Workspace } from './modules/workspace/workspace.entity';
     WebsocketModule,
     S3Module,
   ],
-  providers: [SeedService],
+  providers: [
+    SeedService,
+    // Глобальные guards - порядок важен: сначала JWT, потом Roles
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
 export class AppModule {}

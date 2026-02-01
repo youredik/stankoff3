@@ -22,7 +22,7 @@
   }
 
   body {
-    background: linear-gradient(135deg, hsl(210, 20%, 98%) 0%, hsl(210, 30%, 96%) 100%);
+    background: hsl(210, 20%, 98%);
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
@@ -61,6 +61,14 @@
     text-wrap: balance;
   }
 
+  /* Интерактивные элементы */
+  button,
+  [role="button"],
+  a,
+  .clickable {
+    cursor: pointer;
+  }
+
   /* Стеклянный эффект */
   .glass {
     background: rgba(255, 255, 255, 0.8);
@@ -76,17 +84,12 @@
 
   /* Градиентный текст */
   .text-gradient {
-    background: linear-gradient(135deg, #0ea5e9 0%, #d946ef 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #0369a1;
   }
 
   /* Градиентная граница */
   .border-gradient {
-    border: 1px solid transparent;
-    background: linear-gradient(white, white) padding-box,
-                linear-gradient(135deg, #0ea5e9 0%, #d946ef 100%) border-box;
+    border: 1px solid #e5e7eb;
   }
 
   /* Карточка с hover эффектом */
@@ -99,17 +102,8 @@
     box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 2px 10px -2px rgba(0, 0, 0, 0.04);
   }
 
-  /* Мягкий градиентный фон */
+  /* Мягкий фон */
   .bg-gradient-subtle {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.05) 0%, rgba(217, 70, 239, 0.05) 100%);
-  }
-
-  /* Неоновое свечение */
-  .glow-primary {
-    box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
-  }
-
-  .glow-accent {
-    box-shadow: 0 0 20px rgba(217, 70, 239, 0.4);
+    background: hsl(210, 20%, 97%);
   }
 }

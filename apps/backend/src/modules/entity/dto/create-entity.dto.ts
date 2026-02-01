@@ -2,9 +2,6 @@ import { IsString, IsOptional, IsObject } from 'class-validator';
 
 export class CreateEntityDto {
   @IsString()
-  customId: string;
-
-  @IsString()
   workspaceId: string;
 
   @IsString()

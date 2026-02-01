@@ -19,8 +19,8 @@ export function KanbanColumn({ id, title, color, cards }: KanbanColumnProps) {
   return (
     <div className="flex-shrink-0 w-80">
       <div
-        className={`bg-gray-50/80 backdrop-blur-sm rounded-2xl p-4 transition-all duration-200 ${
-          isOver ? 'ring-2 ring-primary-400 bg-primary-50/50 shadow-glow' : ''
+        className={`bg-gray-50 rounded-xl p-4 transition-colors ${
+          isOver ? 'ring-2 ring-primary-500 bg-primary-50' : ''
         }`}
       >
         {/* Header */}
@@ -34,7 +34,7 @@ export function KanbanColumn({ id, title, color, cards }: KanbanColumnProps) {
             )}
             <h3 className="font-semibold text-gray-900">{title}</h3>
           </div>
-          <span className="bg-white text-gray-600 px-2.5 py-1 rounded-lg text-sm font-medium shadow-sm border border-gray-100">
+          <span className="bg-white text-gray-600 px-2 py-0.5 rounded text-sm font-medium border border-gray-200">
             {cards.length}
           </span>
         </div>
@@ -57,7 +57,7 @@ export function KanbanColumn({ id, title, color, cards }: KanbanColumnProps) {
 
           {cards.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-white shadow-soft flex items-center justify-center mb-3">
+              <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center mb-3">
                 <Inbox className="w-5 h-5 text-gray-300" />
               </div>
               <p className="text-sm text-gray-400">Нет заявок</p>
