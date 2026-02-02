@@ -40,10 +40,12 @@ services:
     depends_on:
       - postgres
 
-  # Keycloak (закомментировано, подключим позже)
+  # Keycloak SSO (раскомментируйте для включения SSO)
+  # Для включения: 1) раскомментируйте сервис, 2) установите AUTH_PROVIDER=keycloak в .env
   # keycloak:
-  #   image: quay.io/keycloak/keycloak:latest
+  #   image: quay.io/keycloak/keycloak:26.0
   #   container_name: stankoff-keycloak
+  #   restart: unless-stopped
   #   environment:
   #     KEYCLOAK_ADMIN: admin
   #     KEYCLOAK_ADMIN_PASSWORD: admin
@@ -51,13 +53,15 @@ services:
   #     KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
   #     KC_DB_USERNAME: stankoff_admin
   #     KC_DB_PASSWORD: stankoff_secret_2026
+  #     KC_HEALTH_ENABLED: "true"
   #   command: start-dev
   #   ports:
   #     - "8080:8080"
   #   networks:
   #     - stankoff-network
   #   depends_on:
-  #     - postgres
+  #     postgres:
+  #       condition: service_healthy
 
 volumes:
   postgres_data:

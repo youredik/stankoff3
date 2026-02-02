@@ -9,11 +9,13 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { KeycloakService } from './keycloak.service';
 
 @Module({
   imports: [
     UserModule,
     PassportModule,
+    ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -25,12 +27,13 @@ import { RolesGuard } from './guards/roles.guard';
   ],
   providers: [
     AuthService,
+    KeycloakService,
     LocalStrategy,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
   ],
   controllers: [AuthController],
-  exports: [AuthService, JwtModule, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, KeycloakService, JwtModule, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

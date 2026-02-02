@@ -26,6 +26,9 @@ export class Workspace {
   @Column({ default: 0 })
   lastEntityNumber: number; // Последний использованный номер
 
+  @Column({ default: false })
+  isArchived: boolean; // Архивирован ли workspace
+
   @Column('jsonb', { default: [] })
   sections: {
     id: string;

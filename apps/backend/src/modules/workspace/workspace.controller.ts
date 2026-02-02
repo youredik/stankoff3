@@ -3,12 +3,16 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Param,
   Body,
+  Res,
   ForbiddenException,
   NotFoundException,
+  Header,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { WorkspaceService } from './workspace.service';
 import { Workspace } from './workspace.entity';
 import { WorkspaceRole } from './workspace-member.entity';
@@ -147,5 +151,84 @@ export class WorkspaceController {
       throw new ForbiddenException('Недостаточно прав для удаления участников');
     }
     return this.workspaceService.removeMember(id, userId);
+  }
+
+  // === Дублирование, архивирование, экспорт ===
+
+  @Post(':id/duplicate')
+  @Roles(UserRole.ADMIN)
+  async duplicate(
+    @Param('id') id: string,
+    @Body() body: { name?: string },
+    @CurrentUser() user: User,
+  ): Promise<Workspace> {
+    return this.workspaceService.duplicate(id, user.id, body.name);
+  }
+
+  @Patch(':id/archive')
+  @Roles(UserRole.ADMIN)
+  async setArchived(
+    @Param('id') id: string,
+    @Body() body: { isArchived: boolean },
+  ): Promise<Workspace> {
+    return this.workspaceService.setArchived(id, body.isArchived);
+  }
+
+  @Get(':id/export/json')
+  async exportJson(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const access = await this.workspaceService.checkAccess(
+      id,
+      user.id,
+      user.role,
+      WorkspaceRole.ADMIN,
+    );
+    if (!access) {
+      throw new ForbiddenException('Недостаточно прав для экспорта');
+    }
+
+    const data = await this.workspaceService.exportToJson(id);
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${data.workspace.prefix}-export.json"`,
+    );
+    res.send(JSON.stringify(data, null, 2));
+  }
+
+  @Get(':id/export/csv')
+  async exportCsv(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const access = await this.workspaceService.checkAccess(
+      id,
+      user.id,
+      user.role,
+      WorkspaceRole.ADMIN,
+    );
+    if (!access) {
+      throw new ForbiddenException('Недостаточно прав для экспорта');
+    }
+
+    const workspace = await this.workspaceService.findOne(id);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    const csv = await this.workspaceService.exportToCsv(id);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${workspace.prefix}-export.csv"`,
+    );
+    // BOM для корректного открытия в Excel
+    res.send('\uFEFF' + csv);
   }
 }

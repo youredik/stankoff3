@@ -39,4 +39,17 @@ export const workspacesApi = {
 
   removeMember: (workspaceId: string, userId: string) =>
     apiClient.delete(`/workspaces/${workspaceId}/members/${userId}`),
+
+  // Дублирование, архивирование, экспорт
+  duplicate: (workspaceId: string, name?: string) =>
+    apiClient.post<Workspace>(`/workspaces/${workspaceId}/duplicate`, { name }).then((r) => r.data),
+
+  setArchived: (workspaceId: string, isArchived: boolean) =>
+    apiClient.patch<Workspace>(`/workspaces/${workspaceId}/archive`, { isArchived }).then((r) => r.data),
+
+  exportJson: (workspaceId: string) =>
+    `${process.env.NEXT_PUBLIC_API_URL}/api/workspaces/${workspaceId}/export/json`,
+
+  exportCsv: (workspaceId: string) =>
+    `${process.env.NEXT_PUBLIC_API_URL}/api/workspaces/${workspaceId}/export/csv`,
 };

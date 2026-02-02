@@ -97,7 +97,7 @@ export class CommentController {
       throw new ForbiddenException('Недостаточно прав для редактирования комментария');
     }
 
-    return this.commentService.update(id, body.content);
+    return this.commentService.update(id, body.content, user.id);
   }
 
   @Delete(':id')
@@ -125,6 +125,6 @@ export class CommentController {
       throw new ForbiddenException('Недостаточно прав для удаления комментария');
     }
 
-    return this.commentService.remove(id);
+    return this.commentService.remove(id, user.id);
   }
 }

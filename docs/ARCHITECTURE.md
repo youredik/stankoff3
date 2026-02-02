@@ -72,6 +72,7 @@ Stankoff Portal - это корпоративная система управл�
 **Entity**
 - `CommentEditor.tsx` - Rich text редактор с Tiptap, @mentions и вложениями
 - `LinkedEntities.tsx` - Управление связями между сущностями
+- `ActivityPanel.tsx` - История активности по сущности (создание, изменения, комментарии)
 
 **Workspace**
 - `WorkspaceBuilder.tsx` - Drag & Drop конструктор рабочих мест (редактирование названия, иконки, секций и полей)
@@ -82,7 +83,7 @@ Stankoff Portal - это корпоративная система управл�
 
 **Layout**
 - `Header.tsx` - Шапка с поиском и уведомлениями
-- `Sidebar.tsx` - Боковое меню с рабочими местами и бейджами ролей (viewer/editor)
+- `Sidebar.tsx` - Боковое меню с рабочими местами, бейджами ролей и выпадающим меню (дублировать, архивировать, экспорт)
 - `NotificationPanel.tsx` - Выпадающая панель уведомлений с иконками типов
 
 **UI**
@@ -130,6 +131,8 @@ interface WorkspaceStore {
   fetchMyRoles(): Promise<void>;              // Получить роли во всех workspaces
   createWorkspace(data: Partial<Workspace>): Promise<Workspace>;
   updateWorkspace(id: string, data: Partial<Workspace>): Promise<void>;
+  duplicateWorkspace(id: string, name?: string): Promise<Workspace>;
+  archiveWorkspace(id: string, isArchived: boolean): Promise<void>;
 
   // Permission helpers
   canEdit(): boolean;                         // viewer не может редактировать
@@ -236,6 +239,7 @@ interface Workspace {
   icon: string;
   prefix: string;           // Префикс для номеров заявок: TP, REK и т.д.
   lastEntityNumber: number; // Счётчик для автогенерации номеров
+  isArchived: boolean;      // Архивирован ли workspace
   sections: Section[];      // Секции с полями
   createdAt: Date;
   updatedAt: Date;
@@ -371,6 +375,87 @@ interface Attachment {
 
 > **Генерация превью:** При загрузке изображений автоматически создаётся thumbnail 200x200px в формате JPEG с качеством 80%. Превью сохраняется в `/attachments/thumbnails/`.
 
+**AuditLogModule**
+История активности (Audit Log) для отслеживания всех действий в системе.
+
+```typescript
+enum AuditActionType {
+  ENTITY_CREATED = 'entity:created',
+  ENTITY_UPDATED = 'entity:updated',
+  ENTITY_DELETED = 'entity:deleted',
+  ENTITY_STATUS_CHANGED = 'entity:status:changed',
+  ENTITY_ASSIGNEE_CHANGED = 'entity:assignee:changed',
+  COMMENT_CREATED = 'comment:created',
+  COMMENT_UPDATED = 'comment:updated',
+  COMMENT_DELETED = 'comment:deleted',
+  FILE_UPLOADED = 'file:uploaded',
+  FILE_DELETED = 'file:deleted',
+}
+
+interface AuditLog {
+  id: string;
+  action: AuditActionType;
+  actorId: string | null;    // null для системных действий
+  actor: User | null;
+  entityId: string | null;
+  entity: WorkspaceEntity | null;
+  workspaceId: string;
+  details: {
+    description: string;      // Читаемое описание действия
+    oldValues?: Record<string, any>;
+    newValues?: Record<string, any>;
+    changedFields?: string[];
+    fileName?: string;
+    commentId?: string;
+  };
+  createdAt: Date;
+}
+```
+
+> **Автоматическое логирование:** EntityService и CommentService автоматически записывают в audit log все операции создания, обновления и удаления. История доступна через вкладку "История" в детальной панели сущности.
+
+**EmailModule**
+Email уведомления через SMTP.
+
+```typescript
+interface EmailService {
+  send(options: EmailOptions): Promise<boolean>;
+  sendAssignmentNotification(assignee, entity, assignedBy, frontendUrl): Promise<boolean>;
+  sendCommentNotification(recipient, entity, commentAuthor, commentPreview, frontendUrl): Promise<boolean>;
+  sendStatusChangeNotification(recipient, entity, changedBy, oldStatus, newStatus, frontendUrl): Promise<boolean>;
+}
+```
+
+**Переменные окружения:**
+- `SMTP_ENABLED` - включить/выключить отправку (по умолчанию false)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` - настройки SMTP
+- `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` - отправитель
+
+> **Типы уведомлений:** Email отправляется исполнителю при: назначении на заявку, изменении статуса заявки другим пользователем.
+
+**Функции Workspace**
+
+Дополнительные операции с рабочими местами:
+
+1. **Дублирование** - создаёт копию workspace со всеми секциями и полями:
+   - Генерирует новые UUID для workspace, секций и полей
+   - Сбрасывает счётчик номеров (lastEntityNumber = 0)
+   - Не копирует сущности, только структуру
+
+2. **Архивирование** - скрывает workspace без удаления данных:
+   - Устанавливает флаг `isArchived: true`
+   - Архивированные workspace отображаются с приглушённым стилем и иконкой архива
+   - Можно разархивировать обратно
+
+3. **Экспорт JSON** - полный бэкап workspace:
+   - Включает workspace с настройками секций/полей
+   - Включает все сущности с полями
+   - Добавляет timestamp экспорта
+
+4. **Экспорт CSV** - табличный экспорт сущностей:
+   - Формат с BOM для корректного отображения в Excel
+   - Колонки: ID, Номер, Название, Статус, Приоритет, Исполнитель, Дата создания
+
 #### API Endpoints
 
 | Метод | URL | Описание |
@@ -397,13 +482,19 @@ interface Attachment {
 | GET | /api/workspaces/:id/my-role | Роль пользователя в workspace |
 | GET | /api/workspaces/:id/members | Участники workspace |
 | POST | /api/workspaces | Создать рабочее место (admin) |
+| POST | /api/workspaces/:id/duplicate | Дублировать workspace (admin) |
 | POST | /api/workspaces/:id/members | Добавить участника (workspace admin) |
 | PUT | /api/workspaces/:id | Обновить структуру (admin) |
 | PUT | /api/workspaces/:id/members/:userId | Изменить роль участника |
+| PATCH | /api/workspaces/:id/archive | Архивировать/разархивировать (admin) |
 | DELETE | /api/workspaces/:id/members/:userId | Удалить участника |
+| GET | /api/workspaces/:id/export/json | Экспорт workspace в JSON |
+| GET | /api/workspaces/:id/export/csv | Экспорт entities в CSV |
 | POST | /api/files/upload | Загрузить файл в S3 |
 | GET | /api/files/signed-url/:key | Получить signed URL для ключа |
 | GET | /api/files/download/*path | Скачать файл через прокси (attachment) |
+| GET | /api/audit-logs/entity/:entityId | История активности по сущности |
+| GET | /api/audit-logs/workspace/:workspaceId | История активности по workspace |
 
 ## Потоки данных
 
@@ -716,8 +807,44 @@ workspace_id | user_id | role
 - `ValidationPipe` для валидации входящих данных
 - CORS настроен для фронтенда с credentials: true
 
+### Keycloak SSO интеграция
+
+Система поддерживает два режима аутентификации, переключаемых через `AUTH_PROVIDER`:
+
+**Локальная аутентификация (AUTH_PROVIDER=local):**
+- Стандартная JWT авторизация с email/password
+- Пароли хешируются через bcrypt
+- Access token (15 мин) + Refresh token (7 дней, HttpOnly cookie)
+
+**Keycloak SSO (AUTH_PROVIDER=keycloak):**
+- OIDC Authorization Code Flow с PKCE
+- Auto-provisioning пользователей из Keycloak claims
+- Маппинг ролей: realm-admin/admin → admin, manager → manager, остальные → employee
+- Поддержка logout через Keycloak
+
+**Настройка Keycloak:**
+1. Раскомментируйте сервис keycloak в docker-compose.yml
+2. Создайте realm "stankoff" в Keycloak Admin Console (http://localhost:8080)
+3. Создайте client "stankoff-portal" с настройками:
+   - Client authentication: On
+   - Valid redirect URIs: http://localhost:3000/*
+   - Web origins: http://localhost:3000
+4. Скопируйте Client Secret в .env (KEYCLOAK_CLIENT_SECRET)
+5. Установите AUTH_PROVIDER=keycloak в .env
+
+**API эндпоинты Keycloak:**
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | /api/auth/provider | Информация о провайдере (local/keycloak) |
+| GET | /api/auth/keycloak/login | Редирект на Keycloak для авторизации |
+| GET | /api/auth/keycloak/callback | Callback после авторизации в Keycloak |
+
+**Frontend:**
+- Страница логина автоматически показывает кнопку "Войти через SSO" при AUTH_PROVIDER=keycloak
+- После успешной SSO авторизации пользователь перенаправляется на /dashboard с access_token
+- AuthProvider обрабатывает токен и загружает профиль пользователя
+
 ### Планируется
-- Keycloak SSO интеграция
 - Rate limiting
 
 ## Развёртывание

@@ -1,18 +1,23 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, FormEvent, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Shield } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { setAuthInterceptors } from '@/lib/api/client';
+import { authApi } from '@/lib/api/auth';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading, error, clearError, accessToken, refreshTokens } =
+  const searchParams = useSearchParams();
+  const { login, isAuthenticated, isLoading, error, clearError } =
     useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authProvider, setAuthProvider] = useState<'local' | 'keycloak'>('local');
+  const [providerLoading, setProviderLoading] = useState(true);
 
   // Устанавливаем interceptors при монтировании
   useEffect(() => {
@@ -21,6 +26,31 @@ export default function LoginPage() {
       () => useAuthStore.getState().refreshTokens(),
     );
   }, []);
+
+  // Загружаем информацию о провайдере авторизации
+  useEffect(() => {
+    const loadProvider = async () => {
+      try {
+        const providerInfo = await authApi.getProvider();
+        setAuthProvider(providerInfo.provider);
+      } catch {
+        // По умолчанию используем local
+        setAuthProvider('local');
+      } finally {
+        setProviderLoading(false);
+      }
+    };
+    loadProvider();
+  }, []);
+
+  // Проверяем ошибку SSO из query параметра
+  useEffect(() => {
+    const ssoError = searchParams.get('error');
+    if (ssoError === 'sso_failed') {
+      // Устанавливаем ошибку в store через workaround
+      useAuthStore.setState({ error: 'Ошибка SSO авторизации. Попробуйте снова.' });
+    }
+  }, [searchParams]);
 
   // Редирект если уже авторизован
   useEffect(() => {
@@ -44,7 +74,12 @@ export default function LoginPage() {
     }
   };
 
-  if (isLoading) {
+  const handleKeycloakLogin = () => {
+    // Редирект на backend endpoint который перенаправит на Keycloak
+    window.location.href = authApi.getKeycloakLoginUrl();
+  };
+
+  if (isLoading || providerLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -65,14 +100,37 @@ export default function LoginPage() {
             <p className="text-gray-500 mt-2">Войдите в систему</p>
           </div>
 
-          {/* Форма */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            )}
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-6">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
 
+          {/* Keycloak SSO кнопка */}
+          {authProvider === 'keycloak' && (
+            <>
+              <button
+                type="button"
+                onClick={handleKeycloakLogin}
+                className="w-full py-3 px-4 bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 mb-6"
+              >
+                <Shield className="w-5 h-5" />
+                Войти через SSO (Keycloak)
+              </button>
+
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white text-gray-500">или войти с паролем</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Форма локального входа */}
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label
                 htmlFor="email"
@@ -128,15 +186,33 @@ export default function LoginPage() {
           </form>
 
           {/* Подсказка */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-500 text-center">
-              Тестовые учётные данные:
-              <br />
-              <span className="font-mono">admin@stankoff.ru / password</span>
-            </p>
-          </div>
+          {authProvider === 'local' && (
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500 text-center">
+                Тестовые учётные данные:
+                <br />
+                <span className="font-mono">admin@stankoff.ru / password</span>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function LoginPageFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

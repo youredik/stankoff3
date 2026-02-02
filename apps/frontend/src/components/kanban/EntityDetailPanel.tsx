@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
-import { X, MessageSquare, Clock, Image as ImageIcon, FileText, Paperclip } from 'lucide-react';
+import { X, MessageSquare, Clock, Image as ImageIcon, FileText, Paperclip, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { CommentEditor } from '@/components/entity/CommentEditor';
 import { LinkedEntities } from '@/components/entity/LinkedEntities';
+import { ActivityPanel } from '@/components/entity/ActivityPanel';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment } from '@/types';
@@ -54,6 +55,7 @@ export function EntityDetailPanel() {
   const canAssign = user?.role === 'admin' || user?.role === 'manager' || canEditEntity;
 
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'comments' | 'history'>('comments');
 
   // Get status options from workspace
   const statuses = useMemo(() => {
@@ -169,68 +171,96 @@ export function EntityDetailPanel() {
                 )}
               </div>
 
-              {/* Comments */}
-              <div className="px-8 pb-6 flex-1">
-                <div className="flex items-center gap-2 mb-4">
-                  <MessageSquare className="w-5 h-5 text-gray-500" />
-                  <p className="text-base font-medium text-gray-700">
-                    Комментарии
-                  </p>
-                  <span className="text-sm text-gray-400">
-                    ({comments.length})
-                  </span>
+              {/* Tabs */}
+              <div className="px-8 pb-6 flex-1 flex flex-col">
+                <div className="flex items-center gap-4 mb-4 border-b border-gray-200">
+                  <button
+                    onClick={() => setActiveTab('comments')}
+                    className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
+                      activeTab === 'comments'
+                        ? 'border-primary-600 text-primary-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span className="text-sm font-medium">Комментарии</span>
+                    <span className="text-xs text-gray-400">({comments.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('history')}
+                    className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
+                      activeTab === 'history'
+                        ? 'border-primary-600 text-primary-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <History className="w-4 h-4" />
+                    <span className="text-sm font-medium">История</span>
+                  </button>
                 </div>
 
-                {comments.length === 0 && (
-                  <p className="text-xs text-gray-400 italic">
-                    Пока нет комментариев
-                  </p>
+                {/* Comments Tab */}
+                {activeTab === 'comments' && (
+                  <div className="flex-1">
+                    {comments.length === 0 && (
+                      <p className="text-xs text-gray-400 italic">
+                        Пока нет комментариев
+                      </p>
+                    )}
+
+                    <div className="space-y-5">
+                      {comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-4">
+                          <div className="w-9 h-9 bg-primary-600 rounded-full flex-shrink-0 flex items-center justify-center">
+                            <span className="text-white text-sm font-medium">
+                              {comment.author.firstName[0]}
+                              {comment.author.lastName[0]}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-800">
+                                {comment.author.firstName}{' '}
+                                {comment.author.lastName}
+                              </span>
+                              <span className="text-sm text-gray-400">
+                                {format(
+                                  new Date(comment.createdAt),
+                                  'dd.MM HH:mm',
+                                  { locale: ru }
+                                )}
+                              </span>
+                            </div>
+                            <div
+                              className="text-gray-600 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-600 [&_a]:underline [&_.mention]:text-primary-600 [&_.mention]:bg-primary-50 [&_.mention]:rounded [&_.mention]:px-0.5"
+                              dangerouslySetInnerHTML={{ __html: comment.content }}
+                            />
+                            {/* Attachments */}
+                            {comment.attachments && comment.attachments.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {comment.attachments.map((attachment) => (
+                                  <AttachmentPreview
+                                    key={attachment.id}
+                                    attachment={attachment}
+                                    allAttachments={allEntityAttachments}
+                                    showThumbnail={true}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
 
-                <div className="space-y-5">
-                  {comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-4">
-                      <div className="w-9 h-9 bg-primary-600 rounded-full flex-shrink-0 flex items-center justify-center">
-                        <span className="text-white text-sm font-medium">
-                          {comment.author.firstName[0]}
-                          {comment.author.lastName[0]}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-800">
-                            {comment.author.firstName}{' '}
-                            {comment.author.lastName}
-                          </span>
-                          <span className="text-sm text-gray-400">
-                            {format(
-                              new Date(comment.createdAt),
-                              'dd.MM HH:mm',
-                              { locale: ru }
-                            )}
-                          </span>
-                        </div>
-                        <div
-                          className="text-gray-600 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-600 [&_a]:underline [&_.mention]:text-primary-600 [&_.mention]:bg-primary-50 [&_.mention]:rounded [&_.mention]:px-0.5"
-                          dangerouslySetInnerHTML={{ __html: comment.content }}
-                        />
-                        {/* Attachments */}
-                        {comment.attachments && comment.attachments.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {comment.attachments.map((attachment) => (
-                              <AttachmentPreview
-                                key={attachment.id}
-                                attachment={attachment}
-                                allAttachments={allEntityAttachments}
-                                showThumbnail={true}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {/* History Tab */}
+                {activeTab === 'history' && (
+                  <div className="flex-1 overflow-y-auto">
+                    <ActivityPanel entityId={selectedEntity.id} />
+                  </div>
+                )}
               </div>
 
               {/* Comment editor — pinned to bottom of left column (hidden for viewers) */}

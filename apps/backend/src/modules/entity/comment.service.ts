@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Comment } from './comment.entity';
+import { WorkspaceEntity } from './entity.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { EventsGateway } from '../websocket/events.gateway';
 import { S3Service } from '../s3/s3.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import { AuditActionType } from '../audit-log/audit-log.entity';
 
 // Response attachment type with signed URLs
 export interface AttachmentWithUrls {
@@ -27,8 +30,12 @@ export class CommentService {
   constructor(
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
+    @InjectRepository(WorkspaceEntity)
+    private entityRepository: Repository<WorkspaceEntity>,
     private eventsGateway: EventsGateway,
     private s3Service: S3Service,
+    @Inject(forwardRef(() => AuditLogService))
+    private auditLogService: AuditLogService,
   ) {}
 
   async findOne(id: string): Promise<Comment | null> {
@@ -119,26 +126,82 @@ export class CommentService {
     };
 
     this.eventsGateway.emitCommentCreated(result);
+
+    // Логирование создания комментария
+    const entity = await this.entityRepository.findOne({ where: { id: entityId } });
+    if (entity) {
+      const attachmentNames = (dto.attachments || []).map(a => a.name).join(', ');
+      await this.auditLogService.log(
+        AuditActionType.COMMENT_CREATED,
+        entity.workspaceId,
+        dto.authorId,
+        {
+          description: 'Добавлен комментарий',
+          commentId: saved.id,
+          ...(attachmentNames && { fileName: attachmentNames }),
+        },
+        entityId,
+      );
+    }
+
     return result;
   }
 
-  async update(id: string, content: string): Promise<Comment> {
+  async update(id: string, content: string, actorId?: string): Promise<Comment> {
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ['author'],
+      relations: ['author', 'entity'],
     });
     if (!comment) {
       throw new NotFoundException(`Comment ${id} not found`);
     }
+
+    const oldContent = comment.content;
     comment.content = content;
-    return this.commentRepository.save(comment);
+    const updated = await this.commentRepository.save(comment);
+
+    // Логирование обновления комментария
+    if (actorId && comment.entity) {
+      await this.auditLogService.log(
+        AuditActionType.COMMENT_UPDATED,
+        comment.entity.workspaceId,
+        actorId,
+        {
+          description: 'Отредактирован комментарий',
+          commentId: id,
+          oldValues: { content: oldContent.substring(0, 100) },
+          newValues: { content: content.substring(0, 100) },
+        },
+        comment.entityId,
+      );
+    }
+
+    return updated;
   }
 
-  async remove(id: string): Promise<void> {
-    const comment = await this.commentRepository.findOne({ where: { id } });
+  async remove(id: string, actorId?: string): Promise<void> {
+    const comment = await this.commentRepository.findOne({
+      where: { id },
+      relations: ['entity'],
+    });
     if (!comment) {
       throw new NotFoundException(`Comment ${id} not found`);
     }
+
+    // Логирование удаления (перед удалением)
+    if (actorId && comment.entity) {
+      await this.auditLogService.log(
+        AuditActionType.COMMENT_DELETED,
+        comment.entity.workspaceId,
+        actorId,
+        {
+          description: 'Удалён комментарий',
+          commentId: id,
+        },
+        comment.entityId,
+      );
+    }
+
     await this.commentRepository.remove(comment);
   }
 }

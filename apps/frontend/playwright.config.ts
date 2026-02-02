@@ -15,12 +15,18 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    // Setup project - авторизация
+    // Setup project - авторизация admin
     {
       name: 'setup',
-      testMatch: /auth\.setup\.ts/,
+      testMatch: '**/auth.setup.ts',
+      testIgnore: '**/viewer-auth.setup.ts',
     },
-    // Основные тесты - зависят от setup
+    // Setup project - авторизация viewer
+    {
+      name: 'viewer-setup',
+      testMatch: '**/viewer-auth.setup.ts',
+    },
+    // Основные тесты - зависят от setup (admin)
     {
       name: 'chromium',
       use: {
@@ -28,6 +34,17 @@ export default defineConfig({
         storageState: '.auth/user.json',
       },
       dependencies: ['setup'],
+      testIgnore: /rbac\.spec\.ts/,
+    },
+    // RBAC тесты - зависят от viewer-setup
+    {
+      name: 'rbac',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: '.auth/viewer.json',
+      },
+      dependencies: ['viewer-setup'],
+      testMatch: /rbac\.spec\.ts/,
     },
   ],
   webServer: {

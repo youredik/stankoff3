@@ -73,7 +73,7 @@ export class EntityController {
     if (!access) {
       throw new ForbiddenException('Недостаточно прав для создания заявок');
     }
-    return this.entityService.create(dto);
+    return this.entityService.create(dto, user.id);
   }
 
   @Put(':id')
@@ -96,7 +96,7 @@ export class EntityController {
     if (!access) {
       throw new ForbiddenException('Недостаточно прав для редактирования');
     }
-    return this.entityService.update(id, dto);
+    return this.entityService.update(id, dto, user.id);
   }
 
   @Patch(':id/status')
@@ -119,7 +119,7 @@ export class EntityController {
     if (!access) {
       throw new ForbiddenException('Недостаточно прав для изменения статуса');
     }
-    return this.entityService.updateStatus(id, body.status);
+    return this.entityService.updateStatus(id, body.status, user.id);
   }
 
   @Patch(':id/assignee')
@@ -142,7 +142,7 @@ export class EntityController {
     if (!access) {
       throw new ForbiddenException('Недостаточно прав для назначения исполнителя');
     }
-    return this.entityService.updateAssignee(id, body.assigneeId);
+    return this.entityService.updateAssignee(id, body.assigneeId, user.id);
   }
 
   @Delete('cleanup/test-data')
@@ -167,6 +167,6 @@ export class EntityController {
     if (!access) {
       throw new ForbiddenException('Недостаточно прав для удаления');
     }
-    return this.entityService.remove(id);
+    return this.entityService.remove(id, user.id);
   }
 }

@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { Workspace } from './workspace.entity';
 import { WorkspaceMember, WorkspaceRole } from './workspace-member.entity';
+import { WorkspaceEntity } from '../entity/entity.entity';
 import { UserRole } from '../user/user.entity';
 
 @Injectable()
@@ -12,6 +14,8 @@ export class WorkspaceService {
     private workspaceRepository: Repository<Workspace>,
     @InjectRepository(WorkspaceMember)
     private memberRepository: Repository<WorkspaceMember>,
+    @InjectRepository(WorkspaceEntity)
+    private entityRepository: Repository<WorkspaceEntity>,
   ) {}
 
   // Получить все workspaces (фильтрация по пользователю)
@@ -172,5 +176,125 @@ export class WorkspaceService {
     if (result.affected === 0) {
       throw new NotFoundException('Участник не найден');
     }
+  }
+
+  // === Дублирование, архивирование, экспорт ===
+
+  // Дублировать workspace (структуру без заявок)
+  async duplicate(
+    workspaceId: string,
+    creatorId: string,
+    newName?: string,
+  ): Promise<Workspace> {
+    const original = await this.findOne(workspaceId);
+    if (!original) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    // Генерируем новые ID для секций и полей
+    const newSections = original.sections.map((section) => ({
+      ...section,
+      id: uuidv4(),
+      fields: section.fields.map((field) => ({
+        ...field,
+        id: uuidv4(),
+        options: field.options?.map((opt) => ({ ...opt, id: uuidv4() })),
+      })),
+    }));
+
+    // Создаём копию workspace
+    const duplicated = this.workspaceRepository.create({
+      name: newName || `${original.name} (копия)`,
+      icon: original.icon,
+      prefix: `${original.prefix}C`, // Добавляем суффикс C (Copy)
+      sections: newSections,
+      lastEntityNumber: 0, // Сбрасываем счётчик
+      isArchived: false,
+    });
+
+    const saved = await this.workspaceRepository.save(duplicated);
+
+    // Добавляем создателя как admin
+    await this.addMember(saved.id, creatorId, WorkspaceRole.ADMIN);
+
+    return saved;
+  }
+
+  // Архивировать/разархивировать workspace
+  async setArchived(workspaceId: string, isArchived: boolean): Promise<Workspace> {
+    const workspace = await this.findOne(workspaceId);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    workspace.isArchived = isArchived;
+    return this.workspaceRepository.save(workspace);
+  }
+
+  // Экспорт заявок workspace в JSON
+  async exportToJson(workspaceId: string): Promise<{
+    workspace: Workspace;
+    entities: WorkspaceEntity[];
+    exportedAt: string;
+  }> {
+    const workspace = await this.findOne(workspaceId);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    const entities = await this.entityRepository.find({
+      where: { workspaceId },
+      relations: ['assignee', 'comments', 'comments.author'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      workspace,
+      entities,
+      exportedAt: new Date().toISOString(),
+    };
+  }
+
+  // Экспорт заявок workspace в CSV
+  async exportToCsv(workspaceId: string): Promise<string> {
+    const workspace = await this.findOne(workspaceId);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    const entities = await this.entityRepository.find({
+      where: { workspaceId },
+      relations: ['assignee'],
+      order: { createdAt: 'DESC' },
+    });
+
+    // Заголовки CSV
+    const headers = [
+      'ID',
+      'Номер',
+      'Название',
+      'Статус',
+      'Приоритет',
+      'Исполнитель',
+      'Создано',
+      'Обновлено',
+    ];
+
+    // Строки данных
+    const rows = entities.map((e) => [
+      e.id,
+      e.customId,
+      `"${(e.title || '').replace(/"/g, '""')}"`,
+      e.status,
+      e.priority || '',
+      e.assignee ? `${e.assignee.firstName} ${e.assignee.lastName}` : '',
+      e.createdAt.toISOString(),
+      e.updatedAt.toISOString(),
+    ]);
+
+    // Собираем CSV
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    return csv;
   }
 }

@@ -10,6 +10,11 @@ export interface RefreshResponse {
   accessToken: string;
 }
 
+export interface AuthProviderResponse {
+  provider: 'local' | 'keycloak';
+  keycloakEnabled: boolean;
+}
+
 export const authApi = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
     const { data } = await apiClient.post<LoginResponse>('/auth/login', {
@@ -31,5 +36,15 @@ export const authApi = {
   me: async (): Promise<User> => {
     const { data } = await apiClient.get<User>('/auth/me');
     return data;
+  },
+
+  getProvider: async (): Promise<AuthProviderResponse> => {
+    const { data } = await apiClient.get<AuthProviderResponse>('/auth/provider');
+    return data;
+  },
+
+  getKeycloakLoginUrl: (): string => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    return `${apiUrl}/api/auth/keycloak/login`;
   },
 };

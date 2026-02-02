@@ -27,6 +27,8 @@ interface WorkspaceStore {
   createWorkspace: (data: Partial<Workspace>) => Promise<Workspace>;
   updateWorkspace: (id: string, data: Partial<Workspace>) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
+  duplicateWorkspace: (id: string, name?: string) => Promise<Workspace>;
+  archiveWorkspace: (id: string, isArchived: boolean) => Promise<void>;
 
   // Section mutations
   addSection: (name: string) => void;
@@ -206,6 +208,32 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspaces: state.workspaces.filter((w) => w.id !== id),
         currentWorkspace:
           state.currentWorkspace?.id === id ? null : state.currentWorkspace,
+      }));
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
+  duplicateWorkspace: async (id, name) => {
+    try {
+      const duplicated = await workspacesApi.duplicate(id, name);
+      set((state) => ({
+        workspaces: [...state.workspaces, duplicated],
+      }));
+      return duplicated;
+    } catch (err) {
+      set({ error: (err as Error).message });
+      throw err;
+    }
+  },
+
+  archiveWorkspace: async (id, isArchived) => {
+    try {
+      const updated = await workspacesApi.setArchived(id, isArchived);
+      set((state) => ({
+        workspaces: state.workspaces.map((w) =>
+          w.id === id ? { ...w, isArchived: updated.isArchived } : w
+        ),
       }));
     } catch (err) {
       set({ error: (err as Error).message });

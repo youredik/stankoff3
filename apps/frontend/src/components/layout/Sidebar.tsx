@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut, Eye } from 'lucide-react';
+import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut, Eye, Copy, Archive, Download, ArchiveRestore } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { workspacesApi } from '@/lib/api/workspaces';
 import type { Workspace } from '@/types';
 
 interface SidebarProps {
@@ -20,7 +21,7 @@ const ROLE_CONFIG = {
 
 export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) {
   const router = useRouter();
-  const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace, getRoleForWorkspace } =
+  const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace, duplicateWorkspace, archiveWorkspace, getRoleForWorkspace } =
     useWorkspaceStore();
   const { user, logout } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -78,6 +79,29 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
         if (next) onWorkspaceChange(next.id);
       }
     }
+  };
+
+  const handleDuplicateWorkspace = async (workspace: Workspace) => {
+    setMenuOpen(null);
+    const newName = `${workspace.name} (копия)`;
+    const duplicated = await duplicateWorkspace(workspace.id, newName);
+    onWorkspaceChange(duplicated.id);
+  };
+
+  const handleArchiveWorkspace = async (workspace: Workspace) => {
+    setMenuOpen(null);
+    const newState = !workspace.isArchived;
+    await archiveWorkspace(workspace.id, newState);
+  };
+
+  const handleExportJson = (id: string) => {
+    setMenuOpen(null);
+    window.open(workspacesApi.exportJson(id), '_blank');
+  };
+
+  const handleExportCsv = (id: string) => {
+    setMenuOpen(null);
+    window.open(workspacesApi.exportCsv(id), '_blank');
   };
 
   return (
@@ -150,9 +174,14 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                     : 'text-gray-700'
                 }`}
               >
-                <span className="text-xl">{workspace.icon}</span>
+                <span className={`text-xl ${workspace.isArchived ? 'opacity-50' : ''}`}>{workspace.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <span className="font-medium truncate block">{workspace.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`font-medium truncate ${workspace.isArchived ? 'text-gray-400' : ''}`}>{workspace.name}</span>
+                    {workspace.isArchived && (
+                      <Archive className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    )}
+                  </div>
                   {/* Бейдж роли */}
                   {roleConfig && role !== 'admin' && (
                     <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${roleConfig.bg} ${roleConfig.text}`}>
@@ -185,7 +214,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                         className="fixed inset-0 z-10"
                         onClick={() => setMenuOpen(null)}
                       />
-                      <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-soft-lg py-1 w-44">
+                      <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-soft-lg py-1 w-48">
                         <button
                           onClick={() => handleEditWorkspace(workspace.id)}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
@@ -193,6 +222,45 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                           <Pencil className="w-4 h-4 text-gray-400" />
                           <span>Настроить</span>
                         </button>
+                        <button
+                          onClick={() => handleDuplicateWorkspace(workspace)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          <Copy className="w-4 h-4 text-gray-400" />
+                          <span>Дублировать</span>
+                        </button>
+                        <button
+                          onClick={() => handleArchiveWorkspace(workspace)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          {workspace.isArchived ? (
+                            <>
+                              <ArchiveRestore className="w-4 h-4 text-gray-400" />
+                              <span>Разархивировать</span>
+                            </>
+                          ) : (
+                            <>
+                              <Archive className="w-4 h-4 text-gray-400" />
+                              <span>Архивировать</span>
+                            </>
+                          )}
+                        </button>
+                        <div className="h-px bg-gray-200 my-1" />
+                        <button
+                          onClick={() => handleExportJson(workspace.id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          <Download className="w-4 h-4 text-gray-400" />
+                          <span>Экспорт JSON</span>
+                        </button>
+                        <button
+                          onClick={() => handleExportCsv(workspace.id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          <Download className="w-4 h-4 text-gray-400" />
+                          <span>Экспорт CSV</span>
+                        </button>
+                        <div className="h-px bg-gray-200 my-1" />
                         <button
                           onClick={() => handleDeleteWorkspace(workspace.id)}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors cursor-pointer"

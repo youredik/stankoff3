@@ -41,6 +41,7 @@ export interface Workspace {
   icon: string;
   prefix: string; // Префикс для номеров заявок: TP, REK и т.д.
   lastEntityNumber: number; // Последний использованный номер
+  isArchived?: boolean; // Архивирован ли workspace
   sections: Section[];
   members?: WorkspaceMember[];
   createdAt: Date;
@@ -140,7 +141,7 @@ export interface Notification {
 }
 
 // WebSocket события
-export type WebSocketEvent = 
+export type WebSocketEvent =
   | 'entity:created'
   | 'entity:updated'
   | 'entity:deleted'
@@ -152,4 +153,41 @@ export interface WebSocketMessage<T = any> {
   event: WebSocketEvent;
   data: T;
   timestamp: Date;
+}
+
+// Audit Log
+export enum AuditActionType {
+  ENTITY_CREATED = 'entity:created',
+  ENTITY_UPDATED = 'entity:updated',
+  ENTITY_DELETED = 'entity:deleted',
+  ENTITY_STATUS_CHANGED = 'entity:status:changed',
+  ENTITY_ASSIGNEE_CHANGED = 'entity:assignee:changed',
+  COMMENT_CREATED = 'comment:created',
+  COMMENT_UPDATED = 'comment:updated',
+  COMMENT_DELETED = 'comment:deleted',
+  FILE_UPLOADED = 'file:uploaded',
+  FILE_DELETED = 'file:deleted',
+}
+
+export interface AuditLogDetails {
+  description: string;
+  oldValues?: Record<string, any>;
+  newValues?: Record<string, any>;
+  changedFields?: string[];
+  fileName?: string;
+  fileSize?: number;
+  fileMimeType?: string;
+  commentId?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: AuditActionType;
+  actor: User | null;
+  actorId: string | null;
+  entity?: Entity | null;
+  entityId: string | null;
+  workspaceId: string;
+  details: AuditLogDetails;
+  createdAt: string;
 }
