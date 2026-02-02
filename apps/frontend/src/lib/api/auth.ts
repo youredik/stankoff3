@@ -28,6 +28,6 @@ export const authApi = {
 
   getKeycloakLoginUrl: (): string => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    return `${apiUrl}/api/auth/keycloak/login`;
+    return `${apiUrl}/auth/keycloak/login`;
   },
 };
