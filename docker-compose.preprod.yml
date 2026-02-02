@@ -97,6 +97,8 @@ services:
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-stankoff}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-stankoff-portal}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
+      # TypeORM
+      - TYPEORM_SYNC=${TYPEORM_SYNC:-false}
     expose:
       - "3001"
     volumes:
