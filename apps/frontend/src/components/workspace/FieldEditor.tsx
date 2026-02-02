@@ -23,6 +23,18 @@ const PRESET_COLORS = [
   '#06B6D4', // cyan
 ];
 
+const TYPE_LABELS: Record<FieldType, string> = {
+  text: 'Текст',
+  textarea: 'Многострочный',
+  number: 'Число',
+  date: 'Дата',
+  select: 'Выбор из списка',
+  status: 'Статус',
+  user: 'Пользователь',
+  file: 'Файл',
+  relation: 'Связь',
+};
+
 export function FieldEditor({
   field,
   sectionId,
@@ -31,7 +43,7 @@ export function FieldEditor({
   onClose,
 }: FieldEditorProps) {
   const [name, setName] = useState(field.name);
-  const [type, setType] = useState<FieldType>(field.type);
+  const type = field.type;
   const [required, setRequired] = useState(field.required || false);
   const [description, setDescription] = useState(field.description || '');
   const [options, setOptions] = useState<FieldOption[]>(field.options || []);
@@ -39,7 +51,6 @@ export function FieldEditor({
     field.relatedWorkspaceId || ''
   );
 
-  const isSystemField = ['title', 'status'].includes(field.id);
   const hasOptions = type === 'select' || type === 'status';
 
   useEffect(() => {
@@ -82,10 +93,6 @@ export function FieldEditor({
       description: description || undefined,
     };
 
-    if (!isSystemField) {
-      updates.type = type;
-    }
-
     if (hasOptions) {
       updates.options = options;
     }
@@ -106,9 +113,14 @@ export function FieldEditor({
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Настройка поля
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Настройка поля
+              </h3>
+              <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs font-medium rounded">
+                {TYPE_LABELS[type]}
+              </span>
+            </div>
             <button
               onClick={onClose}
               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
@@ -131,34 +143,6 @@ export function FieldEditor({
                 className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="Введите название"
               />
-            </div>
-
-            {/* Type */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
-                Тип поля
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as FieldType)}
-                disabled={isSystemField}
-                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-500"
-              >
-                <option value="text">Текст</option>
-                <option value="textarea">Многострочный</option>
-                <option value="number">Число</option>
-                <option value="date">Дата</option>
-                <option value="select">Выбор из списка</option>
-                <option value="status">Статус</option>
-                <option value="user">Пользователь</option>
-                <option value="file">Файл</option>
-                <option value="relation">Связь</option>
-              </select>
-              {isSystemField && (
-                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  Тип системного поля изменить нельзя
-                </p>
-              )}
             </div>
 
             {/* Required */}
