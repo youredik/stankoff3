@@ -33,6 +33,13 @@ function LoginPageContent() {
     // Если уже авторизован - на dashboard
     if (isAuthenticated && !isLoading) {
       router.push('/dashboard');
+      return;
+    }
+
+    // Если не авторизован и нет ошибки - автоматический редирект на SSO
+    if (!isAuthenticated && !isLoading && !ssoError) {
+      setIsRedirecting(true);
+      window.location.href = authApi.getKeycloakLoginUrl();
     }
   }, [searchParams, isAuthenticated, isLoading, router]);
 
