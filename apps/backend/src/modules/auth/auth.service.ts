@@ -24,18 +24,6 @@ export class AuthService {
     private keycloakService: KeycloakService,
   ) {}
 
-  getAuthProvider(): 'local' | 'keycloak' {
-    return (this.configService.get<string>('AUTH_PROVIDER') as 'local' | 'keycloak') || 'local';
-  }
-
-  async validateUser(email: string, password: string): Promise<User | null> {
-    const user = await this.userService.findByEmail(email);
-    if (user && (await bcrypt.compare(password, user.password))) {
-      return user;
-    }
-    return null;
-  }
-
   async login(user: User): Promise<{ accessToken: string; refreshToken: string }> {
     const payload: JwtPayload = {
       sub: user.id,

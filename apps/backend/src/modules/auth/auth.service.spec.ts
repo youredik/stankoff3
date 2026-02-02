@@ -2,11 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
 import { User, UserRole } from '../user/user.entity';
-
-jest.mock('bcrypt');
 
 // Mock KeycloakService module before importing AuthService
 jest.mock('./keycloak.service', () => ({
@@ -74,52 +71,6 @@ describe('AuthService', () => {
     userService = module.get(UserService);
     jwtService = module.get(JwtService);
     configService = module.get(ConfigService);
-  });
-
-  describe('getAuthProvider', () => {
-    it('должен вернуть "local" по умолчанию', () => {
-      configService.get.mockReturnValue(undefined);
-
-      const result = service.getAuthProvider();
-
-      expect(result).toBe('local');
-    });
-
-    it('должен вернуть значение из конфига', () => {
-      configService.get.mockReturnValue('keycloak');
-
-      const result = service.getAuthProvider();
-
-      expect(result).toBe('keycloak');
-    });
-  });
-
-  describe('validateUser', () => {
-    it('должен вернуть пользователя при верных credentials', async () => {
-      userService.findByEmail.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-
-      const result = await service.validateUser('test@example.com', 'password');
-
-      expect(result).toEqual(mockUser);
-    });
-
-    it('должен вернуть null при неверном пароле', async () => {
-      userService.findByEmail.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-
-      const result = await service.validateUser('test@example.com', 'wrong');
-
-      expect(result).toBeNull();
-    });
-
-    it('должен вернуть null если пользователь не найден', async () => {
-      userService.findByEmail.mockResolvedValue(null);
-
-      const result = await service.validateUser('none@example.com', 'password');
-
-      expect(result).toBeNull();
-    });
   });
 
   describe('login', () => {

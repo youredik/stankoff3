@@ -13,7 +13,6 @@ interface AuthState {
 }
 
 interface AuthActions {
-  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshTokens: () => Promise<boolean>;
   checkAuth: () => Promise<void>;
@@ -27,31 +26,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isAuthenticated: false,
   isLoading: true, // Начинаем с true чтобы не было редиректа до проверки авторизации
   error: null,
-
-  login: async (email: string, password: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await authApi.login(email, password);
-      set({
-        user: response.user,
-        accessToken: response.accessToken,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      });
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : 'Неверный email или пароль';
-      set({
-        error: errorMessage,
-        isLoading: false,
-        isAuthenticated: false,
-      });
-      throw err;
-    }
-  },
 
   logout: async () => {
     try {

@@ -172,14 +172,14 @@ export function LinkedEntities({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase">
+        <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
           <Link2 className="w-3.5 h-3.5" />
           <span>Связи</span>
         </div>
         {!readOnly && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
             title="Добавить связь"
           >
             <Plus className="w-4 h-4" />
@@ -189,12 +189,12 @@ export function LinkedEntities({
 
       {loading && (
         <div className="flex items-center justify-center py-2">
-          <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+          <Loader2 className="w-4 h-4 text-gray-400 dark:text-gray-500 animate-spin" />
         </div>
       )}
 
       {!loading && linkedEntities.length === 0 && (
-        <p className="text-xs text-gray-400 italic">Нет связей</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 italic">Нет связей</p>
       )}
 
       {!loading && linkedEntities.length > 0 && (
@@ -202,21 +202,21 @@ export function LinkedEntities({
           {linkedEntities.map((entity) => (
             <div
               key={entity.id}
-              className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg group"
+              className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg group"
             >
               <span className="text-sm">{entity.workspaceIcon}</span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono text-gray-500">
+                  <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
                     {entity.customId}
                   </span>
                 </div>
-                <p className="text-xs text-gray-700 truncate">{entity.title}</p>
+                <p className="text-xs text-gray-700 dark:text-gray-300 truncate">{entity.title}</p>
               </div>
               {!readOnly && (
                 <button
                   onClick={() => handleRemoveLink(entity.customId)}
-                  className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Удалить связь"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -235,14 +235,14 @@ export function LinkedEntities({
             onClick={() => setShowAddModal(false)}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="font-semibold text-gray-900">Добавить связь</h3>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md">
+              <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Добавить связь</h3>
                 <button
                   onClick={() => setShowAddModal(false)}
-                  className="p-1 hover:bg-gray-100 rounded"
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
 
@@ -251,7 +251,7 @@ export function LinkedEntities({
                 <select
                   value={selectedWorkspaceId}
                   onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">Все рабочие места</option>
                   {workspaces.map((ws) => (
@@ -267,13 +267,13 @@ export function LinkedEntities({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск по ID или названию..."
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
 
                 {/* Entity list */}
                 <div className="max-h-64 overflow-y-auto space-y-1">
                   {filteredEntities.length === 0 && (
-                    <p className="text-sm text-gray-400 text-center py-4">
+                    <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
                       Нет доступных сущностей
                     </p>
                   )}
@@ -285,23 +285,23 @@ export function LinkedEntities({
                       <button
                         key={entity.id}
                         onClick={() => handleAddLink(entity.customId)}
-                        className="w-full flex items-center gap-2 p-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                        className="w-full flex items-center gap-2 p-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
                       >
                         <span className="text-sm">{workspace?.icon || '📋'}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono text-gray-500">
+                            <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
                               {entity.customId}
                             </span>
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-gray-400 dark:text-gray-500">
                               {workspace?.name}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-700 truncate">
+                          <p className="text-sm text-gray-700 dark:text-gray-300 truncate">
                             {entity.title}
                           </p>
                         </div>
-                        <ExternalLink className="w-4 h-4 text-gray-400" />
+                        <ExternalLink className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                       </button>
                     );
                   })}

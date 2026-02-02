@@ -1,18 +1,8 @@
 import { apiClient } from './client';
 import { User } from '@/types';
 
-export interface LoginResponse {
-  accessToken: string;
-  user: User;
-}
-
 export interface RefreshResponse {
   accessToken: string;
-}
-
-export interface AuthProviderResponse {
-  provider: 'local' | 'keycloak';
-  keycloakEnabled: boolean;
 }
 
 export interface LogoutResponse {
@@ -21,14 +11,6 @@ export interface LogoutResponse {
 }
 
 export const authApi = {
-  login: async (email: string, password: string): Promise<LoginResponse> => {
-    const { data } = await apiClient.post<LoginResponse>('/auth/login', {
-      email,
-      password,
-    });
-    return data;
-  },
-
   refresh: async (): Promise<RefreshResponse> => {
     const { data } = await apiClient.post<RefreshResponse>('/auth/refresh');
     return data;
@@ -41,11 +23,6 @@ export const authApi = {
 
   me: async (): Promise<User> => {
     const { data } = await apiClient.get<User>('/auth/me');
-    return data;
-  },
-
-  getProvider: async (): Promise<AuthProviderResponse> => {
-    const { data } = await apiClient.get<AuthProviderResponse>('/auth/provider');
     return data;
   },
 

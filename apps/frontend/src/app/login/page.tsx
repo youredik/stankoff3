@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, FormEvent, useEffect, Suspense } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Shield } from 'lucide-react';
+import { Shield, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { setAuthInterceptors } from '@/lib/api/client';
 import { authApi } from '@/lib/api/auth';
@@ -10,14 +10,7 @@ import { authApi } from '@/lib/api/auth';
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isAuthenticated, isLoading, error, clearError } =
-    useAuthStore();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authProvider, setAuthProvider] = useState<'local' | 'keycloak'>('local');
-  const [providerLoading, setProviderLoading] = useState(true);
+  const { isAuthenticated, isLoading, error, clearError } = useAuthStore();
 
   // Устанавливаем interceptors при монтировании
   useEffect(() => {
@@ -27,74 +20,48 @@ function LoginPageContent() {
     );
   }, []);
 
-  // Загружаем информацию о провайдере авторизации
+  // Редирект на Keycloak при загрузке
   useEffect(() => {
-    const loadProvider = async () => {
-      try {
-        const providerInfo = await authApi.getProvider();
-        setAuthProvider(providerInfo.provider);
+    // Проверяем ошибку SSO
+    const ssoError = searchParams.get('error');
+    if (ssoError === 'sso_failed') {
+      useAuthStore.setState({ error: 'Ошибка SSO авторизации. Попробуйте снова.' });
+      return;
+    }
 
-        // Если есть ошибка SSO — показываем её
-        const ssoError = searchParams.get('error');
-        if (ssoError === 'sso_failed') {
-          useAuthStore.setState({ error: 'Ошибка SSO авторизации. Попробуйте снова.' });
-        }
-
-        // Авто-редирект на Keycloak только если:
-        // 1. Провайдер - keycloak
-        // 2. Нет ошибки SSO
-        // 3. Нет флага что мы уже пытались (защита от loop)
-        const alreadyTried = sessionStorage.getItem('sso_redirect_attempted');
-        if (providerInfo.provider === 'keycloak' && !ssoError && !alreadyTried) {
-          sessionStorage.setItem('sso_redirect_attempted', 'true');
-          window.location.href = authApi.getKeycloakLoginUrl();
-          return;
-        }
-      } catch {
-        // По умолчанию используем local
-        setAuthProvider('local');
-      } finally {
-        setProviderLoading(false);
-      }
-    };
-    loadProvider();
-  }, [searchParams]);
-
-  // Редирект если уже авторизован
-  useEffect(() => {
+    // Если уже авторизован - на dashboard
     if (isAuthenticated && !isLoading) {
       router.push('/dashboard');
+      return;
     }
-  }, [isAuthenticated, isLoading, router]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+    // Авто-редирект на Keycloak (если нет ошибки и не пытались ранее)
+    const alreadyTried = sessionStorage.getItem('sso_redirect_attempted');
+    if (!ssoError && !alreadyTried && !isLoading) {
+      sessionStorage.setItem('sso_redirect_attempted', 'true');
+      window.location.href = authApi.getKeycloakLoginUrl();
+    }
+  }, [searchParams, isAuthenticated, isLoading, router]);
+
+  const handleRetryLogin = () => {
     clearError();
-    setIsSubmitting(true);
-
-    try {
-      await login(email, password);
-      router.push('/dashboard');
-    } catch {
-      // Ошибка уже в store
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleKeycloakLogin = () => {
-    // Редирект на backend endpoint который перенаправит на Keycloak
+    sessionStorage.removeItem('sso_redirect_attempted');
     window.location.href = authApi.getKeycloakLoginUrl();
   };
 
-  if (isLoading || providerLoading) {
+  // Показываем loading если идёт проверка или редирект
+  if (isLoading || (!error && !isAuthenticated)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Перенаправление на SSO...</p>
+        </div>
       </div>
     );
   }
 
+  // Показываем ошибку с кнопкой повтора
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
       <div className="w-full max-w-md">
@@ -105,7 +72,7 @@ function LoginPageContent() {
               <span className="text-3xl">🏭</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Stankoff Portal</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">Войдите в систему</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">Вход через SSO</p>
           </div>
 
           {error && (
@@ -114,85 +81,18 @@ function LoginPageContent() {
             </div>
           )}
 
-          {/* Keycloak SSO — показываем только при ошибке */}
-          {authProvider === 'keycloak' && (
-            <button
-              type="button"
-              onClick={handleKeycloakLogin}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              <Shield className="w-5 h-5" />
-              Повторить вход через SSO
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleRetryLogin}
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <Shield className="w-5 h-5" />
+            Войти через SSO
+          </button>
 
-          {/* Форма локального входа — только для local провайдера */}
-          {authProvider === 'local' && (
-            <>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
-                    Email
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@stankoff.ru"
-                    required
-                    autoComplete="email"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
-                    Пароль
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    autoComplete="current-password"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Вход...
-                    </>
-                  ) : (
-                    'Войти'
-                  )}
-                </button>
-              </form>
-
-              <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                  Тестовые учётные данные:
-                  <br />
-                  <span className="font-mono">admin@stankoff.ru / password</span>
-                </p>
-              </div>
-            </>
-          )}
+          <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-6">
+            Авторизация осуществляется через корпоративный SSO (Keycloak)
+          </p>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import {
   UserCheck,
   RefreshCw,
   FileText,
+  Briefcase,
   X,
 } from 'lucide-react';
 import { useNotificationStore } from '@/store/useNotificationStore';
@@ -19,6 +20,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
   status: RefreshCw,
   assignment: UserCheck,
   mention: Bell,
+  workspace: Briefcase,
 };
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
@@ -27,6 +29,7 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   status: 'text-orange-500 bg-orange-100 dark:bg-orange-900/40',
   assignment: 'text-purple-500 bg-purple-100 dark:bg-purple-900/40',
   mention: 'text-pink-500 bg-pink-100 dark:bg-pink-900/40',
+  workspace: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-900/40',
 };
 
 export function ToastContainer() {

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { browserNotifications } from '@/hooks/useBrowserNotifications';
 
-export type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention';
+export type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace';
 
 export interface AppNotification {
   id: string;
@@ -21,6 +21,7 @@ const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   status: 'Изменение статуса',
   assignment: 'Назначение исполнителя',
   mention: 'Упоминание',
+  workspace: 'Рабочее место',
 };
 
 interface NotificationStore {

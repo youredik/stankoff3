@@ -23,16 +23,16 @@ const ACTION_CONFIG: Record<
   AuditActionType,
   { icon: React.ElementType; label: string; color: string }
 > = {
-  'entity:created': { icon: Plus, label: 'Создание', color: 'text-green-600 bg-green-100' },
-  'entity:updated': { icon: Pencil, label: 'Изменение', color: 'text-blue-600 bg-blue-100' },
-  'entity:deleted': { icon: Trash2, label: 'Удаление', color: 'text-red-600 bg-red-100' },
-  'entity:status:changed': { icon: ArrowRight, label: 'Статус', color: 'text-purple-600 bg-purple-100' },
-  'entity:assignee:changed': { icon: UserPlus, label: 'Исполнитель', color: 'text-orange-600 bg-orange-100' },
-  'comment:created': { icon: MessageSquare, label: 'Комментарий', color: 'text-cyan-600 bg-cyan-100' },
-  'comment:updated': { icon: MessageSquare, label: 'Редакт. комментария', color: 'text-cyan-600 bg-cyan-100' },
-  'comment:deleted': { icon: MessageSquare, label: 'Удален. комментария', color: 'text-gray-600 bg-gray-100' },
-  'file:uploaded': { icon: FileText, label: 'Файл загружен', color: 'text-indigo-600 bg-indigo-100' },
-  'file:deleted': { icon: FileText, label: 'Файл удалён', color: 'text-gray-600 bg-gray-100' },
+  'entity:created': { icon: Plus, label: 'Создание', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+  'entity:updated': { icon: Pencil, label: 'Изменение', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+  'entity:deleted': { icon: Trash2, label: 'Удаление', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
+  'entity:status:changed': { icon: ArrowRight, label: 'Статус', color: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' },
+  'entity:assignee:changed': { icon: UserPlus, label: 'Исполнитель', color: 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30' },
+  'comment:created': { icon: MessageSquare, label: 'Комментарий', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
+  'comment:updated': { icon: MessageSquare, label: 'Редакт. комментария', color: 'text-cyan-600 bg-cyan-100 dark:text-cyan-400 dark:bg-cyan-900/30' },
+  'comment:deleted': { icon: MessageSquare, label: 'Удален. комментария', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700' },
+  'file:uploaded': { icon: FileText, label: 'Файл загружен', color: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30' },
+  'file:deleted': { icon: FileText, label: 'Файл удалён', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700' },
 };
 
 function formatDate(dateString: string): string {
@@ -68,11 +68,11 @@ function renderChanges(log: AuditLog): React.ReactNode {
   if (action === 'entity:status:changed' && details.oldValues && details.newValues) {
     return (
       <div className="mt-1 flex items-center gap-2 text-xs">
-        <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+        <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
           {details.oldValues.status}
         </span>
-        <ArrowRight className="w-3 h-3 text-gray-400" />
-        <span className="px-2 py-0.5 rounded bg-primary-100 text-primary-700">
+        <ArrowRight className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+        <span className="px-2 py-0.5 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
           {details.newValues.status}
         </span>
       </div>
@@ -81,7 +81,7 @@ function renderChanges(log: AuditLog): React.ReactNode {
 
   if (action === 'entity:assignee:changed') {
     return (
-      <div className="mt-1 text-xs text-gray-500">
+      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         {details.newValues?.assigneeId
           ? 'Назначен новый исполнитель'
           : 'Исполнитель снят'}
@@ -91,7 +91,7 @@ function renderChanges(log: AuditLog): React.ReactNode {
 
   if (details.changedFields && details.changedFields.length > 0) {
     return (
-      <div className="mt-1 text-xs text-gray-500">
+      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         Изменено: {details.changedFields.join(', ')}
       </div>
     );
@@ -148,8 +148,8 @@ export function ActivityPanel({ entityId }: ActivityPanelProps) {
   if (logs.length === 0) {
     return (
       <div className="text-center py-8">
-        <Clock className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-        <p className="text-sm text-gray-500">История пока пуста</p>
+        <Clock className="w-8 h-8 mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">История пока пуста</p>
       </div>
     );
   }
@@ -165,21 +165,21 @@ export function ActivityPanel({ entityId }: ActivityPanelProps) {
         const Icon = config.icon;
 
         return (
-          <div key={log.id} className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+          <div key={log.id} className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${config.color}`}>
               <Icon className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {getActorName(log.actor)}
                   </span>
-                  <span className="text-sm text-gray-500 ml-1">
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
                     {log.details.description}
                   </span>
                 </div>
-                <span className="text-xs text-gray-400 whitespace-nowrap">
+                <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
                   {formatDate(log.createdAt)}
                 </span>
               </div>
@@ -193,7 +193,7 @@ export function ActivityPanel({ entityId }: ActivityPanelProps) {
         <button
           onClick={loadMore}
           disabled={loading}
-          className="w-full py-2 text-sm text-primary-600 hover:text-primary-700 flex items-center justify-center gap-1 disabled:opacity-50"
+          className="w-full py-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center justify-center gap-1 disabled:opacity-50"
         >
           {loading ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600" />

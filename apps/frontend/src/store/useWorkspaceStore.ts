@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import type { Workspace, Field, Section, FieldOption, WorkspaceRole } from '@/types';
 import { workspacesApi } from '@/lib/api/workspaces';
+import { useNotificationStore } from './useNotificationStore';
 
 interface WorkspaceStore {
   workspaces: Workspace[];
@@ -177,6 +178,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspaces: [...state.workspaces, created],
         currentWorkspace: created,
       }));
+      useNotificationStore.getState().addNotification({
+        text: `Рабочее место «${created.name}» создано`,
+        type: 'workspace',
+        workspaceId: created.id,
+      });
       return created;
     } catch (err) {
       set({ error: (err as Error).message });
@@ -202,6 +208,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   deleteWorkspace: async (id) => {
+    const workspace = get().workspaces.find((w) => w.id === id);
     try {
       await workspacesApi.delete(id);
       set((state) => ({
@@ -209,6 +216,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         currentWorkspace:
           state.currentWorkspace?.id === id ? null : state.currentWorkspace,
       }));
+      useNotificationStore.getState().addNotification({
+        text: `Рабочее место «${workspace?.name || 'Без названия'}» удалено`,
+        type: 'workspace',
+      });
     } catch (err) {
       set({ error: (err as Error).message });
     }
@@ -220,6 +231,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       set((state) => ({
         workspaces: [...state.workspaces, duplicated],
       }));
+      useNotificationStore.getState().addNotification({
+        text: `Рабочее место «${duplicated.name}» создано как копия`,
+        type: 'workspace',
+        workspaceId: duplicated.id,
+      });
       return duplicated;
     } catch (err) {
       set({ error: (err as Error).message });
@@ -230,11 +246,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   archiveWorkspace: async (id, isArchived) => {
     try {
       const updated = await workspacesApi.setArchived(id, isArchived);
+      const workspace = get().workspaces.find((w) => w.id === id);
       set((state) => ({
         workspaces: state.workspaces.map((w) =>
           w.id === id ? { ...w, isArchived: updated.isArchived } : w
         ),
       }));
+      useNotificationStore.getState().addNotification({
+        text: `Рабочее место «${workspace?.name || 'Без названия'}» ${isArchived ? 'архивировано' : 'разархивировано'}`,
+        type: 'workspace',
+        workspaceId: id,
+      });
     } catch (err) {
       set({ error: (err as Error).message });
     }
@@ -390,6 +412,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         sections: currentWorkspace.sections,
       });
       set({ loading: false });
+      useNotificationStore.getState().addNotification({
+        text: `Рабочее место «${currentWorkspace.name}» сохранено`,
+        type: 'workspace',
+        workspaceId: currentWorkspace.id,
+      });
     } catch (err) {
       set({ loading: false, error: (err as Error).message });
     }

@@ -12,7 +12,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -28,34 +27,6 @@ export class AuthController {
     private authService: AuthService,
     private configService: ConfigService,
   ) {}
-
-  @Public()
-  @UseGuards(LocalAuthGuard)
-  @Post('login')
-  async login(
-    @Request() req: { user: User },
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { accessToken, refreshToken } = await this.authService.login(
-      req.user,
-    );
-
-    // Устанавливаем refresh token в HttpOnly cookie
-    res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: COOKIE_MAX_AGE,
-      path: '/api/auth',
-    });
-
-    // Возвращаем access token и данные пользователя
-    const { password, ...userWithoutPassword } = req.user;
-    return {
-      accessToken,
-      user: userWithoutPassword,
-    };
-  }
 
   @Public()
   @Post('refresh')
@@ -106,16 +77,11 @@ export class AuthController {
       path: '/api/auth',
     });
 
-    const provider = this.authService.getAuthProvider();
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
 
-    // Если Keycloak - возвращаем URL для logout из Keycloak
-    if (provider === 'keycloak') {
-      const keycloakLogoutUrl = this.authService.getKeycloakLogoutUrl(frontendUrl + '/login', idToken);
-      return { message: 'Выход выполнен успешно', keycloakLogoutUrl };
-    }
-
-    return { message: 'Выход выполнен успешно' };
+    // Возвращаем URL для logout из Keycloak
+    const keycloakLogoutUrl = this.authService.getKeycloakLogoutUrl(frontendUrl + '/login', idToken);
+    return { message: 'Выход выполнен успешно', keycloakLogoutUrl };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -125,28 +91,11 @@ export class AuthController {
     return userWithoutPassword;
   }
 
-  // ==================== Auth Provider Info ====================
-
-  @Public()
-  @Get('provider')
-  getProvider() {
-    const provider = this.authService.getAuthProvider();
-    return {
-      provider,
-      keycloakEnabled: provider === 'keycloak',
-    };
-  }
-
   // ==================== Keycloak SSO Endpoints ====================
 
   @Public()
   @Get('keycloak/login')
   async keycloakLogin(@Res() res: Response) {
-    const provider = this.authService.getAuthProvider();
-    if (provider !== 'keycloak') {
-      throw new BadRequestException('Keycloak SSO не включен');
-    }
-
     // Callback идёт на backend, не на frontend
     const backendPort = this.configService.get<string>('BACKEND_PORT') || '3001';
     const redirectUri = `http://localhost:${backendPort}/api/auth/keycloak/callback`;
@@ -164,11 +113,6 @@ export class AuthController {
     @Query('session_state') sessionState: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const provider = this.authService.getAuthProvider();
-    if (provider !== 'keycloak') {
-      throw new BadRequestException('Keycloak SSO не включен');
-    }
-
     if (!code || !state) {
       throw new BadRequestException('Отсутствует code или state');
     }
