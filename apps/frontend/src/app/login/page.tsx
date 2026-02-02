@@ -45,10 +45,10 @@ function LoginPageContent() {
   // Показываем loading при редиректе
   if (isRedirecting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500 dark:text-gray-400">Перенаправление на SSO...</p>
+          <div className="animate-spin rounded h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-500">Перенаправление на SSO...</p>
         </div>
       </div>
     );
@@ -57,10 +57,10 @@ function LoginPageContent() {
   // Показываем loading пока проверяется авторизация
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500 dark:text-gray-400">Проверка авторизации...</p>
+          <div className="animate-spin rounded h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-500">Проверка авторизации...</p>
         </div>
       </div>
     );
@@ -68,20 +68,20 @@ function LoginPageContent() {
 
   // Показываем страницу входа
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
       <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-8">
           {/* Логотип */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500 rounded mb-4">
               <span className="text-3xl">🏭</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Stankoff Portal</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">Корпоративный портал</p>
+            <p className="text-gray-500 mt-2">Корпоративный портал</p>
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg mb-6">
+            <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded mb-6">
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             </div>
           )}
@@ -89,13 +89,13 @@ function LoginPageContent() {
           <button
             type="button"
             onClick={handleLogin}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-primary-500 hover:bg-primary-400 text-white font-semibold rounded transition-colors flex items-center justify-center gap-2"
           >
             <Shield className="w-5 h-5" />
             Войти через SSO
           </button>
 
-          <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-6">
+          <p className="text-xs text-gray-500 text-center mt-6">
             Авторизация осуществляется через корпоративный SSO (Keycloak)
           </p>
         </div>
@@ -106,8 +106,8 @@ function LoginPageContent() {
 
 function LoginPageFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="animate-spin rounded h-12 w-12 border-b-2 border-primary-500"></div>
     </div>
   );
 }

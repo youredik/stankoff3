@@ -79,6 +79,27 @@ export function AttachmentPreview({
               className="w-full h-full object-cover"
             />
           </div>
+        ) : isVideo && showThumbnail ? (
+          <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0 relative bg-gray-200 dark:bg-gray-700">
+            {attachment.thumbnailUrl ? (
+              <img
+                src={attachment.thumbnailUrl}
+                alt={attachment.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <video
+                src={attachment.url}
+                className="w-full h-full object-cover"
+                preload="metadata"
+                muted
+                playsInline
+              />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <Film className="w-3 h-3 text-white" />
+            </div>
+          </div>
         ) : isImage ? (
           <Image className="w-4 h-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
         ) : isVideo ? (

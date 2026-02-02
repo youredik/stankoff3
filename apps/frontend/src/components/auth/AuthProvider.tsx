@@ -15,6 +15,14 @@ function AuthProviderInner({ children }: AuthProviderProps) {
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
   const [ssoProcessing, setSsoProcessing] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Ждём восстановления из localStorage (Zustand persist)
+  useEffect(() => {
+    // Небольшая задержка для гарантии что persist восстановил данные
+    const timer = setTimeout(() => setHydrated(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Устанавливаем interceptors при монтировании
   useEffect(() => {
@@ -28,7 +36,8 @@ function AuthProviderInner({ children }: AuthProviderProps) {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    if (authChecked) return;
+    // Ждём hydration перед проверкой авторизации
+    if (!hydrated || authChecked) return;
 
     const accessTokenParam = searchParams.get('access_token');
     if (accessTokenParam) {
@@ -78,12 +87,19 @@ function AuthProviderInner({ children }: AuthProviderProps) {
       };
 
       fetchProfile();
-    } else if (!authChecked) {
+    } else {
       setAuthChecked(true);
-      // Стандартная проверка авторизации
-      checkAuth();
+      // Если есть сохранённый токен в localStorage - проверяем его валидность
+      const savedToken = useAuthStore.getState().accessToken;
+      if (savedToken) {
+        // Токен есть - проверяем что он ещё действителен
+        checkAuth();
+      } else {
+        // Нет токена - не авторизован
+        useAuthStore.setState({ isLoading: false, isAuthenticated: false });
+      }
     }
-  }, [searchParams, checkAuth, authChecked]);
+  }, [hydrated, searchParams, checkAuth, authChecked]);
 
   // Редирект на логин если не авторизован
   useEffect(() => {
@@ -92,8 +108,8 @@ function AuthProviderInner({ children }: AuthProviderProps) {
     }
   }, [isLoading, ssoProcessing, isAuthenticated, pathname, router]);
 
-  // Показываем загрузку пока проверяем авторизацию или обрабатываем SSO
-  if (isLoading || ssoProcessing) {
+  // Показываем загрузку пока ждём hydration, проверяем авторизацию или обрабатываем SSO
+  if (!hydrated || isLoading || ssoProcessing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">

@@ -33,28 +33,28 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
   const getPriorityConfig = (priority?: string) => {
     switch(priority) {
       case 'high': return {
-        bg: 'bg-danger-50 dark:bg-danger-900/30',
-        text: 'text-danger-700 dark:text-danger-400',
-        border: 'border-danger-200 dark:border-danger-800',
+        bg: 'bg-danger-100 dark:bg-danger-900/40',
+        text: 'text-danger-600 dark:text-danger-400',
+        border: 'border-danger-300 dark:border-danger-800',
         dot: 'bg-danger-500'
       };
       case 'medium': return {
-        bg: 'bg-warning-50 dark:bg-warning-900/30',
-        text: 'text-warning-700 dark:text-warning-400',
-        border: 'border-warning-200 dark:border-warning-800',
+        bg: 'bg-warning-100 dark:bg-warning-900/40',
+        text: 'text-warning-600 dark:text-warning-400',
+        border: 'border-warning-300 dark:border-warning-800',
         dot: 'bg-warning-500'
       };
       case 'low': return {
-        bg: 'bg-success-50 dark:bg-success-900/30',
-        text: 'text-success-700 dark:text-success-400',
-        border: 'border-success-200 dark:border-success-800',
+        bg: 'bg-success-100 dark:bg-success-900/40',
+        text: 'text-success-600 dark:text-success-400',
+        border: 'border-success-300 dark:border-success-800',
         dot: 'bg-success-500'
       };
       default: return {
-        bg: 'bg-gray-50 dark:bg-gray-800',
+        bg: 'bg-gray-200 dark:bg-gray-800',
         text: 'text-gray-600 dark:text-gray-400',
-        border: 'border-gray-200 dark:border-gray-700',
-        dot: 'bg-gray-400'
+        border: 'border-gray-300 dark:border-gray-700',
+        dot: 'bg-gray-500'
       };
     }
   };
@@ -79,11 +79,11 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
       onClick={() => !isDragging && selectEntity(entity.id)}
       data-testid="kanban-card"
       data-entity-id={entity.id}
-      className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-soft hover:shadow-soft-lg cursor-pointer transition-shadow"
+      className="bg-white dark:bg-gray-800 p-4 rounded border border-gray-200 dark:border-gray-700 hover:border-primary-500/30 cursor-pointer transition-colors"
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <span className="text-xs font-mono text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-700 px-2 py-0.5 rounded-md">
+        <span className="text-xs font-mono text-gray-500 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-md">
           {entity.customId}
         </span>
         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full ${priorityConfig.bg} ${priorityConfig.text}`}>
@@ -100,20 +100,20 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
         <div className="flex items-center gap-2">
           {entity.assignee ? (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-primary-600 rounded flex items-center justify-center">
-                <span className="text-white text-[10px] font-medium">
+              <div className="w-6 h-6 bg-primary-500 rounded flex items-center justify-center">
+                <span className="text-white text-[10px] font-semibold">
                   {entity.assignee.firstName[0]}{entity.assignee.lastName[0]}
                 </span>
               </div>
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-gray-400">
                 {entity.assignee.firstName} {entity.assignee.lastName[0]}.
               </span>
             </div>
           ) : (
-            <span className="text-xs text-gray-400 dark:text-gray-500">Не назначен</span>
+            <span className="text-xs text-gray-500">Не назначен</span>
           )}
         </div>
-        <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+        <div className="flex items-center gap-1 text-xs text-gray-500">
           <Calendar className="w-3 h-3" />
           <span>{format(entity.createdAt, 'dd.MM', { locale: ru })}</span>
         </div>
@@ -121,8 +121,8 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
 
       {/* Links */}
       {entity.linkedEntityIds && entity.linkedEntityIds.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400">
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-1.5 text-xs text-primary-400">
             <Link2 className="w-3 h-3" />
             <span>{entity.linkedEntityIds.length} связанных</span>
           </div>

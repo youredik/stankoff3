@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { User } from '@/types';
 import { authApi } from '@/lib/api/auth';
 
@@ -20,12 +21,14 @@ interface AuthActions {
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
-  user: null,
-  accessToken: null,
-  isAuthenticated: false,
-  isLoading: true, // Начинаем с true чтобы не было редиректа до проверки авторизации
-  error: null,
+export const useAuthStore = create<AuthState & AuthActions>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: true, // Начинаем с true чтобы не было редиректа до проверки авторизации
+      error: null,
 
   logout: async () => {
     try {
@@ -123,4 +126,23 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   clearError: () => {
     set({ error: null });
   },
-}));
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        accessToken: state.accessToken,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      onRehydrateStorage: () => (state) => {
+        // После восстановления из localStorage - проверяем токен
+        if (state?.accessToken) {
+          // Токен есть - нужно проверить его валидность
+          state.isLoading = true;
+        } else {
+          state!.isLoading = false;
+        }
+      },
+    }
+  )
+);

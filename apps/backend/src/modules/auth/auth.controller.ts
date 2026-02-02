@@ -34,10 +34,13 @@ export class AuthController {
     @Request() req: { cookies: Record<string, string> },
     @Res({ passthrough: true }) res: Response,
   ) {
+    console.log('Refresh endpoint called, cookies:', Object.keys(req.cookies || {}));
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
     if (!refreshToken) {
+      console.log('Refresh token NOT found in cookies');
       throw new UnauthorizedException('Refresh token не найден');
     }
+    console.log('Refresh token found, refreshing...');
 
     const tokens = await this.authService.refreshTokens(refreshToken);
 
@@ -45,7 +48,7 @@ export class AuthController {
     res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: COOKIE_MAX_AGE,
       path: '/api/auth',
     });

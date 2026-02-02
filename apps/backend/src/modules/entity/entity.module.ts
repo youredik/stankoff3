@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkspaceEntity } from './entity.entity';
 import { Comment } from './comment.entity';
+import { GlobalCounter } from './global-counter.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { User } from '../user/user.entity';
 import { EntityService } from './entity.service';
@@ -16,7 +17,7 @@ import { AutomationModule } from '../automation/automation.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WorkspaceEntity, Comment, Workspace, User]),
+    TypeOrmModule.forFeature([WorkspaceEntity, Comment, GlobalCounter, Workspace, User]),
     WebsocketModule,
     S3Module,
     WorkspaceModule,

@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Workspace } from '../workspace/workspace.entity';
 import { User } from '../user/user.entity';
@@ -17,8 +18,9 @@ export class WorkspaceEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  customId: string; // TP-1234, REK-445 и т.д.
+  @Column({ unique: true })
+  @Index({ unique: true })
+  customId: string; // TP-1234, REK-445 и т.д. - глобально уникальный
 
   @ManyToOne(() => Workspace, (workspace) => workspace.entities)
   @JoinColumn({ name: 'workspaceId' })

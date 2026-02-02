@@ -13,11 +13,24 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { getEntityHistory } from '@/lib/api/audit-logs';
-import type { AuditLog, AuditActionType } from '@/types';
+import type { AuditLog, AuditActionType, FieldOption } from '@/types';
 
 interface ActivityPanelProps {
   entityId: string;
+  statusOptions?: FieldOption[];
 }
+
+// Маппинг технических названий полей на человекочитаемые
+const FIELD_LABELS: Record<string, string> = {
+  title: 'Название',
+  status: 'Статус',
+  priority: 'Приоритет',
+  assigneeId: 'Исполнитель',
+  data: 'Данные',
+  linkedEntityIds: 'Связанные заявки',
+  description: 'Описание',
+  customId: 'Номер',
+};
 
 const ACTION_CONFIG: Record<
   AuditActionType,
@@ -62,18 +75,32 @@ function getActorName(actor: AuditLog['actor']): string {
   return name || actor.email;
 }
 
-function renderChanges(log: AuditLog): React.ReactNode {
+function getStatusLabel(statusId: string, statusOptions?: FieldOption[]): string {
+  if (statusOptions) {
+    const option = statusOptions.find(o => o.id === statusId);
+    if (option) return option.label;
+  }
+  return statusId;
+}
+
+function getFieldLabel(fieldName: string): string {
+  return FIELD_LABELS[fieldName] || fieldName;
+}
+
+function renderChanges(log: AuditLog, statusOptions?: FieldOption[]): React.ReactNode {
   const { details, action } = log;
 
   if (action === 'entity:status:changed' && details.oldValues && details.newValues) {
+    const oldLabel = getStatusLabel(details.oldValues.status, statusOptions);
+    const newLabel = getStatusLabel(details.newValues.status, statusOptions);
     return (
       <div className="mt-1 flex items-center gap-2 text-xs">
         <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-          {details.oldValues.status}
+          {oldLabel}
         </span>
         <ArrowRight className="w-3 h-3 text-gray-400 dark:text-gray-500" />
         <span className="px-2 py-0.5 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
-          {details.newValues.status}
+          {newLabel}
         </span>
       </div>
     );
@@ -90,9 +117,10 @@ function renderChanges(log: AuditLog): React.ReactNode {
   }
 
   if (details.changedFields && details.changedFields.length > 0) {
+    const translatedFields = details.changedFields.map(f => getFieldLabel(f));
     return (
       <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Изменено: {details.changedFields.join(', ')}
+        Изменено: {translatedFields.join(', ')}
       </div>
     );
   }
@@ -100,7 +128,7 @@ function renderChanges(log: AuditLog): React.ReactNode {
   return null;
 }
 
-export function ActivityPanel({ entityId }: ActivityPanelProps) {
+export function ActivityPanel({ entityId, statusOptions }: ActivityPanelProps) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -183,7 +211,7 @@ export function ActivityPanel({ entityId }: ActivityPanelProps) {
                   {formatDate(log.createdAt)}
                 </span>
               </div>
-              {renderChanges(log)}
+              {renderChanges(log, statusOptions)}
             </div>
           </div>
         );

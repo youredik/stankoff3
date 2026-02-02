@@ -24,9 +24,9 @@ const DEFAULT_STATUSES: FieldOption[] = [
 ];
 
 const PRIORITY_COLORS: Record<string, string> = {
-  high: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
-  medium: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
-  low: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
+  high: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800',
+  medium: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-800',
+  low: 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 border-green-300 dark:border-green-800',
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -100,7 +100,7 @@ function FieldValue({
       <select
         value={value || ''}
         onChange={(e) => onUpdate(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
       >
         <option value="">Не выбрано</option>
         {field.options.map((opt) => (
@@ -135,7 +135,7 @@ function FieldValue({
       <select
         value={value || ''}
         onChange={(e) => onUpdate(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
       >
         <option value="">Не выбрано</option>
         {users.map((u) => (
@@ -163,7 +163,7 @@ function FieldValue({
         type="date"
         value={value || ''}
         onChange={(e) => onUpdate(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
       />
     );
   }
@@ -182,7 +182,7 @@ function FieldValue({
         type="number"
         value={value ?? ''}
         onChange={(e) => onUpdate(e.target.value ? Number(e.target.value) : null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
         placeholder={field.description || ''}
       />
     );
@@ -206,7 +206,7 @@ function FieldValue({
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
             rows={3}
-            className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
+            className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
             autoFocus
           />
         </div>
@@ -274,7 +274,7 @@ function FieldValue({
           </div>
         )}
         {canEdit && (
-          <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 dark:border-gray-600 rounded cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             <Upload className="w-4 h-4 text-gray-400" />
             <span className="text-sm text-gray-500 dark:text-gray-400">Загрузить файл</span>
             <input
@@ -342,7 +342,7 @@ function FieldValue({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
         autoFocus
       />
     );
@@ -385,7 +385,7 @@ function FieldSection({
   if (customFields.length === 0) return null;
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+    <div className="border border-gray-200 dark:border-gray-700 rounded overflow-hidden bg-white dark:bg-gray-800">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
@@ -475,8 +475,19 @@ export function EntityDetailPanel() {
     return allEntityAttachments.filter((a) => a.mimeType.startsWith('image/'));
   }, [allEntityAttachments]);
 
+  const videoAttachments = useMemo(() => {
+    return allEntityAttachments.filter((a) => a.mimeType.startsWith('video/'));
+  }, [allEntityAttachments]);
+
+  // Медиа для галереи (изображения + видео)
+  const mediaAttachments = useMemo(() => {
+    return [...imageAttachments, ...videoAttachments];
+  }, [imageAttachments, videoAttachments]);
+
   const otherAttachments = useMemo(() => {
-    return allEntityAttachments.filter((a) => !a.mimeType.startsWith('image/'));
+    return allEntityAttachments.filter((a) =>
+      !a.mimeType.startsWith('image/') && !a.mimeType.startsWith('video/')
+    );
   }, [allEntityAttachments]);
 
   // Handle Escape key to close panel
@@ -514,7 +525,7 @@ export function EntityDetailPanel() {
       {/* Overlay */}
       <div
         data-testid="detail-panel-overlay"
-        className="fixed inset-0 bg-black/30 z-40"
+        className="fixed inset-0 bg-black/60 z-40"
         onClick={deselectEntity}
       />
 
@@ -524,12 +535,12 @@ export function EntityDetailPanel() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="entity-detail-title"
-          className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-[95vw] h-[95vh] flex flex-col pointer-events-auto"
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-xl w-[95vw] h-[95vh] flex flex-col pointer-events-auto"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-8 py-5 border-b dark:border-gray-700">
+          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
+              <span className="text-xs font-mono bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
                 {selectedEntity.customId}
               </span>
               <span
@@ -539,7 +550,7 @@ export function EntityDetailPanel() {
               </span>
               {currentStatus && (
                 <span
-                  className="text-xs font-medium px-2 py-1 rounded text-white"
+                  className="text-xs font-medium px-2 py-1 rounded text-gray-900"
                   style={{ backgroundColor: currentStatus.color }}
                 >
                   {currentStatus.label}
@@ -551,14 +562,14 @@ export function EntityDetailPanel() {
               aria-label="Закрыть панель"
               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
             >
-              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <X className="w-5 h-5 text-gray-400" />
             </button>
           </div>
 
           {/* Body — three columns */}
           <div className="flex flex-1 overflow-hidden">
             {/* Left column: title, description, custom fields */}
-            <div className="flex-1 border-r dark:border-gray-700 overflow-y-auto">
+            <div className="flex-1 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
               <div className="p-6">
                 <h2 id="entity-detail-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   {selectedEntity.title}
@@ -611,20 +622,20 @@ export function EntityDetailPanel() {
                   onClick={() => setActiveTab('comments')}
                   className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
                     activeTab === 'comments'
-                      ? 'border-primary-600 text-primary-600 dark:text-primary-400'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      ? 'border-primary-500 text-primary-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-300'
                   }`}
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span className="text-sm font-medium">Комментарии</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">({comments.length})</span>
+                  <span className="text-xs text-gray-500">({comments.length})</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('history')}
                   className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
                     activeTab === 'history'
-                      ? 'border-primary-600 text-primary-600 dark:text-primary-400'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      ? 'border-primary-500 text-primary-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-300'
                   }`}
                 >
                   <History className="w-4 h-4" />
@@ -638,7 +649,7 @@ export function EntityDetailPanel() {
                 {activeTab === 'comments' && (
                   <div>
                     {comments.length === 0 && (
-                      <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                      <p className="text-sm text-gray-500 italic">
                         Пока нет комментариев
                       </p>
                     )}
@@ -646,19 +657,19 @@ export function EntityDetailPanel() {
                     <div className="space-y-5">
                       {comments.map((comment) => (
                         <div key={comment.id} className="flex gap-3">
-                          <div className="w-8 h-8 bg-primary-600 rounded-full flex-shrink-0 flex items-center justify-center">
-                            <span className="text-white text-xs font-medium">
+                          <div className="w-8 h-8 bg-primary-500 rounded flex-shrink-0 flex items-center justify-center">
+                            <span className="text-white text-xs font-semibold">
                               {comment.author.firstName[0]}
                               {comment.author.lastName[0]}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                              <span className="text-sm font-medium text-gray-900 dark:text-gray-200">
                                 {comment.author.firstName}{' '}
                                 {comment.author.lastName}
                               </span>
-                              <span className="text-xs text-gray-400 dark:text-gray-500">
+                              <span className="text-xs text-gray-500">
                                 {format(
                                   new Date(comment.createdAt),
                                   'dd.MM HH:mm',
@@ -667,7 +678,7 @@ export function EntityDetailPanel() {
                               </span>
                             </div>
                             <div
-                              className="text-sm text-gray-600 dark:text-gray-300 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-600 dark:[&_a]:text-primary-400 [&_a]:underline [&_.mention]:text-primary-600 dark:[&_.mention]:text-primary-400 [&_.mention]:bg-primary-50 dark:[&_.mention]:bg-primary-900/30 [&_.mention]:rounded [&_.mention]:px-0.5"
+                              className="text-sm text-gray-700 dark:text-gray-300 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-400 [&_a]:underline [&_.mention]:text-primary-400 [&_.mention]:bg-primary-100 dark:[&_.mention]:bg-primary-900/30 [&_.mention]:rounded [&_.mention]:px-0.5"
                               dangerouslySetInnerHTML={{ __html: comment.content }}
                             />
                             {/* Attachments */}
@@ -692,24 +703,24 @@ export function EntityDetailPanel() {
 
                 {/* History Tab */}
                 {activeTab === 'history' && (
-                  <ActivityPanel entityId={selectedEntity.id} />
+                  <ActivityPanel entityId={selectedEntity.id} statusOptions={statuses} />
                 )}
               </div>
 
               {/* Comment editor — pinned to bottom */}
               {canEditEntity && (
-                <div className="border-t dark:border-gray-700 p-4">
+                <div className="border-t border-gray-200 dark:border-gray-700 p-4">
                   <CommentEditor users={users} onSubmit={handleSubmitComment} />
                 </div>
               )}
             </div>
 
             {/* Right sidebar: status, assignee, files, meta */}
-            <div className="w-[280px] flex-shrink-0 border-l dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 overflow-y-auto">
+            <div className="w-[280px] flex-shrink-0 border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
               <div className="p-5 space-y-5">
                 {/* Status */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase mb-2">
                     Статус
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -719,12 +730,12 @@ export function EntityDetailPanel() {
                         onClick={() => canEditEntity && updateStatus(selectedEntity.id, s.id)}
                         disabled={!canEditEntity}
                         title={!canEditEntity ? 'Недостаточно прав для изменения статуса' : undefined}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-1.5 ${
                           selectedEntity.status === s.id
                             ? 'text-white'
                             : canEditEntity
-                              ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer bg-white dark:bg-gray-700'
-                              : 'text-gray-400 dark:text-gray-500 cursor-default bg-white dark:bg-gray-700'
+                              ? 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer bg-gray-100 dark:bg-gray-700'
+                              : 'text-gray-500 cursor-default bg-gray-100 dark:bg-gray-700'
                         }`}
                         style={
                           selectedEntity.status === s.id
@@ -746,7 +757,7 @@ export function EntityDetailPanel() {
 
                 {/* Assignee */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase mb-2">
                     Исполнитель
                   </p>
                   {canAssign ? (
@@ -755,7 +766,7 @@ export function EntityDetailPanel() {
                       onChange={(e) =>
                         updateAssignee(selectedEntity.id, e.target.value || null)
                       }
-                      className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
+                      className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
                     >
                       <option value="">Не назначен</option>
                       {users.map((u) => (
@@ -766,7 +777,7 @@ export function EntityDetailPanel() {
                     </select>
                   ) : (
                     <p
-                      className="text-sm text-gray-700 dark:text-gray-300"
+                      className="text-sm text-gray-300"
                       title="Недостаточно прав для назначения исполнителя"
                     >
                       {selectedEntity.assignee
@@ -780,34 +791,62 @@ export function EntityDetailPanel() {
                 {allEntityAttachments.length > 0 && (
                   <div>
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Paperclip className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <Paperclip className="w-3.5 h-3.5 text-gray-500" />
+                      <p className="text-xs font-medium text-gray-500 uppercase">
                         Файлы ({allEntityAttachments.length})
                       </p>
                     </div>
 
-                    {/* Галерея изображений */}
-                    {imageAttachments.length > 0 && (
+                    {/* Галерея медиа (изображения + видео) */}
+                    {mediaAttachments.length > 0 && (
                       <div className="grid grid-cols-4 gap-1 mb-2">
-                        {imageAttachments.slice(0, 8).map((att, idx) => (
-                          <button
-                            key={att.id}
-                            onClick={() => setGalleryIndex(idx)}
-                            className="aspect-square rounded overflow-hidden bg-gray-200 dark:bg-gray-700 hover:opacity-80 transition-opacity"
-                          >
-                            <img
-                              src={att.thumbnailUrl || att.url}
-                              alt={att.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                        ))}
-                        {imageAttachments.length > 8 && (
+                        {mediaAttachments.slice(0, 8).map((att, idx) => {
+                          const isVideo = att.mimeType.startsWith('video/');
+                          return (
+                            <button
+                              key={att.id}
+                              onClick={() => setGalleryIndex(idx)}
+                              className="aspect-square rounded overflow-hidden bg-gray-200 dark:bg-gray-800 hover:opacity-80 transition-opacity relative"
+                            >
+                              {isVideo ? (
+                                <>
+                                  {att.thumbnailUrl ? (
+                                    <img
+                                      src={att.thumbnailUrl}
+                                      alt={att.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <video
+                                      src={att.url}
+                                      className="w-full h-full object-cover"
+                                      preload="metadata"
+                                      muted
+                                      playsInline
+                                    />
+                                  )}
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                    <div className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center">
+                                      <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[8px] border-l-gray-800 border-b-[5px] border-b-transparent ml-0.5" />
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <img
+                                  src={att.thumbnailUrl || att.url}
+                                  alt={att.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+                        {mediaAttachments.length > 8 && (
                           <button
                             onClick={() => setGalleryIndex(8)}
-                            className="aspect-square rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            className="aspect-square rounded bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
                           >
-                            +{imageAttachments.length - 8}
+                            +{mediaAttachments.length - 8}
                           </button>
                         )}
                       </div>
@@ -831,7 +870,7 @@ export function EntityDetailPanel() {
 
                 {/* Meta */}
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
                     <Clock className="w-3.5 h-3.5" />
                     <span>
                       Создано{' '}
@@ -847,10 +886,10 @@ export function EntityDetailPanel() {
         </div>
       </div>
 
-      {/* Галерея для просмотра изображений из сайдбара */}
-      {galleryIndex !== null && imageAttachments.length > 0 && (
+      {/* Галерея для просмотра медиа из сайдбара */}
+      {galleryIndex !== null && mediaAttachments.length > 0 && (
         <MediaLightbox
-          attachments={imageAttachments}
+          attachments={mediaAttachments}
           initialIndex={galleryIndex}
           onClose={() => setGalleryIndex(null)}
         />

@@ -27,12 +27,13 @@ export function MediaLightbox({
   const [zoom, setZoom] = useState(1);
   const [mounted, setMounted] = useState(false);
 
-  // Фильтруем только изображения
+  // Фильтруем изображения и видео
   const mediaAttachments = attachments.filter((a) =>
-    a.mimeType.startsWith('image/')
+    a.mimeType.startsWith('image/') || a.mimeType.startsWith('video/')
   );
 
   const current = mediaAttachments[currentIndex];
+  const isCurrentVideo = current?.mimeType.startsWith('video/');
 
   useEffect(() => {
     setMounted(true);
@@ -88,23 +89,27 @@ export function MediaLightbox({
           {current.name} ({currentIndex + 1} / {mediaAttachments.length})
         </span>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
-            className="p-2 text-white/80 hover:text-white transition-colors"
-            title="Уменьшить"
-          >
-            <ZoomOut className="w-5 h-5" />
-          </button>
-          <span className="text-white text-sm w-12 text-center">
-            {Math.round(zoom * 100)}%
-          </span>
-          <button
-            onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
-            className="p-2 text-white/80 hover:text-white transition-colors"
-            title="Увеличить"
-          >
-            <ZoomIn className="w-5 h-5" />
-          </button>
+          {!isCurrentVideo && (
+            <>
+              <button
+                onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+                className="p-2 text-white/80 hover:text-white transition-colors"
+                title="Уменьшить"
+              >
+                <ZoomOut className="w-5 h-5" />
+              </button>
+              <span className="text-white text-sm w-12 text-center">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
+                className="p-2 text-white/80 hover:text-white transition-colors"
+                title="Увеличить"
+              >
+                <ZoomIn className="w-5 h-5" />
+              </button>
+            </>
+          )}
           <button
             onClick={handleDownload}
             className="p-2 text-white/80 hover:text-white transition-colors"
@@ -122,18 +127,27 @@ export function MediaLightbox({
         </div>
       </div>
 
-      {/* Image */}
+      {/* Image or Video */}
       <div
         className="max-w-[90vw] max-h-[85vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <img
-          src={current.url}
-          alt={current.name}
-          className="transition-transform duration-200 max-h-[85vh] object-contain"
-          style={{ transform: `scale(${zoom})` }}
-          draggable={false}
-        />
+        {isCurrentVideo ? (
+          <video
+            src={current.url}
+            controls
+            autoPlay
+            className="max-h-[85vh] max-w-[90vw] object-contain"
+          />
+        ) : (
+          <img
+            src={current.url}
+            alt={current.name}
+            className="transition-transform duration-200 max-h-[85vh] object-contain"
+            style={{ transform: `scale(${zoom})` }}
+            draggable={false}
+          />
+        )}
       </div>
 
       {/* Navigation arrows */}
@@ -166,24 +180,51 @@ export function MediaLightbox({
           className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 p-2 bg-black/50 rounded-lg max-w-[90vw] overflow-x-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          {mediaAttachments.map((att, idx) => (
-            <button
-              key={att.id}
-              onClick={() => {
-                setCurrentIndex(idx);
-                setZoom(1);
-              }}
-              className={`w-12 h-12 rounded overflow-hidden border-2 transition-colors flex-shrink-0 ${
-                idx === currentIndex ? 'border-white' : 'border-transparent'
-              }`}
-            >
-              <img
-                src={att.thumbnailUrl || att.url}
-                alt={att.name}
-                className="w-full h-full object-cover"
-              />
-            </button>
-          ))}
+          {mediaAttachments.map((att, idx) => {
+            const isVideo = att.mimeType.startsWith('video/');
+            return (
+              <button
+                key={att.id}
+                onClick={() => {
+                  setCurrentIndex(idx);
+                  setZoom(1);
+                }}
+                className={`w-12 h-12 rounded overflow-hidden border-2 transition-colors flex-shrink-0 relative ${
+                  idx === currentIndex ? 'border-white' : 'border-transparent'
+                }`}
+              >
+                {isVideo ? (
+                  <>
+                    {att.thumbnailUrl ? (
+                      <img
+                        src={att.thumbnailUrl}
+                        alt={att.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <video
+                        src={att.url}
+                        className="w-full h-full object-cover"
+                        preload="metadata"
+                        muted
+                      />
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <div className="w-4 h-4 rounded-full bg-white/90 flex items-center justify-center">
+                        <div className="w-0 h-0 border-t-[3px] border-t-transparent border-l-[5px] border-l-gray-800 border-b-[3px] border-b-transparent ml-0.5" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <img
+                    src={att.thumbnailUrl || att.url}
+                    alt={att.name}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>,

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository, DataSource } from 'typeorm';
 import { WorkspaceEntity } from './entity.entity';
+import { GlobalCounter } from './global-counter.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { User } from '../user/user.entity';
 import { CreateEntityDto } from './dto/create-entity.dto';
@@ -23,6 +24,8 @@ export class EntityService {
   constructor(
     @InjectRepository(WorkspaceEntity)
     private entityRepository: Repository<WorkspaceEntity>,
+    @InjectRepository(GlobalCounter)
+    private globalCounterRepository: Repository<GlobalCounter>,
     @InjectRepository(Workspace)
     private workspaceRepository: Repository<Workspace>,
     @InjectRepository(User)
@@ -130,22 +133,42 @@ export class EntityService {
   async create(dto: CreateEntityDto, actorId?: string): Promise<WorkspaceEntity> {
     // Генерируем customId в транзакции для избежания дублирования номеров
     const saved = await this.dataSource.transaction(async (manager) => {
-      // Получаем workspace с блокировкой для обновления
+      // Получаем workspace для prefix
       const workspace = await manager.findOne(Workspace, {
         where: { id: dto.workspaceId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (!workspace) {
         throw new NotFoundException(`Workspace ${dto.workspaceId} not found`);
       }
 
-      // Инкрементируем счётчик и генерируем customId
-      workspace.lastEntityNumber += 1;
-      const customId = `${workspace.prefix}-${workspace.lastEntityNumber}`;
+      // Получаем или создаём глобальный счётчик с блокировкой
+      let counter = await manager.findOne(GlobalCounter, {
+        where: { name: 'entity_number' },
+        lock: { mode: 'pessimistic_write' },
+      });
 
-      // Сохраняем обновлённый workspace
-      await manager.save(Workspace, workspace);
+      if (!counter) {
+        // Первый запуск - создаём счётчик и инициализируем его максимальным номером из существующих заявок
+        const maxResult = await manager
+          .createQueryBuilder(WorkspaceEntity, 'e')
+          .select('MAX(CAST(SPLIT_PART(e.customId, \'-\', 2) AS INTEGER))', 'maxNum')
+          .getRawOne();
+
+        const maxNum = maxResult?.maxNum || 0;
+
+        counter = manager.create(GlobalCounter, {
+          name: 'entity_number',
+          value: maxNum,
+        });
+      }
+
+      // Инкрементируем глобальный счётчик
+      counter.value += 1;
+      await manager.save(GlobalCounter, counter);
+
+      // Генерируем customId с prefix workspace и глобальным номером
+      const customId = `${workspace.prefix}-${counter.value}`;
 
       // Создаём entity с сгенерированным customId
       const entity = manager.create(WorkspaceEntity, {

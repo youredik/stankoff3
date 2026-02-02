@@ -16,9 +16,9 @@ interface SidebarProps {
 }
 
 const ROLE_CONFIG = {
-  admin: { label: 'Админ', bg: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-700 dark:text-purple-300' },
-  editor: { label: 'Редактор', bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300' },
-  viewer: { label: 'Просмотр', bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-300', icon: true },
+  admin: { label: 'Админ', bg: 'bg-primary-100 dark:bg-primary-900/40', text: 'text-primary-700 dark:text-primary-400' },
+  editor: { label: 'Редактор', bg: 'bg-primary-100 dark:bg-primary-900/30', text: 'text-primary-700 dark:text-primary-400' },
+  viewer: { label: 'Просмотр', bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-400', icon: true },
 } as const;
 
 export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) {
@@ -151,7 +151,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
       <div className="p-6 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded bg-primary-500 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -163,7 +163,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
           <button
             onClick={close}
             aria-label="Закрыть меню"
-            className="lg:hidden p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="lg:hidden p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -177,10 +177,10 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             <button
               onClick={handleCreateWorkspace}
               disabled={creating}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 text-white font-semibold rounded hover:bg-primary-600 transition-colors disabled:opacity-50"
             >
               <Plus className="w-5 h-5" />
-              <span className="font-medium">
+              <span>
                 {creating ? 'Создаём...' : 'Создать рабочее место'}
               </span>
             </button>
@@ -189,16 +189,16 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
 
         {/* Workspaces */}
         <div className="space-y-1">
-          <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             Рабочие места
           </div>
 
           {workspaces.length === 0 && (
             <div className="px-3 py-8 text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                 <span className="text-2xl opacity-50">📭</span>
               </div>
-              <p className="text-sm text-gray-400 dark:text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Нет рабочих мест
               </p>
             </div>
@@ -211,26 +211,26 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             return (
             <div
               key={workspace.id}
-              className={`group relative flex items-center rounded-lg transition-colors ${
+              className={`group relative flex items-center rounded transition-colors ${
                 selectedWorkspace === workspace.id
-                  ? 'bg-primary-50 dark:bg-primary-900/30'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-500/30'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 border border-transparent'
               }`}
             >
               <button
                 onClick={() => handleWorkspaceChange(workspace.id)}
                 className={`flex-1 flex items-center gap-3 px-3 py-2.5 cursor-pointer ${
                   selectedWorkspace === workspace.id
-                    ? 'text-primary-700 dark:text-primary-400'
+                    ? 'text-primary-600 dark:text-primary-400'
                     : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
                 <span className={`text-xl ${workspace.isArchived ? 'opacity-50' : ''}`}>{workspace.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className={`font-medium truncate ${workspace.isArchived ? 'text-gray-400 dark:text-gray-500' : ''}`}>{workspace.name}</span>
+                    <span className={`font-medium truncate ${workspace.isArchived ? 'text-gray-500' : ''}`}>{workspace.name}</span>
                     {workspace.isArchived && (
-                      <Archive className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <Archive className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
                     )}
                   </div>
                   {/* Бейдж роли */}
@@ -242,7 +242,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                   )}
                 </div>
                 {selectedWorkspace === workspace.id && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-500" />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400" />
                 )}
               </button>
 
@@ -257,7 +257,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                     aria-label="Меню рабочего места"
                     aria-expanded={menuOpen === workspace.id}
                     aria-haspopup="true"
-                    className="p-1.5 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    className="p-1.5 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
@@ -268,24 +268,24 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                         className="fixed inset-0 z-10"
                         onClick={() => setMenuOpen(null)}
                       />
-                      <div role="menu" aria-label="Действия с рабочим местом" className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-soft-lg py-1 w-48">
+                      <div role="menu" aria-label="Действия с рабочим местом" className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-48">
                         <button
                           onClick={() => handleEditWorkspace(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                         >
                           <Pencil className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Настроить</span>
                         </button>
                         <button
                           onClick={() => handleDuplicateWorkspace(workspace)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                         >
                           <Copy className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Дублировать</span>
                         </button>
                         <button
                           onClick={() => handleArchiveWorkspace(workspace)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                         >
                           {workspace.isArchived ? (
                             <>
@@ -302,21 +302,21 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                         <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                         <button
                           onClick={() => handleExportJson(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                         >
                           <Download className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Экспорт JSON</span>
                         </button>
                         <button
                           onClick={() => handleExportCsv(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                         >
                           <Download className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Экспорт CSV</span>
                         </button>
                         <button
                           onClick={() => handleImport(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                         >
                           <Upload className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Импорт</span>
@@ -347,7 +347,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             </div>
             <button
               onClick={() => router.push('/admin/users')}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 rounded-lg transition-colors cursor-pointer"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
             >
               <Users className="w-5 h-5" />
               <span className="font-medium">Пользователи</span>
@@ -359,7 +359,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
       {/* User section */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center text-white text-sm font-medium">
+          <div className="w-9 h-9 rounded bg-primary-500 flex items-center justify-center text-white text-sm font-medium">
             {getInitials()}
           </div>
           <div className="flex-1 min-w-0">
@@ -369,7 +369,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
           <button
             onClick={handleLogout}
             aria-label="Выйти из системы"
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
             title="Выйти"
           >
             <LogOut className="w-4 h-4" />

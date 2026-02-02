@@ -119,13 +119,13 @@ export function GlobalSearch() {
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300';
+        return 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400';
       case 'medium':
-        return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300';
+        return 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-400';
       case 'low':
-        return 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300';
+        return 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400';
       default:
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
+        return 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
     }
   };
 
@@ -151,11 +151,11 @@ export function GlobalSearch() {
           className="w-full relative group"
         >
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
-            <div className="w-full pl-10 pr-20 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-left text-gray-400 dark:text-gray-500 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <div className="w-full pl-10 pr-20 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-left text-gray-500 text-sm hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer">
               Поиск по заявкам...
             </div>
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-xs text-gray-400 dark:text-gray-500">
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1 px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600 text-xs text-gray-500">
               <Command className="w-3 h-3" />
               <span>K</span>
             </div>
@@ -167,7 +167,7 @@ export function GlobalSearch() {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-50"
+            className="fixed inset-0 bg-black/60 z-50"
             onClick={close}
           />
           <div className="fixed top-[15%] left-1/2 -translate-x-1/2 w-full max-w-2xl z-50 p-4">
@@ -175,11 +175,11 @@ export function GlobalSearch() {
               role="dialog"
               aria-modal="true"
               aria-label="Глобальный поиск"
-              className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl overflow-hidden"
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-2xl overflow-hidden"
             >
               {/* Search Input */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <Search className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <Search className="w-5 h-5 text-gray-500" />
                 <input
                   ref={inputRef}
                   type="text"
@@ -187,21 +187,21 @@ export function GlobalSearch() {
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Поиск по номеру или названию заявки..."
-                  className="flex-1 text-base outline-none bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className="flex-1 text-base outline-none bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-500"
                 />
                 <button
                   onClick={close}
                   aria-label="Закрыть поиск"
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                 >
-                  <X className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
 
               {/* Results */}
               <div ref={resultsRef} className="max-h-[400px] overflow-y-auto" role="listbox" aria-label="Результаты поиска">
                 {query.length < 2 ? (
-                  <div className="p-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+                  <div className="p-8 text-center text-gray-500 text-sm">
                     Введите минимум 2 символа для поиска
                   </div>
                 ) : loading ? (
@@ -211,7 +211,7 @@ export function GlobalSearch() {
                     <SkeletonSearchResult />
                   </div>
                 ) : results.length === 0 ? (
-                  <div className="p-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+                  <div className="p-8 text-center text-gray-500 text-sm">
                     Ничего не найдено
                   </div>
                 ) : (
@@ -221,19 +221,19 @@ export function GlobalSearch() {
                       onClick={() => handleSelect(result)}
                       className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors ${
                         index === selectedIndex
-                          ? 'bg-primary-50 dark:bg-primary-900/30'
-                          : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                          ? 'bg-primary-100 dark:bg-primary-900/30'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-800/50'
                       }`}
                     >
                       {/* Workspace icon */}
-                      <div className="w-8 h-8 flex items-center justify-center text-lg bg-gray-100 dark:bg-gray-800 rounded-lg flex-shrink-0">
+                      <div className="w-8 h-8 flex items-center justify-center text-lg bg-gray-200 dark:bg-gray-800 rounded flex-shrink-0">
                         {result.workspaceIcon || '📋'}
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-gray-400 dark:text-gray-500">
+                          <span className="text-xs font-mono text-gray-500">
                             {result.customId}
                           </span>
                           {result.priority && (
@@ -249,7 +249,7 @@ export function GlobalSearch() {
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                           {result.title}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        <p className="text-xs text-gray-500 mt-0.5">
                           {result.workspaceName}
                           {result.assignee && (
                             <span>
@@ -266,17 +266,17 @@ export function GlobalSearch() {
 
               {/* Footer */}
               {results.length > 0 && (
-                <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+                <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center gap-4 text-xs text-gray-500">
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">↑↓</kbd>
+                    <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600">↑↓</kbd>
                     навигация
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">Enter</kbd>
+                    <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600">Enter</kbd>
                     открыть
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">Esc</kbd>
+                    <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600">Esc</kbd>
                     закрыть
                   </span>
                 </div>
