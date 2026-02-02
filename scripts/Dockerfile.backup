@@ -1,0 +1,34 @@
+# Backup Cron Service
+FROM alpine:3.19
+
+# Install dependencies
+RUN apk add --no-cache \
+    bash \
+    postgresql16-client \
+    aws-cli \
+    dcron \
+    tzdata
+
+# Set timezone
+ENV TZ=Europe/Moscow
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Create backup directory
+RUN mkdir -p /backups /scripts
+
+# Copy backup script
+COPY backup.sh /scripts/backup.sh
+RUN chmod +x /scripts/backup.sh
+
+# Create cron job (hourly backup)
+RUN echo "0 * * * * /scripts/backup.sh scheduled >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+
+# Create log file
+RUN touch /var/log/backup.log
+
+# Healthcheck
+HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
+    CMD pgrep crond || exit 1
+
+# Start cron in foreground
+CMD ["crond", "-f", "-l", "2"]

@@ -16,17 +16,18 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus, Save, ArrowLeft, Loader2, Pencil, Users, Settings2 } from 'lucide-react';
+import { Plus, Save, ArrowLeft, Loader2, Pencil, Users, Settings2, Zap } from 'lucide-react';
 import { SectionCard } from './SectionCard';
 import { FieldCard } from './FieldCard';
 import { FieldPalette, FIELD_TYPES } from './FieldPalette';
 import { FieldEditor } from './FieldEditor';
 import { WorkspaceMembers } from './WorkspaceMembers';
+import { AutomationRules } from './AutomationRules';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { Field, FieldType, Workspace } from '@/types';
 
-type TabType = 'structure' | 'members';
+type TabType = 'structure' | 'members' | 'automation';
 
 // Популярные эмодзи для рабочих мест
 const WORKSPACE_ICONS = ['📋', '📁', '🔧', '💼', '📊', '🎯', '📝', '⚙️', '🛠️', '📦', '🚀', '💡', '🔬', '📐', '🎨', '📈'];
@@ -64,6 +65,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('structure');
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const { user } = useAuthStore();
   const isGlobalAdmin = user?.role === 'admin';
@@ -75,7 +77,8 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchWorkspace(workspaceId);
+    setIsInitialized(false);
+    fetchWorkspace(workspaceId).finally(() => setIsInitialized(true));
     fetchWorkspaces();
   }, [workspaceId, fetchWorkspace, fetchWorkspaces]);
 
@@ -239,7 +242,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
     setShowIconPicker(false);
   };
 
-  if (loading && !currentWorkspace) {
+  if (!isInitialized || (loading && !currentWorkspace)) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
@@ -386,6 +389,19 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 <span>Участники</span>
               </button>
             )}
+            {isGlobalAdmin && (
+              <button
+                onClick={() => setActiveTab('automation')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'automation'
+                    ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+                <span>Автоматизация</span>
+              </button>
+            )}
           </div>
 
           {/* Content */}
@@ -411,9 +427,13 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 </button>
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'members' ? (
             <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
               <WorkspaceMembers workspaceId={workspaceId} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
+              <AutomationRules workspaceId={workspaceId} />
             </div>
           )}
         </div>

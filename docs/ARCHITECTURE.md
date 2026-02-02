@@ -79,6 +79,7 @@ Stankoff Portal - это корпоративная система управл�
 **Workspace**
 - `WorkspaceBuilder.tsx` - Drag & Drop конструктор рабочих мест (редактирование названия, иконки, секций и полей)
 - `WorkspaceMembers.tsx` - Управление участниками workspace с ролями
+- `AutomationRules.tsx` - Управление правилами автоматизации (триггеры, условия, действия)
 - `FieldPalette.tsx` - Палитра типов полей
 - `FieldEditor.tsx` - Редактор свойств полей
 - `SectionCard.tsx` - Секция с полями
@@ -496,6 +497,73 @@ interface EmailService {
 
 > **Типы уведомлений:** Email отправляется исполнителю при: назначении на заявку, изменении статуса заявки другим пользователем.
 
+**AutomationModule**
+Автоматизация действий по событиям (триггеры, условия, действия).
+
+```typescript
+enum TriggerType {
+  ON_CREATE = 'on_create',           // При создании заявки
+  ON_STATUS_CHANGE = 'on_status_change', // При изменении статуса
+  ON_FIELD_CHANGE = 'on_field_change',   // При изменении поля
+  ON_ASSIGN = 'on_assign',           // При назначении исполнителя
+  ON_COMMENT = 'on_comment',         // При добавлении комментария
+  SCHEDULED = 'scheduled',           // По расписанию (cron)
+}
+
+enum ActionType {
+  SET_STATUS = 'set_status',         // Установить статус
+  SET_ASSIGNEE = 'set_assignee',     // Назначить исполнителя
+  SET_PRIORITY = 'set_priority',     // Установить приоритет
+  SET_FIELD = 'set_field',           // Установить значение поля
+  SEND_NOTIFICATION = 'send_notification', // Отправить уведомление
+  SEND_EMAIL = 'send_email',         // Отправить email
+}
+
+enum ConditionOperator {
+  EQUALS = 'equals',
+  NOT_EQUALS = 'not_equals',
+  CONTAINS = 'contains',
+  NOT_CONTAINS = 'not_contains',
+  STARTS_WITH = 'starts_with',
+  ENDS_WITH = 'ends_with',
+  IS_EMPTY = 'is_empty',
+  IS_NOT_EMPTY = 'is_not_empty',
+  GREATER_THAN = 'greater_than',
+  LESS_THAN = 'less_than',
+  CHANGED_TO = 'changed_to',
+  CHANGED_FROM = 'changed_from',
+}
+
+interface AutomationRule {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  trigger: TriggerType;
+  triggerConfig?: Record<string, any>;  // Настройки триггера
+  conditions: RuleCondition[];          // Условия (AND логика)
+  actions: RuleAction[];                // Действия (последовательно)
+  isEnabled: boolean;
+  executionCount: number;
+  lastExecutedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface RuleCondition {
+  field: string;       // Поле для проверки (status, priority, assigneeId, data.*)
+  operator: ConditionOperator;
+  value?: any;
+}
+
+interface RuleAction {
+  type: ActionType;
+  config: Record<string, any>;  // Настройки действия
+}
+```
+
+> **Выполнение правил:** При срабатывании триггера (создание, изменение статуса и т.д.) AutomationService находит все включённые правила для workspace, проверяет условия и выполняет действия. Правила выполняются в порядке приоритета.
+
 **Функции Workspace**
 
 Дополнительные операции с рабочими местами:
@@ -563,6 +631,12 @@ interface EmailService {
 | GET | /api/files/download/*path | Скачать файл через прокси (attachment) |
 | GET | /api/audit-logs/entity/:entityId | История активности по сущности |
 | GET | /api/audit-logs/workspace/:workspaceId | История активности по workspace |
+| GET | /api/automation?workspaceId=:id | Список правил автоматизации |
+| GET | /api/automation/:id | Детали правила |
+| POST | /api/automation | Создать правило (workspace admin) |
+| PUT | /api/automation/:id | Обновить правило (workspace admin) |
+| PATCH | /api/automation/:id/toggle | Включить/выключить правило |
+| DELETE | /api/automation/:id | Удалить правило (workspace admin) |
 
 ## Потоки данных
 
@@ -923,29 +997,130 @@ npm run docker:up   # PostgreSQL + pgAdmin
 npm run dev         # Frontend + Backend
 ```
 
-### Production (планируется)
-```yaml
-# docker-compose.prod.yml
-services:
-  frontend:
-    build: ./apps/frontend
-    environment:
-      - NODE_ENV=production
+### Production
 
-  backend:
-    build: ./apps/backend
-    environment:
-      - NODE_ENV=production
-
-  postgres:
-    image: postgres:18.1
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-  nginx:
-    image: nginx:alpine
-    # Reverse proxy, SSL termination
+**Файлы конфигурации:**
 ```
+apps/backend/Dockerfile       # Multi-stage build, non-root user, healthcheck
+apps/frontend/Dockerfile      # Standalone Next.js, non-root user, healthcheck
+docker-compose.prod.yml       # Production compose
+nginx/nginx.conf              # Reverse proxy configuration
+scripts/backup.sh             # Database backup/restore script
+.github/workflows/ci.yml      # CI/CD pipeline
+```
+
+**Запуск:**
+```bash
+# 1. Настроить окружение
+cp .env.example .env
+# Отредактировать .env с production значениями
+
+# 2. Запустить все сервисы
+docker compose -f docker-compose.prod.yml up -d --build
+
+# 3. Проверить статус
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost/api/health
+```
+
+**Сервисы docker-compose.prod.yml:**
+| Сервис | Порт | Описание |
+|--------|------|----------|
+| nginx | 80, 443 | Reverse proxy, SSL termination, rate limiting |
+| frontend | 3000 (internal) | Next.js standalone |
+| backend | 3001 (internal) | NestJS API |
+| postgres | 5432 (internal) | PostgreSQL 16 |
+
+**Nginx features:**
+- Reverse proxy для frontend и backend
+- WebSocket support для Socket.IO
+- Rate limiting (10 req/s для API, 5 req/min для login)
+- Gzip compression
+- Security headers (X-Frame-Options, X-Content-Type-Options, etc.)
+- Static files caching для Next.js
+- SSL конфигурация (закомментирована, готова к использованию)
+
+**Backup базы данных:**
+
+Локальные команды:
+```bash
+./scripts/backup.sh backup              # Создать локальный бэкап
+./scripts/backup.sh list                # Список локальных бэкапов
+./scripts/backup.sh restore backup.sql.gz  # Восстановить из локального файла
+./scripts/backup.sh cleanup             # Удалить старые локальные бэкапы
+```
+
+S3 команды:
+```bash
+./scripts/backup.sh backup-s3           # Создать бэкап и загрузить в S3
+./scripts/backup.sh list-s3             # Список бэкапов в S3
+./scripts/backup.sh restore-s3          # Восстановить из последнего S3 бэкапа
+./scripts/backup.sh restore-s3 path/to/backup.sql.gz  # Восстановить конкретный
+./scripts/backup.sh cleanup-s3          # Удалить старые S3 бэкапы
+./scripts/backup.sh scheduled           # Полный цикл: backup + S3 + cleanup
+```
+
+**Автоматические бэкапы (production):**
+
+Сервис `backup` в docker-compose.prod.yml:
+- Запускает бэкапы **раз в час** (cron: `0 * * * *`)
+- Автоматически загружает в S3 (Yandex Object Storage)
+- Удаляет старые бэкапы (>7 дней по умолчанию)
+- Логи: `docker logs stankoff-backup`
+
+Переменные окружения:
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
+| S3_BUCKET | Имя S3 бакета | (обязательно) |
+| S3_BACKUP_PREFIX | Путь в бакете | backups/postgres |
+| BACKUP_RETENTION_DAYS | Хранить бэкапы (дней) | 7 |
+
+### SSL сертификаты (Let's Encrypt)
+
+Автоматическая генерация и продление SSL сертификатов для **bpms.stankoff.ru**.
+
+**Первичная установка:**
+```bash
+# Генерация сертификата
+./scripts/init-ssl.sh admin@stankoff.ru
+
+# Тестирование (Let's Encrypt staging):
+STAGING=1 ./scripts/init-ssl.sh admin@stankoff.ru
+```
+
+**Автопродление:**
+| Сервис | Действие | Интервал |
+|--------|----------|----------|
+| certbot | Проверка и продление | каждые 12 часов |
+| nginx | Перезагрузка сертификатов | каждые 6 часов |
+
+**Файлы:**
+```
+nginx/nginx.conf        # HTTPS конфигурация с Let's Encrypt
+nginx/nginx-init.conf   # Минимальный конфиг для первого запроса сертификата
+scripts/init-ssl.sh     # Скрипт первичной генерации сертификата
+```
+
+**Docker volumes:**
+- `certbot-conf` — сертификаты Let's Encrypt (`/etc/letsencrypt`)
+- `certbot-www` — ACME challenge файлы (`/var/www/certbot`)
+
+**Ручное продление:**
+```bash
+docker compose -f docker-compose.prod.yml run --rm certbot renew
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+### CI/CD Pipeline
+
+GitHub Actions workflow (`.github/workflows/ci.yml`):
+
+1. **Lint & Type Check** - проверка линтера и типов
+2. **Backend Tests** - Jest unit тесты с PostgreSQL
+3. **Frontend Tests** - Vitest unit тесты
+4. **E2E Tests** - Playwright тесты
+5. **Build Docker Images** - сборка и push в GitHub Container Registry
+6. **Deploy** - деплой на production (требует настройки)
 
 ## Мониторинг и логирование
 

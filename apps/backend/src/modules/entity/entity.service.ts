@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository, DataSource } from 'typeorm';
@@ -12,9 +12,12 @@ import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AuditActionType } from '../audit-log/audit-log.entity';
 import { EmailService } from '../email/email.service';
+import { AutomationService, AutomationContext } from '../automation/automation.service';
+import { TriggerType } from '../automation/automation-rule.entity';
 
 @Injectable()
 export class EntityService {
+  private readonly logger = new Logger(EntityService.name);
   private readonly frontendUrl: string;
 
   constructor(
@@ -31,6 +34,8 @@ export class EntityService {
     private auditLogService: AuditLogService,
     private emailService: EmailService,
     private configService: ConfigService,
+    @Inject(forwardRef(() => AutomationService))
+    private automationService: AutomationService,
   ) {
     this.frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
   }
@@ -167,6 +172,17 @@ export class EntityService {
       );
     }
 
+    // Автоматизация: триггер ON_CREATE
+    try {
+      const entityWithRelations = await this.findOne(saved.id);
+      await this.automationService.executeRules({
+        entity: entityWithRelations,
+        trigger: TriggerType.ON_CREATE,
+      });
+    } catch (err) {
+      this.logger.error(`Automation error on create: ${err.message}`);
+    }
+
     return saved;
   }
 
@@ -243,6 +259,17 @@ export class EntityService {
           ).catch(() => {}); // Не блокируем при ошибке
         }
       }
+
+      // Автоматизация: триггер ON_STATUS_CHANGE
+      try {
+        await this.automationService.executeRules({
+          entity: updated,
+          previousEntity: current,
+          trigger: TriggerType.ON_STATUS_CHANGE,
+        });
+      } catch (err) {
+        this.logger.error(`Automation error on status change: ${err.message}`);
+      }
     }
 
     return updated;
@@ -295,6 +322,17 @@ export class EntityService {
             assignee, updated, assignedBy, this.frontendUrl,
           ).catch(() => {}); // Не блокируем при ошибке
         }
+      }
+
+      // Автоматизация: триггер ON_ASSIGN
+      try {
+        await this.automationService.executeRules({
+          entity: updated,
+          previousEntity: current,
+          trigger: TriggerType.ON_ASSIGN,
+        });
+      } catch (err) {
+        this.logger.error(`Automation error on assign: ${err.message}`);
       }
     }
 

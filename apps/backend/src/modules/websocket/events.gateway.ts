@@ -82,6 +82,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('user:assigned', data);
   }
 
+  // Отправка события конкретному пользователю по userId
+  emitToUser(userId: string, event: string, data: any) {
+    const clients = this.server.sockets.sockets;
+    clients.forEach((client: AuthenticatedSocket) => {
+      if (client.data?.user?.sub === userId) {
+        client.emit(event, data);
+      }
+    });
+  }
+
   @SubscribeMessage('message')
   handleMessage(client: Socket, payload: any): string {
     return 'Message received';

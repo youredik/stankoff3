@@ -12,6 +12,7 @@ import { WebsocketModule } from '../websocket/websocket.module';
 import { S3Module } from '../s3/s3.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
+import { AutomationModule } from '../automation/automation.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
     S3Module,
     WorkspaceModule,
     forwardRef(() => AuditLogModule),
+    forwardRef(() => AutomationModule),
   ],
   providers: [EntityService, CommentService],
   controllers: [EntityController, CommentController],

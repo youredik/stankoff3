@@ -262,6 +262,47 @@ npm run dev:backend
 
 ---
 
+## ✅ Автоматизация — ГОТОВО
+
+Система автоматизации позволяет создавать правила, которые выполняются автоматически при определённых событиях.
+
+### Backend
+- [x] AutomationRule entity с триггерами, условиями и действиями
+- [x] AutomationService для выполнения правил
+- [x] Интеграция в EntityService (onCreate, onStatusChange, onAssign)
+- [x] API CRUD endpoints (/api/automation)
+
+### Frontend
+- [x] AutomationRules.tsx — UI компонент управления правилами
+- [x] Вкладка "Автоматизация" в WorkspaceBuilder
+
+### Поддерживаемые триггеры
+| Триггер | Описание |
+|---------|----------|
+| on_create | При создании заявки |
+| on_status_change | При изменении статуса |
+| on_field_change | При изменении поля |
+| on_assign | При назначении исполнителя |
+| on_comment | При добавлении комментария |
+
+### Поддерживаемые действия
+| Действие | Описание |
+|----------|----------|
+| set_status | Установить статус |
+| set_assignee | Назначить исполнителя |
+| set_priority | Установить приоритет |
+| set_field | Установить значение поля |
+| send_notification | Отправить уведомление в приложении |
+| send_email | Отправить email |
+
+### Пример правила
+"При создании заявки с высоким приоритетом автоматически назначить на дежурного"
+- Триггер: on_create
+- Условие: priority equals high
+- Действие: set_assignee → ID дежурного
+
+---
+
 ## ✅ UI/UX улучшения (9-я неделя) — ГОТОВО
 
 - [x] Анимации переходов (slide-in, fade-in, scale-in в tailwind.config.ts)
@@ -302,15 +343,73 @@ npm run dev:backend
 
 ---
 
-## 🚀 Деплой (12-я неделя)
+## ✅ Деплой (12-я неделя) — ГОТОВО
 
-- [ ] Создать production Dockerfile для frontend
-- [ ] Создать production Dockerfile для backend
-- [ ] Настроить docker-compose.prod.yml
-- [ ] Настроить CI/CD (GitHub Actions)
-- [ ] Настроить reverse proxy (Nginx)
-- [ ] Настроить SSL сертификаты
-- [ ] Создать backup скрипты для БД
+- [x] Создать production Dockerfile для frontend (apps/frontend/Dockerfile)
+- [x] Создать production Dockerfile для backend (apps/backend/Dockerfile)
+- [x] Настроить docker-compose.prod.yml
+- [x] Настроить CI/CD (GitHub Actions — .github/workflows/ci.yml)
+- [x] Настроить reverse proxy (nginx/nginx.conf)
+- [x] SSL сертификаты (конфигурация готова, закомментирована)
+- [x] Создать backup скрипты для БД (scripts/backup.sh)
+
+### Файлы деплоя:
+```
+apps/backend/Dockerfile       # Multi-stage build, non-root user, healthcheck
+apps/frontend/Dockerfile      # Standalone Next.js, non-root user, healthcheck
+docker-compose.prod.yml       # Production compose с nginx, postgres, backend, frontend, backup
+nginx/nginx.conf              # Reverse proxy, rate limiting, WebSocket support
+.github/workflows/ci.yml      # CI/CD pipeline: lint, test, build, deploy
+scripts/backup.sh             # Backup/restore PostgreSQL с поддержкой S3
+scripts/Dockerfile.backup     # Cron-сервис для автоматических бэкапов
+```
+
+### Запуск в production:
+```bash
+# 1. Копировать .env.example в .env и настроить
+cp .env.example .env
+
+# 2. Запустить все сервисы
+docker compose -f docker-compose.prod.yml up -d --build
+
+# 3. Проверить статус
+docker compose -f docker-compose.prod.yml ps
+curl http://localhost/api/health
+
+# 4. Бэкап базы данных (ручной)
+./scripts/backup.sh backup           # Локальный бэкап
+./scripts/backup.sh backup-s3        # Бэкап + загрузка в S3
+./scripts/backup.sh list-s3          # Список бэкапов в S3
+./scripts/backup.sh restore-s3       # Восстановление из S3
+```
+
+### Автоматические бэкапы:
+- Сервис `backup` в docker-compose.prod.yml запускает бэкапы **раз в час**
+- Бэкапы автоматически загружаются в S3 (Yandex Object Storage)
+- Старые бэкапы (>7 дней) автоматически удаляются
+- Логи: `docker logs stankoff-backup`
+
+### SSL сертификаты (Let's Encrypt):
+Домен: **bpms.stankoff.ru**
+
+```bash
+# 1. Первичная генерация сертификата
+./scripts/init-ssl.sh admin@stankoff.ru
+
+# Тестирование (staging Let's Encrypt):
+STAGING=1 ./scripts/init-ssl.sh admin@stankoff.ru
+```
+
+**Автопродление:**
+- Certbot проверяет сертификаты **каждые 12 часов**
+- Nginx перезагружает сертификаты **каждые 6 часов**
+- Сертификаты автоматически обновляются за 30 дней до истечения
+
+**Ручное продление:**
+```bash
+docker compose -f docker-compose.prod.yml run --rm certbot renew
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+```
 
 ---
 
@@ -321,7 +420,7 @@ npm run dev:backend
 - [x] Импорт данных из CSV (/api/entities/import/csv, ImportModal.tsx)
 - [ ] Экспорт в Excel/PDF
 - [ ] Шаблоны сущностей
-- [ ] Автоматизация (триггеры, правила)
+- [x] Автоматизация (триггеры, правила) — AutomationModule с UI
 - [x] Отчёты и аналитика (AnalyticsDashboard)
 - [ ] Интеграция с внешними системами
 - [ ] Mobile app (React Native)
