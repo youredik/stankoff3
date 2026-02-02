@@ -17,6 +17,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - keycloak
     networks:
       - stankoff-network
     healthcheck:
@@ -62,7 +63,7 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
-      start_period: 10s
+      start_period: 60s
       retries: 3
 
   # Backend NestJS
@@ -132,6 +133,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./backups:/backups
+      - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
     expose:
       - "5432"
     networks:
@@ -141,6 +143,32 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Keycloak SSO
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: stankoff-keycloak
+    restart: unless-stopped
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
+      - KC_DB_USERNAME=${DATABASE_USER:-stankoff_admin}
+      - KC_DB_PASSWORD=${DATABASE_PASSWORD:-postgres}
+      - KC_HEALTH_ENABLED=true
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HTTP_ENABLED=true
+      - KC_HTTP_RELATIVE_PATH=/
+      - KC_HOSTNAME_STRICT=false
+    command: start-dev
+    expose:
+      - "8080"
+    networks:
+      - stankoff-network
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # Backup Cron Service (hourly backups to S3)
   backup:
