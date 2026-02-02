@@ -36,7 +36,7 @@ function LoginPageContent() {
       return;
     }
 
-    // Если не авторизован и нет ошибки - автоматический редирект на SSO
+    // Если не авторизован, не загружается и нет ошибки - автоматический редирект на SSO
     if (!isAuthenticated && !isLoading && !ssoError) {
       setIsRedirecting(true);
       window.location.href = authApi.getKeycloakLoginUrl();

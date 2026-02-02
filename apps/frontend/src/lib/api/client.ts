@@ -1,6 +1,10 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// В браузере используем /api/ для работы через rewrites
+// На сервере (SSR) используем полный URL backend'а
+const API_URL = typeof window === 'undefined'
+  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
+  : '/api';
 
 export const apiClient = axios.create({
   baseURL: API_URL,

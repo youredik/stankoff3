@@ -959,22 +959,40 @@ workspace_id | user_id | role
 - `ValidationPipe` для валидации входящих данных
 - CORS настроен для фронтенда с credentials: true
 
+### API взаимодействие Frontend ↔ Backend
+
+**Development режим:**
+- Frontend (Next.js): `http://localhost:3000`
+- Backend (NestJS): `http://localhost:3001`
+- Next.js rewrites проксируют `/api/*` запросы на backend через `next.config.ts`:
+  ```typescript
+  async rewrites() {
+    return [{
+      source: '/api/:path*',
+      destination: 'http://localhost:3001/api/:path*'
+    }];
+  }
+  ```
+- В браузере apiClient использует `baseURL: '/api'` → rewrites → backend
+- На сервере (SSR) apiClient использует `baseURL: 'http://localhost:3001'`
+- Это обеспечивает корректную работу cookies (refresh token) - они отправляются на тот же origin
+
+**Production режим:**
+- Nginx проксирует `/api/*` на backend
+- Frontend и backend работают на одном домене через reverse proxy
+
 ### Keycloak SSO интеграция
 
-Система поддерживает два режима аутентификации, переключаемых через `AUTH_PROVIDER`:
+**Текущий режим:** Только Keycloak SSO (локальная авторизация отключена)
 
-**Локальная аутентификация (AUTH_PROVIDER=local):**
-- Стандартная JWT авторизация с email/password
-- Пароли хешируются через bcrypt
-- Access token (15 мин) + Refresh token (7 дней, HttpOnly cookie)
-
-**Keycloak SSO (AUTH_PROVIDER=keycloak):**
+**Keycloak SSO:**
 - OIDC Authorization Code Flow с PKCE
 - Auto-provisioning пользователей из Keycloak claims
 - Маппинг ролей: realm-admin/admin → admin, manager → manager, остальные → employee
 - Поддержка logout через Keycloak
+- **Автоматический редирект:** При заходе на `/login` пользователь сразу перенаправляется на Keycloak (без кнопки)
 
-**Настройка Keycloak:**
+**Настройка Keycloak (для локальной разработки):**
 1. Раскомментируйте сервис keycloak в docker-compose.yml
 2. Создайте realm "stankoff" в Keycloak Admin Console (http://localhost:8080)
 3. Создайте client "stankoff-portal" с настройками:
@@ -982,19 +1000,37 @@ workspace_id | user_id | role
    - Valid redirect URIs: http://localhost:3000/*
    - Web origins: http://localhost:3000
 4. Скопируйте Client Secret в .env (KEYCLOAK_CLIENT_SECRET)
-5. Установите AUTH_PROVIDER=keycloak в .env
+
+**Production:** Используется внешний Keycloak на `https://new.stankoff.ru/oidc/`
 
 **API эндпоинты Keycloak:**
 | Метод | URL | Описание |
 |-------|-----|----------|
-| GET | /api/auth/provider | Информация о провайдере (local/keycloak) |
 | GET | /api/auth/keycloak/login | Редирект на Keycloak для авторизации |
 | GET | /api/auth/keycloak/callback | Callback после авторизации в Keycloak |
+| POST | /api/auth/refresh | Обновление access token через refresh token (cookie) |
+| POST | /api/auth/logout | Выход (очистка cookies + Keycloak logout URL) |
+| GET | /api/auth/me | Получить текущего пользователя |
 
-**Frontend:**
-- Страница логина автоматически показывает кнопку "Войти через SSO" при AUTH_PROVIDER=keycloak
-- После успешной SSO авторизации пользователь перенаправляется на /dashboard с access_token
-- AuthProvider обрабатывает токен и загружает профиль пользователя
+**Поток авторизации:**
+1. Пользователь заходит на `/login`
+2. Автоматический редирект на `/api/auth/keycloak/login`
+3. Backend генерирует PKCE challenge и редиректит на Keycloak
+4. Пользователь авторизуется в Keycloak
+5. Keycloak редиректит на `/api/auth/keycloak/callback?code=...`
+6. Backend обменивает code на tokens, создаёт/обновляет пользователя
+7. Backend устанавливает refresh token в HttpOnly cookie
+8. Backend редиректит на `/dashboard?access_token=...`
+9. AuthProvider:
+   - Видит `access_token` в URL и НЕ редиректит на /login
+   - Сохраняет токен в памяти (Zustand store)
+   - Загружает профиль через `/api/auth/me`
+   - Очищает `access_token` из URL
+10. Пользователь авторизован и остаётся на dashboard
+
+**Защита от цикла редиректов:**
+- AuthProvider не редиректит на `/login`, если в URL есть `access_token` (даёт время на обработку)
+- Refresh token в HttpOnly cookie используется для обновления access token
 
 ### Планируется
 - Rate limiting

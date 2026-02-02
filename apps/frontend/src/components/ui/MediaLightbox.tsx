@@ -64,7 +64,7 @@ export function MediaLightbox({
   const handleDownload = () => {
     // Use our backend proxy for download to hide S3 URL and force download
     const downloadUrl = current.key
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api/files/download/${current.key}?name=${encodeURIComponent(current.name)}`
+      ? `/api/files/download/${current.key}?name=${encodeURIComponent(current.name)}`
       : current.url;
 
     const link = document.createElement('a');

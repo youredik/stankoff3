@@ -48,8 +48,8 @@ export const workspacesApi = {
     apiClient.patch<Workspace>(`/workspaces/${workspaceId}/archive`, { isArchived }).then((r) => r.data),
 
   exportJson: (workspaceId: string) =>
-    `${process.env.NEXT_PUBLIC_API_URL}/api/workspaces/${workspaceId}/export/json`,
+    `/api/workspaces/${workspaceId}/export/json`,
 
   exportCsv: (workspaceId: string) =>
-    `${process.env.NEXT_PUBLIC_API_URL}/api/workspaces/${workspaceId}/export/csv`,
+    `/api/workspaces/${workspaceId}/export/csv`,
 };

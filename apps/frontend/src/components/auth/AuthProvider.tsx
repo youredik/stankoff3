@@ -55,8 +55,8 @@ function AuthProviderInner({ children }: AuthProviderProps) {
       // Делаем запрос с явно переданным токеном
       const fetchProfile = async () => {
         try {
-          // Создаём запрос с токеном напрямую
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/me`, {
+          // Используем относительный путь для работы через rewrites и корректной работы cookies
+          const response = await fetch('/api/auth/me', {
             headers: {
               'Authorization': `Bearer ${accessTokenParam}`,
             },
@@ -66,8 +66,6 @@ function AuthProviderInner({ children }: AuthProviderProps) {
           if (!response.ok) throw new Error('Failed to fetch profile');
 
           const user = await response.json();
-          // Очищаем флаг SSO redirect при успешной авторизации
-          sessionStorage.removeItem('sso_redirect_attempted');
           useAuthStore.setState({
             user,
             isAuthenticated: true,
@@ -103,10 +101,12 @@ function AuthProviderInner({ children }: AuthProviderProps) {
 
   // Редирект на логин если не авторизован
   useEffect(() => {
-    if (!isLoading && !ssoProcessing && !isAuthenticated && pathname !== '/login') {
+    // Не редиректим если в URL есть access_token (обрабатывается выше)
+    const hasAccessToken = searchParams.get('access_token');
+    if (!isLoading && !ssoProcessing && !isAuthenticated && pathname !== '/login' && !hasAccessToken) {
       router.push('/login');
     }
-  }, [isLoading, ssoProcessing, isAuthenticated, pathname, router]);
+  }, [isLoading, ssoProcessing, isAuthenticated, pathname, router, searchParams]);
 
   // Показываем загрузку пока ждём hydration, проверяем авторизацию или обрабатываем SSO
   if (!hydrated || isLoading || ssoProcessing) {

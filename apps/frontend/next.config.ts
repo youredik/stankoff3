@@ -27,6 +27,16 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   compress: true,
   poweredByHeader: false,
+
+  // Проксирование API запросов на backend в development
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

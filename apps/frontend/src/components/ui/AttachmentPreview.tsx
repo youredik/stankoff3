@@ -46,7 +46,7 @@ export function AttachmentPreview({
     e.stopPropagation();
     // Use our backend proxy for download to hide S3 URL and force download
     const downloadUrl = attachment.key
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api/files/download/${attachment.key}?name=${encodeURIComponent(attachment.name)}`
+      ? `/api/files/download/${attachment.key}?name=${encodeURIComponent(attachment.name)}`
       : attachment.url;
 
     const link = document.createElement('a');

@@ -100,6 +100,22 @@ stankoff-portal/
 - Стили — Tailwind CSS классы, без отдельных CSS файлов
 - Компоненты размещай по функциональности: `kanban/`, `entity/`, `workspace/`, `layout/`, `ui/`
 
+**API запросы:**
+- **ВАЖНО:** Всегда используй относительные пути для API запросов (начинающиеся с `/api/`)
+- `apiClient` автоматически добавляет префикс `/api` в браузере
+- Next.js rewrites проксируют `/api/*` на backend (см. `next.config.ts`)
+- Это обеспечивает корректную работу cookies (refresh token в HttpOnly cookie)
+- Примеры:
+  - ✅ `apiClient.get('/workspaces')` → `/api/workspaces` → backend
+  - ✅ `fetch('/api/auth/me')` → rewrites → backend
+  - ❌ `fetch('http://localhost:3001/api/auth/me')` → обход rewrites, cookies не работают
+
+**Авторизация:**
+- Текущий режим: **только Keycloak SSO** (локальная авторизация отключена)
+- Страница `/login` автоматически редиректит на Keycloak
+- `AuthProvider` обрабатывает токен из URL после callback
+- Access token хранится в памяти (Zustand), refresh token в HttpOnly cookie
+
 ### Backend
 
 - Один модуль = одна сущность (Entity, Workspace, User, Comment)
@@ -138,7 +154,14 @@ npm run test:e2e:ui      # Интерактивный UI для тестов
 
 ## API
 
-Основные эндпоинты:
+**Авторизация (Keycloak SSO):**
+- `GET /api/auth/keycloak/login` — редирект на Keycloak
+- `GET /api/auth/keycloak/callback` — callback после авторизации
+- `GET /api/auth/me` — текущий пользователь
+- `POST /api/auth/refresh` — обновление access token
+- `POST /api/auth/logout` — выход (очистка cookies + Keycloak logout URL)
+
+**Основные эндпоинты:**
 - `GET/POST /api/entities` — сущности
 - `PATCH /api/entities/:id/status` — изменение статуса
 - `PATCH /api/entities/:id/assignee` — назначение исполнителя
