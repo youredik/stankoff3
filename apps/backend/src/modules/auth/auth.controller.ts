@@ -99,9 +99,11 @@ export class AuthController {
   @Public()
   @Get('keycloak/login')
   async keycloakLogin(@Res() res: Response) {
-    // Callback идёт на backend, не на frontend
-    const backendPort = this.configService.get<string>('BACKEND_PORT') || '3001';
-    const redirectUri = `http://localhost:${backendPort}/api/auth/keycloak/callback`;
+    // Callback идёт на backend через nginx
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    // Используем тот же домен что и frontend, но endpoint на backend
+    const baseUrl = frontendUrl.replace(/\/$/, ''); // убираем trailing slash
+    const redirectUri = `${baseUrl}/api/auth/keycloak/callback`;
 
     const authUrl = await this.authService.getKeycloakAuthUrl(redirectUri);
     res.redirect(authUrl);
@@ -121,8 +123,8 @@ export class AuthController {
     }
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const backendPort = this.configService.get<string>('BACKEND_PORT') || '3001';
-    const redirectUri = `http://localhost:${backendPort}/api/auth/keycloak/callback`;
+    const baseUrl = frontendUrl.replace(/\/$/, ''); // убираем trailing slash
+    const redirectUri = `${baseUrl}/api/auth/keycloak/callback`;
 
     try {
       console.log('Keycloak callback: code=', code?.substring(0, 20) + '...', 'state=', state?.substring(0, 20) + '...', 'iss=', iss, 'session_state=', sessionState?.substring(0, 10));
