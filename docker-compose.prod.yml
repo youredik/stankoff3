@@ -105,6 +105,8 @@ services:
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
+      # Database sync (only for initial setup)
+      - TYPEORM_SYNC=${TYPEORM_SYNC:-false}
     expose:
       - "3001"
     volumes:
