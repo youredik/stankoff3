@@ -292,11 +292,12 @@ jobs:
           echo "Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:preprod"
 
   # ============== Deploy to Production ==============
+  # TODO: Включить после настройки отдельного production сервера
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: false  # Временно отключено - пока используется один сервер для preprod
     environment: production
 
     steps:
