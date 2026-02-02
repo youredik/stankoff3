@@ -1001,7 +1001,11 @@ workspace_id | user_id | role
    - Web origins: http://localhost:3000
 4. Скопируйте Client Secret в .env (KEYCLOAK_CLIENT_SECRET)
 
-**Production:** Используется внешний Keycloak на `https://new.stankoff.ru/oidc/`
+**Внешний Keycloak (Preprod/Production):**
+- URL: `https://new.stankoff.ru/oidc/`
+- Realm для preprod: `stankoff-preprod`
+- Realm для production: `stankoff` (TBD)
+- Client ID: `stankoff-portal`
 
 **API эндпоинты Keycloak:**
 | Метод | URL | Описание |

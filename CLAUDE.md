@@ -143,6 +143,8 @@ stankoff-portal/
 ### Keycloak SSO
 
 **ВАЖНО:** Проект использует **внешний Keycloak**, не контейнеризованный.
+- Keycloak URL: `https://new.stankoff.ru/oidc/`
+- Realm для preprod: `stankoff-preprod`
 - Keycloak сервис **удален** из всех docker-compose файлов
 - Конфигурация через переменные окружения (`KEYCLOAK_URL`, `KEYCLOAK_REALM`, etc.)
 - Nginx **не проксирует** `/auth/` — это внешний сервис
