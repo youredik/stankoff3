@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Shield, RefreshCw } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { setAuthInterceptors } from '@/lib/api/client';
 import { authApi } from '@/lib/api/auth';
@@ -11,6 +11,7 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, error, clearError } = useAuthStore();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Устанавливаем interceptors при монтировании
   useEffect(() => {
@@ -20,7 +21,7 @@ function LoginPageContent() {
     );
   }, []);
 
-  // Редирект на Keycloak при загрузке
+  // Обработка ошибок и редиректа
   useEffect(() => {
     // Проверяем ошибку SSO
     const ssoError = searchParams.get('error');
@@ -32,25 +33,17 @@ function LoginPageContent() {
     // Если уже авторизован - на dashboard
     if (isAuthenticated && !isLoading) {
       router.push('/dashboard');
-      return;
-    }
-
-    // Авто-редирект на Keycloak (если нет ошибки и не пытались ранее)
-    const alreadyTried = sessionStorage.getItem('sso_redirect_attempted');
-    if (!ssoError && !alreadyTried && !isLoading) {
-      sessionStorage.setItem('sso_redirect_attempted', 'true');
-      window.location.href = authApi.getKeycloakLoginUrl();
     }
   }, [searchParams, isAuthenticated, isLoading, router]);
 
-  const handleRetryLogin = () => {
+  const handleLogin = () => {
     clearError();
-    sessionStorage.removeItem('sso_redirect_attempted');
+    setIsRedirecting(true);
     window.location.href = authApi.getKeycloakLoginUrl();
   };
 
-  // Показываем loading если идёт проверка или редирект
-  if (isLoading || (!error && !isAuthenticated)) {
+  // Показываем loading при редиректе
+  if (isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
         <div className="text-center">
@@ -61,7 +54,19 @@ function LoginPageContent() {
     );
   }
 
-  // Показываем ошибку с кнопкой повтора
+  // Показываем loading пока проверяется авторизация
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Проверка авторизации...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Показываем страницу входа
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950">
       <div className="w-full max-w-md">
@@ -72,7 +77,7 @@ function LoginPageContent() {
               <span className="text-3xl">🏭</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Stankoff Portal</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">Вход через SSO</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">Корпоративный портал</p>
           </div>
 
           {error && (
@@ -83,7 +88,7 @@ function LoginPageContent() {
 
           <button
             type="button"
-            onClick={handleRetryLogin}
+            onClick={handleLogin}
             className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             <Shield className="w-5 h-5" />
