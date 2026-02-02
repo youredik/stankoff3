@@ -183,7 +183,7 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
     needs: [test-backend, test-frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     permissions:
       contents: read
       packages: write
@@ -211,6 +211,7 @@ jobs:
             type=sha
             type=ref,event=branch
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=preprod,enable=${{ github.ref == 'refs/heads/develop' }}
 
       - name: Build and push backend
         uses: docker/build-push-action@v5
@@ -231,6 +232,7 @@ jobs:
             type=sha
             type=ref,event=branch
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=preprod,enable=${{ github.ref == 'refs/heads/develop' }}
 
       - name: Build and push frontend
         uses: docker/build-push-action@v5
@@ -242,33 +244,96 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ============== Deploy (example) ==============
-  # TODO: Деплой отключен - требует ручного запуска отдельного workflow
-  deploy:
+  # ============== Deploy to Preprod ==============
+  deploy-preprod:
+    name: Deploy to Preprod
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    environment: preprod
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Preprod via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PREPROD_HOST }}
+          username: ${{ secrets.PREPROD_USER }}
+          key: ${{ secrets.PREPROD_SSH_KEY }}
+          script: |
+            cd /opt/stankoff-portal
+
+            # Login to GitHub Container Registry
+            echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull latest preprod images
+            docker compose -f docker-compose.preprod.yml pull
+
+            # Restart services with new images
+            docker compose -f docker-compose.preprod.yml up -d --remove-orphans
+
+            # Cleanup old images
+            docker image prune -f
+
+            # Wait for services to start
+            sleep 15
+
+            # Health check
+            curl -f http://localhost:3001/api/health || exit 1
+
+            echo "Preprod deployment complete!"
+
+      - name: Notify deployment success
+        run: |
+          echo "🚀 Deployed to preprod.stankoff.ru"
+          echo "Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:preprod"
+          echo "Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:preprod"
+
+  # ============== Deploy to Production ==============
+  deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [build]
-    if: false  # Автодеплой отключен - используйте ручной деплой
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy notification
-        run: |
-          echo "🚀 Deploying to production..."
-          echo "Image tags:"
-          echo "  - Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest"
-          echo "  - Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest"
+      - name: Deploy to Production via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/stankoff-portal
 
-      # Add your deployment steps here, e.g.:
-      # - SSH to server and docker-compose pull/up
-      # - kubectl apply for Kubernetes
-      # - AWS ECS update service
-      # - etc.
+            # Login to GitHub Container Registry
+            echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Health check
+            # Pull latest production images
+            docker compose -f docker-compose.prod.yml pull
+
+            # Restart services with new images
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Cleanup old images
+            docker image prune -f
+
+            # Wait for services to start
+            sleep 15
+
+            # Health check
+            curl -f http://localhost:3001/api/health || exit 1
+
+            echo "Production deployment complete!"
+
+      - name: Notify deployment success
         run: |
-          echo "✅ Deployment complete!"
-          # curl -f https://your-domain.com/api/health || exit 1
+          echo "🚀 Deployed to production"
+          echo "Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest"
+          echo "Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest"
