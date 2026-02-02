@@ -37,7 +37,8 @@ ENV HOSTNAME="0.0.0.0"
 # Copy standalone build
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+# Copy public folder if exists (may be empty)
+COPY --from=builder /app/public* ./public/
 
 # Set proper ownership
 RUN chown -R nextjs:nodejs /app
