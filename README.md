@@ -23,8 +23,13 @@
 - **class-validator** - Валидация DTO
 
 ### Инфраструктура
-- **Docker Compose** (PostgreSQL + pgAdmin)
+- **Docker Compose** (PostgreSQL + pgAdmin для разработки)
 - **Monorepo** с npm workspaces
+- **GitHub Actions** - CI/CD pipeline
+- **GitHub Container Registry** - Docker образы
+- **Nginx** - Reverse proxy
+- **Let's Encrypt** - SSL сертификаты
+- **Yandex Cloud** - Preprod и Production серверы
 
 ## Быстрый старт
 
@@ -49,6 +54,48 @@ npm run dev
 # Backend API: http://localhost:3001/api
 # pgAdmin: http://localhost:5050
 ```
+
+## Окружения и деплой
+
+### Окружения
+
+| Окружение | Ветка | Домен | Автодеплой | Статус |
+|-----------|-------|-------|------------|--------|
+| **Development** | Любая | localhost:3000 | — | ✅ Локально |
+| **Preprod** | `develop` | https://preprod.stankoff.ru | ✅ Да | ✅ Работает |
+| **Production** | `main` | bpms.stankoff.ru | ⏸️ Пока отключен | 🔜 Планируется |
+
+### CI/CD Pipeline
+
+GitHub Actions автоматически деплоит на preprod при push в ветку `develop`:
+
+1. ✅ Lint & Type Check
+2. ✅ Backend Tests
+3. ✅ Frontend Tests
+4. ✅ Build Docker Images (AMD64)
+5. ✅ Push to GitHub Container Registry
+6. ✅ Deploy to Server (SSH)
+
+### SSL сертификаты
+
+**Preprod:**
+- ✅ Let's Encrypt SSL сертификат настроен
+- ✅ Автоматическое обновление каждые 12 часов через Certbot
+- ✅ HTTPS редирект (HTTP → HTTPS)
+- ✅ HTTP/2 включен
+
+**Проверка:**
+```bash
+curl https://preprod.stankoff.ru/api/health  # Backend API
+curl https://preprod.stankoff.ru/           # Frontend
+```
+
+### Документация деплоя
+
+Полная документация по настройке CI/CD:
+- [📋 QUICKSTART-DEPLOY.md](./QUICKSTART-DEPLOY.md) - Быстрый старт (15 минут)
+- [📚 docs/DEPLOY.md](./docs/DEPLOY.md) - Полная инструкция
+- [📝 NEXT_STEPS_DEPLOY.md](./NEXT_STEPS_DEPLOY.md) - Следующие шаги
 
 ## Структура проекта
 
@@ -229,9 +276,16 @@ S3_BUCKET_NAME=stankoff-portal-files
 
 ## Документация
 
+### Разработка
 - [SETUP.md](./SETUP.md) - Подробная инструкция установки
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Архитектура системы
 - [NEXT_STEPS.md](./NEXT_STEPS.md) - План разработки
+- [CLAUDE.md](./CLAUDE.md) - Правила для ИИ-агента
+
+### Деплой
+- [QUICKSTART-DEPLOY.md](./QUICKSTART-DEPLOY.md) - Быстрый старт деплоя (15 минут)
+- [docs/DEPLOY.md](./docs/DEPLOY.md) - Полная инструкция по деплою
+- [NEXT_STEPS_DEPLOY.md](./NEXT_STEPS_DEPLOY.md) - Следующие шаги после настройки
 
 ## Лицензия
 

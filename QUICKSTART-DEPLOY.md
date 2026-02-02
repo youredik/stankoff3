@@ -128,9 +128,14 @@ chmod +x init-ssl.sh
 ## ✅ Готово!
 
 Теперь ваше приложение доступно на:
-- **Frontend**: https://preprod.stankoff.ru
-- **Backend API**: https://preprod.stankoff.ru/api/health
-- **Keycloak**: https://preprod.stankoff.ru/auth
+- **Frontend**: https://preprod.stankoff.ru (✅ SSL настроен)
+- **Backend API**: https://preprod.stankoff.ru/api/health (✅ SSL настроен)
+- **Keycloak**: Внешний сервис (не в docker-compose)
+
+**SSL сертификат:**
+- ✅ Let's Encrypt автоматически обновляется каждые 12 часов
+- ✅ HTTP автоматически редиректит на HTTPS
+- ✅ HTTP/2 включен
 
 ## 🔄 Workflow разработки
 
@@ -196,6 +201,27 @@ docker compose -f docker-compose.preprod.yml logs frontend
 Проверьте, что DNS настроен правильно и указывает на сервер:
 ```bash
 nslookup preprod.stankoff.ru
+```
+
+### Backend не создает схему БД
+
+Если видите ошибку `relation "users" does not exist`:
+
+```bash
+ssh -l youredik 51.250.117.178
+cd /opt/stankoff-portal
+
+# Остановить контейнеры
+docker compose -f docker-compose.preprod.yml down
+
+# Удалить старый PostgreSQL volume
+docker volume rm stankoff-portal_postgres-data
+
+# Запустить заново (TypeORM создаст схему с TYPEORM_SYNC=true)
+docker compose -f docker-compose.preprod.yml up -d
+
+# Проверить логи
+docker compose -f docker-compose.preprod.yml logs -f backend
 ```
 
 ---

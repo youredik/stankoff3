@@ -8,7 +8,8 @@
 
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand, @dnd-kit, Tiptap, Socket.IO Client
 - **Backend:** NestJS 11, TypeORM, PostgreSQL, Socket.IO, AWS SDK v3 (S3)
-- **Инфраструктура:** Docker Compose, Yandex Object Storage
+- **Инфраструктура:** Docker Compose, Yandex Object Storage, GitHub Actions CI/CD, Nginx, Let's Encrypt SSL
+- **Деплой:** GitHub Container Registry (GHCR), Docker multi-platform builds (AMD64)
 
 ## Структура проекта
 
@@ -129,6 +130,62 @@ stankoff-portal/
 - Поле `status` с типом `FieldOption[]` определяет колонки канбана
 - `Attachment` содержит: id, name, size, url, mimeType
 
+## Окружения и деплой
+
+### Окружения
+
+| Окружение | Ветка | Домен | Автодеплой | Сервер |
+|-----------|-------|-------|------------|--------|
+| **Preprod** | `develop` | preprod.stankoff.ru | ✅ Да | 51.250.117.178 |
+| **Production** | `main` | bpms.stankoff.ru | ⏸️ Пока отключен | TBD |
+| **Development** | Любая | localhost:3000 | — | Локально |
+
+### Keycloak SSO
+
+**ВАЖНО:** Проект использует **внешний Keycloak**, не контейнеризованный.
+- Keycloak сервис **удален** из всех docker-compose файлов
+- Конфигурация через переменные окружения (`KEYCLOAK_URL`, `KEYCLOAK_REALM`, etc.)
+- Nginx **не проксирует** `/auth/` — это внешний сервис
+
+### TypeORM синхронизация
+
+- **Preprod:** `TYPEORM_SYNC=true` — автоматическое создание схемы БД
+- **Production:** `TYPEORM_SYNC=false` — только миграции
+- **Development:** `TYPEORM_SYNC=true` — для удобства разработки
+
+**ВАЖНО:** Переменная должна быть в `environment` секции docker-compose, а не только в `.env` файле.
+
+### CI/CD Pipeline
+
+GitHub Actions автоматически деплоит при push в `develop` или `main`:
+
+```
+Push в ветку
+    ↓
+1. Lint & Type Check
+2. Backend Tests
+3. Frontend Tests
+    ↓
+4. Build Docker Images (AMD64)
+5. Push to GitHub Container Registry
+    ↓
+6. Deploy to Server (SSH)
+```
+
+**Требуемые GitHub Secrets:**
+- `PREPROD_HOST` — IP адрес preprod сервера
+- `PREPROD_USER` — SSH пользователь
+- `PREPROD_SSH_KEY` — Приватный SSH ключ (весь, включая BEGIN/END)
+- `GHCR_TOKEN` — Personal Access Token с `write:packages`, `read:packages`
+
+**Docker образы:** `ghcr.io/youredik/stankoff3/frontend:preprod`, `ghcr.io/youredik/stankoff3/backend:preprod`
+
+### SSL сертификаты
+
+- **Preprod:** Let's Encrypt через Certbot (автообновление каждые 12 часов)
+- **Production:** Let's Encrypt (будет настроено позже)
+- Сертификаты в volume `certbot-conf`, ACME challenge через nginx
+
 ## Команды
 
 ```bash
@@ -148,6 +205,19 @@ cd apps/frontend
 npm run test:e2e         # Запуск всех тестов (с автоочисткой)
 npm run test:e2e:headed  # Тесты с видимым браузером
 npm run test:e2e:ui      # Интерактивный UI для тестов
+
+# Деплой
+git push origin develop  # Автоматический деплой на preprod
+git push origin main     # Автоматический деплой на production (пока отключен)
+
+# Проверка preprod сервера
+ssh -l youredik 51.250.117.178 "cd /opt/stankoff-portal && docker compose -f docker-compose.preprod.yml ps"
+ssh -l youredik 51.250.117.178 "cd /opt/stankoff-portal && docker compose -f docker-compose.preprod.yml logs -f backend"
+curl https://preprod.stankoff.ru/api/health  # Health check
+
+# Сборка Docker образов (локально для тестирования)
+docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/backend:preprod -f apps/backend/Dockerfile --push .
+docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/frontend:preprod -f apps/frontend/Dockerfile --push .
 ```
 
 > **Изоляция тестов:** E2E тесты автоматически очищают тестовые данные через `global-setup.ts` и `global-teardown.ts`. Очистка удаляет сущности с маркерами в названии (Playwright, Тест, DnD, и т.д.).

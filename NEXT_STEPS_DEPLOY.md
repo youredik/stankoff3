@@ -7,6 +7,10 @@
 3. ✅ Ветка develop создана
 4. ✅ Production deployment временно отключен
 5. ✅ Документация создана
+6. ✅ SSL сертификат Let's Encrypt настроен и работает
+7. ✅ Preprod окружение работает: https://preprod.stankoff.ru
+8. ✅ TYPEORM_SYNC настроен для автоматического создания схемы БД
+9. ✅ Keycloak удален из docker-compose (используется внешний)
 
 ## 📋 Что нужно сделать (15 минут)
 
@@ -91,12 +95,15 @@ chmod +x init-ssl.sh
 - **Полная инструкция**: [docs/DEPLOY.md](docs/DEPLOY.md)
 - **Архитектура**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-## 🔄 После успешного деплоя
+## 🔄 Текущий статус
 
-Приложение будет доступно на:
-- Frontend: https://preprod.stankoff.ru
-- Backend: https://preprod.stankoff.ru/api/health
-- Keycloak: https://preprod.stankoff.ru/auth
+Приложение работает на preprod:
+- ✅ Frontend: https://preprod.stankoff.ru
+- ✅ Backend: https://preprod.stankoff.ru/api/health
+- ✅ SSL: Let's Encrypt (автообновление каждые 12 часов)
+- ✅ HTTP/2: Включен
+- ✅ TypeORM: Автоматически создает схему БД (TYPEORM_SYNC=true)
+- ℹ️ Keycloak: Внешний сервис (не в docker-compose)
 
 ## 🚨 Важно
 

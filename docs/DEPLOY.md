@@ -204,9 +204,15 @@ curl http://localhost:3001/api/health
 
 ### Проверка работоспособности
 
-1. **Backend API**: https://preprod.stankoff.ru/api/health
-2. **Frontend**: https://preprod.stankoff.ru
-3. **Keycloak**: https://preprod.stankoff.ru/auth
+1. **Backend API**: https://preprod.stankoff.ru/api/health (✅ SSL настроен)
+2. **Frontend**: https://preprod.stankoff.ru (✅ SSL настроен)
+3. **Keycloak**: Внешний сервис (не в docker-compose)
+
+**Статус preprod окружения:**
+- ✅ SSL сертификат Let's Encrypt активен (автообновление каждые 12 часов)
+- ✅ HTTP → HTTPS редирект настроен
+- ✅ HTTP/2 включен
+- ✅ TypeORM автоматически создает схему БД (TYPEORM_SYNC=true)
 
 ## 🛠️ Ручной деплой
 
@@ -236,9 +242,17 @@ curl http://localhost:3001/api/health
 
 ## 🔐 SSL сертификаты (Let's Encrypt)
 
-### Первичная генерация
+**Статус preprod:** ✅ SSL сертификат настроен и работает
 
-После первого деплоя на preprod:
+- Домен: preprod.stankoff.ru
+- Выдан: Let's Encrypt (E8)
+- Автообновление: Каждые 12 часов через Certbot
+- HTTP/2: Включен
+- HTTPS редирект: Включен
+
+### Первичная генерация (уже выполнено для preprod)
+
+Если нужно настроить SSL для нового окружения:
 
 ```bash
 ssh -l youredik 51.250.117.178
@@ -338,6 +352,29 @@ docker compose -f docker-compose.preprod.yml exec postgres pg_isready
 
 # Проверьте логи backend
 docker compose -f docker-compose.preprod.yml logs backend
+```
+
+### TypeORM не создает схему БД
+
+**Проблема**: `relation "users" does not exist` в логах backend
+
+**Причина**: PostgreSQL volume содержит старую БД без схемы, или TYPEORM_SYNC не включен
+
+**Решение**:
+```bash
+# 1. Проверьте, что TYPEORM_SYNC=true в .env
+grep TYPEORM_SYNC /opt/stankoff-portal/.env
+
+# 2. Проверьте, что переменная передается в контейнер
+docker compose -f docker-compose.preprod.yml config | grep TYPEORM_SYNC
+
+# 3. Если переменная есть, но схема не создается - удалите volume
+docker compose -f docker-compose.preprod.yml down
+docker volume rm stankoff-portal_postgres-data
+docker compose -f docker-compose.preprod.yml up -d
+
+# 4. Проверьте, что схема создалась
+docker compose -f docker-compose.preprod.yml exec postgres psql -U postgres -d stankoff_preprod -c '\dt'
 ```
 
 ## 📊 Best Practices
