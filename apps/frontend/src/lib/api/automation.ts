@@ -89,7 +89,7 @@ export interface CreateRuleDto {
   priority?: number;
 }
 
-export interface UpdateRuleDto extends Partial<Omit<CreateRuleDto, 'workspaceId'>> {}
+export type UpdateRuleDto = Partial<Omit<CreateRuleDto, 'workspaceId'>>;
 
 export const automationApi = {
   getByWorkspace: (workspaceId: string) =>

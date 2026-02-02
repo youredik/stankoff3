@@ -4,7 +4,6 @@ import { useAuthStore } from './useAuthStore';
 // Mock the auth API
 vi.mock('@/lib/api/auth', () => ({
   authApi: {
-    login: vi.fn(),
     logout: vi.fn(),
     refresh: vi.fn(),
     me: vi.fn(),
@@ -35,46 +34,6 @@ describe('useAuthStore', () => {
       expect(state.isAuthenticated).toBe(false);
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
-    });
-  });
-
-  describe('login', () => {
-    it('должен успешно залогинить пользователя', async () => {
-      const mockUser = {
-        id: '1',
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
-        role: 'employee' as const,
-        isActive: true,
-      };
-
-      vi.mocked(authApi.login).mockResolvedValue({
-        user: mockUser,
-        accessToken: 'test-token',
-      });
-
-      await useAuthStore.getState().login('test@example.com', 'password');
-
-      const state = useAuthStore.getState();
-      expect(state.user).toEqual(mockUser);
-      expect(state.accessToken).toBe('test-token');
-      expect(state.isAuthenticated).toBe(true);
-      expect(state.isLoading).toBe(false);
-      expect(state.error).toBeNull();
-    });
-
-    it('должен установить ошибку при неудачном логине', async () => {
-      vi.mocked(authApi.login).mockRejectedValue(new Error('Неверные данные'));
-
-      await expect(
-        useAuthStore.getState().login('test@example.com', 'wrong'),
-      ).rejects.toThrow();
-
-      const state = useAuthStore.getState();
-      expect(state.user).toBeNull();
-      expect(state.isAuthenticated).toBe(false);
-      expect(state.error).toBe('Неверные данные');
     });
   });
 

@@ -18,7 +18,6 @@ vi.mock('next/navigation', () => ({
 // Mock next/image
 vi.mock('next/image', () => ({
   default: (props: any) => {
-    // eslint-disable-next-line @next/next/no-img-element
     return <img {...props} alt={props.alt} />;
   },
 }));
