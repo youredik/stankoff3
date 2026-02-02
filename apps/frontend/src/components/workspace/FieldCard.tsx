@@ -83,38 +83,38 @@ export function FieldCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg group hover:border-gray-300"
+      className="flex items-center gap-2 p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg group hover:border-gray-300 dark:hover:border-gray-600"
     >
       <button
         {...attributes}
         {...listeners}
-        className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 cursor-grab"
+        className="flex-shrink-0 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-grab"
       >
         <GripVertical className="w-4 h-4" />
       </button>
 
-      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-600">
+      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-600 dark:text-gray-400">
         {FIELD_ICONS[field.type]}
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900 truncate">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
             {field.name}
           </span>
           {field.required && (
             <span className="text-xs text-red-500">*</span>
           )}
           {isSystemField && (
-            <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+            <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded">
               Системное
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           <span>{FIELD_TYPE_LABELS[field.type]}</span>
           {field.options && field.options.length > 0 && (
-            <span className="text-gray-400">
+            <span className="text-gray-400 dark:text-gray-500">
               ({field.options.length} вариантов)
             </span>
           )}
@@ -124,7 +124,7 @@ export function FieldCard({
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={onEdit}
-          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+          className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
           title="Настроить"
         >
           <Settings className="w-4 h-4" />
@@ -132,7 +132,7 @@ export function FieldCard({
         {!isSystemField && (
           <button
             onClick={onRemove}
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+            className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
             title="Удалить"
           >
             <Trash2 className="w-4 h-4" />

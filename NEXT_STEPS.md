@@ -225,86 +225,80 @@
 
 ---
 
-## 🔐 Keycloak Integration (7-8 недели)
+## ✅ Keycloak Integration (ГОТОВО)
+
+Keycloak SSO полностью интегрирован:
 
 ### Backend
-```typescript
-// Установить:
-// npm install keycloak-connect @nestjs/passport passport
-
-// Создать модуль Auth с Keycloak:
-// - auth/keycloak.strategy.ts
-// - auth/guards/keycloak.guard.ts
-// - auth/decorators/current-user.decorator.ts
-
-// Защитить все endpoints guards
-```
+- ✅ `keycloak.service.ts` — OIDC клиент с openid-client v6
+- ✅ PKCE Authorization Code Flow
+- ✅ Auto-provisioning пользователей из Keycloak claims
+- ✅ Маппинг ролей: admin/realm-admin → admin, manager → manager, остальные → employee
+- ✅ Endpoints: `/auth/provider`, `/auth/keycloak/login`, `/auth/keycloak/callback`
 
 ### Frontend
-```typescript
-// Установить:
-// npm install keycloak-js
+- ✅ Страница логина с кнопкой "Войти через SSO"
+- ✅ Автоматическое определение провайдера
+- ✅ Обработка callback и ошибок SSO
 
-// Создать:
-// - lib/auth/keycloak.ts - инициализация
-// - hooks/useAuth.ts - авторизация
-// - components/auth/LoginPage.tsx
-// - components/auth/ProtectedRoute.tsx
+### Инфраструктура
+- ✅ Keycloak 26.0 в docker-compose.yml
+- ✅ Автоматическая настройка через Keycloak Admin API:
+  - Realm: stankoff
+  - Client: stankoff-portal (с PKCE)
+  - Роли: admin, manager, employee
+  - Тестовые пользователи: admin@stankoff.ru, employee@stankoff.ru (пароль: password)
 
-// Обернуть приложение в AuthProvider
-```
+### Как включить
+```bash
+# 1. Запустить Keycloak
+docker compose up -d keycloak
 
-### Docker
-```yaml
-# Раскомментировать Keycloak в docker-compose.yml
-# Настроить realm, client, roles
-# Создать тестовых пользователей
+# 2. Установить AUTH_PROVIDER=keycloak в .env
+
+# 3. Перезапустить backend
+npm run dev:backend
 ```
 
 ---
 
-## 🎨 UI/UX улучшения (9-я неделя)
+## ✅ UI/UX улучшения (9-я неделя) — ГОТОВО
 
-- [ ] Анимации переходов
-- [ ] Skeleton loaders
-- [ ] Тёмная тема
-- [ ] Адаптивная вёрстка для мобильных
-- [ ] Accessibility (a11y)
-- [ ] Keyboard shortcuts
-- [ ] Breadcrumbs навигация
+- [x] Анимации переходов (slide-in, fade-in, scale-in в tailwind.config.ts)
+- [x] Skeleton loaders (Skeleton.tsx с паттернами SkeletonCard, SkeletonColumn, SkeletonSearchResult)
+- [x] Тёмная тема (ThemeToggle, useThemeStore, CSS переменные для dark mode)
+- [x] Адаптивная вёрстка для мобильных (burger menu, slide-in sidebar, responsive breakpoints)
+- [x] Accessibility (a11y) — aria-labels, aria-expanded, role="dialog", useFocusTrap
+- [x] Keyboard shortcuts (Cmd+K для поиска, Escape для закрытия)
+- [x] Breadcrumbs навигация (Breadcrumbs.tsx)
 
 ---
 
-## 🧪 Тестирование (10-я неделя)
+## ✅ Тестирование (10-я неделя) — ГОТОВО
 
 ### Backend
-```bash
-# Создать тесты:
-# - unit тесты для сервисов (Jest)
-# - e2e тесты для API (Supertest)
-# - integration тесты для БД
-```
+- [x] Unit тесты для сервисов (Jest): UserService, AuthService, EmailService
+- [x] Конфигурация Jest в package.json
+- [x] E2E тесты с Supertest (test/app.e2e-spec.ts)
+- [x] npm run test, npm run test:cov, npm run test:e2e
 
 ### Frontend
-```bash
-# Установить:
-# npm install -D vitest @testing-library/react @testing-library/jest-dom
-
-# Создать тесты:
-# - unit тесты для компонентов
-# - integration тесты для forms
-# - e2e тесты (Playwright или Cypress)
-```
+- [x] Vitest + Testing Library настроен
+- [x] Unit тесты для stores: useAuthStore, useEntityStore
+- [x] Конфигурация vitest.config.ts
+- [x] npm run test, npm run test:watch
+- [x] E2E тесты Playwright (уже были)
 
 ---
 
-## 📊 Мониторинг и логирование (11-я неделя)
+## ✅ Мониторинг и логирование (11-я неделя) — ГОТОВО
 
-- [ ] Подключить Sentry для отслеживания ошибок
-- [ ] Настроить структурированное логирование (Winston)
-- [ ] Добавить health check endpoints
-- [ ] Настроить Prometheus metrics
-- [ ] Создать Grafana dashboards
+- [x] Health check endpoints (/api/health, /api/health/live, /api/health/ready)
+- [x] Winston структурированное логирование (JSON в production, цветной вывод в dev)
+- [x] Файловое логирование (logs/error.log, logs/combined.log)
+- [ ] Sentry (опционально, требует аккаунт)
+- [ ] Prometheus metrics (опционально)
+- [ ] Grafana dashboards (опционально)
 
 ---
 
@@ -322,12 +316,13 @@
 
 ## 💡 Дополнительные фичи (по желанию)
 
-- [ ] Email уведомления
+- [x] Email уведомления (nodemailer, SMTP)
+- [x] Экспорт в CSV/JSON (/api/entities/export/csv, /api/entities/export/json)
+- [x] Импорт данных из CSV (/api/entities/import/csv, ImportModal.tsx)
 - [ ] Экспорт в Excel/PDF
-- [ ] Импорт данных из CSV
 - [ ] Шаблоны сущностей
 - [ ] Автоматизация (триггеры, правила)
-- [ ] Отчёты и аналитика
+- [x] Отчёты и аналитика (AnalyticsDashboard)
 - [ ] Интеграция с внешними системами
 - [ ] Mobile app (React Native)
 - [ ] PWA поддержка

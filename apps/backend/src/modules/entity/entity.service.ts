@@ -43,6 +43,40 @@ export class EntityService {
     });
   }
 
+  async search(
+    query: string,
+    workspaceIds: string[],
+    limit = 10,
+  ): Promise<{ entities: WorkspaceEntity[]; workspaces: Map<string, Workspace> }> {
+    const qb = this.entityRepository
+      .createQueryBuilder('entity')
+      .leftJoinAndSelect('entity.assignee', 'assignee')
+      .where('entity.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .andWhere(
+        '(LOWER(entity.title) LIKE LOWER(:query) OR LOWER(entity.customId) LIKE LOWER(:query))',
+        { query: `%${query}%` },
+      )
+      .orderBy('entity.createdAt', 'DESC')
+      .limit(limit);
+
+    const entities = await qb.getMany();
+
+    // Загружаем информацию о workspace для отображения
+    const uniqueWorkspaceIds = [...new Set(entities.map((e) => e.workspaceId))];
+    const workspaces = new Map<string, Workspace>();
+
+    if (uniqueWorkspaceIds.length > 0) {
+      const workspaceList = await this.workspaceRepository.find({
+        where: uniqueWorkspaceIds.map((id) => ({ id })),
+      });
+      for (const ws of workspaceList) {
+        workspaces.set(ws.id, ws);
+      }
+    }
+
+    return { entities, workspaces };
+  }
+
   async findOne(id: string): Promise<any> {
     const entity = await this.entityRepository.findOne({
       where: { id },
@@ -307,5 +341,136 @@ export class EntityService {
     }
 
     return { deleted: testEntities.length };
+  }
+
+  // ==================== Export / Import ====================
+
+  async exportToCsv(workspaceId: string): Promise<string> {
+    const entities = await this.entityRepository.find({
+      where: { workspaceId },
+      relations: ['assignee'],
+      order: { createdAt: 'DESC' },
+    });
+
+    const headers = ['ID', 'Номер', 'Название', 'Статус', 'Приоритет', 'Исполнитель', 'Создано'];
+    const rows = entities.map((e) => [
+      e.id,
+      e.customId,
+      `"${(e.title || '').replace(/"/g, '""')}"`,
+      e.status,
+      e.priority || '',
+      e.assignee ? `${e.assignee.firstName} ${e.assignee.lastName}` : '',
+      e.createdAt.toISOString(),
+    ]);
+
+    return [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+  }
+
+  async exportToJson(workspaceId: string): Promise<object> {
+    const entities = await this.entityRepository.find({
+      where: { workspaceId },
+      relations: ['assignee'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      exportedAt: new Date().toISOString(),
+      workspaceId,
+      count: entities.length,
+      entities: entities.map((e) => ({
+        customId: e.customId,
+        title: e.title,
+        status: e.status,
+        priority: e.priority,
+        data: e.data,
+        assignee: e.assignee
+          ? { email: e.assignee.email, name: `${e.assignee.firstName} ${e.assignee.lastName}` }
+          : null,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt,
+      })),
+    };
+  }
+
+  async importFromCsv(
+    workspaceId: string,
+    csv: string,
+    actorId: string,
+  ): Promise<{ imported: number; errors: string[] }> {
+    const lines = csv.split('\n').filter((line) => line.trim());
+    if (lines.length < 2) {
+      return { imported: 0, errors: ['Файл пуст или содержит только заголовки'] };
+    }
+
+    // Пропускаем заголовок
+    const dataLines = lines.slice(1);
+    const errors: string[] = [];
+    let imported = 0;
+
+    for (let i = 0; i < dataLines.length; i++) {
+      try {
+        const line = dataLines[i];
+        // Парсим CSV с учётом кавычек
+        const parts = this.parseCsvLine(line);
+
+        if (parts.length < 3) {
+          errors.push(`Строка ${i + 2}: недостаточно полей`);
+          continue;
+        }
+
+        const title = parts[2]?.replace(/^"|"$/g, '').replace(/""/g, '"') || '';
+        const status = parts[3] || 'new';
+        const priority = parts[4] as 'low' | 'medium' | 'high' | undefined;
+
+        if (!title) {
+          errors.push(`Строка ${i + 2}: название не указано`);
+          continue;
+        }
+
+        await this.create(
+          {
+            workspaceId,
+            title,
+            status,
+            priority: priority || 'medium',
+            data: {},
+          },
+          actorId,
+        );
+        imported++;
+      } catch (err) {
+        errors.push(`Строка ${i + 2}: ${(err as Error).message}`);
+      }
+    }
+
+    return { imported, errors };
+  }
+
+  private parseCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ';' && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+
+    return result;
   }
 }

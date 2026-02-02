@@ -20,8 +20,8 @@ export function KanbanColumn({ id, title, color, cards, canEdit = true }: Kanban
   return (
     <div className="flex-shrink-0 w-80">
       <div
-        className={`bg-gray-50 rounded-xl p-4 transition-colors ${
-          isOver ? 'ring-2 ring-primary-500 bg-primary-50' : ''
+        className={`bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 transition-colors ${
+          isOver ? 'ring-2 ring-primary-500 bg-primary-50 dark:bg-primary-900/30' : ''
         }`}
       >
         {/* Header */}
@@ -33,9 +33,9 @@ export function KanbanColumn({ id, title, color, cards, canEdit = true }: Kanban
                 style={{ backgroundColor: color }}
               />
             )}
-            <h3 className="font-semibold text-gray-900">{title}</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
           </div>
-          <span className="bg-white text-gray-600 px-2 py-0.5 rounded text-sm font-medium border border-gray-200">
+          <span className="bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded text-sm font-medium border border-gray-200 dark:border-gray-600">
             {cards.length}
           </span>
         </div>
@@ -58,10 +58,10 @@ export function KanbanColumn({ id, title, color, cards, canEdit = true }: Kanban
 
           {cards.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center mb-3">
-                <Inbox className="w-5 h-5 text-gray-300" />
+              <div className="w-10 h-10 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center mb-3">
+                <Inbox className="w-5 h-5 text-gray-300 dark:text-gray-500" />
               </div>
-              <p className="text-sm text-gray-400">Нет заявок</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">Нет заявок</p>
             </div>
           )}
         </div>

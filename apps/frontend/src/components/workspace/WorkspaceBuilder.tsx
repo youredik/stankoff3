@@ -250,10 +250,10 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
   if (!currentWorkspace) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Рабочее место не найдено</p>
+        <p className="text-gray-500 dark:text-gray-400">Рабочее место не найдено</p>
         <button
           onClick={onBack}
-          className="mt-4 text-primary-600 hover:text-primary-700"
+          className="mt-4 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
         >
           Вернуться назад
         </button>
@@ -272,11 +272,11 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b bg-white">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             <div className="flex items-center gap-4">
               <button
                 onClick={onBack}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -286,7 +286,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                   <div className="relative">
                     <button
                       onClick={() => setShowIconPicker(!showIconPicker)}
-                      className="text-2xl hover:bg-gray-100 rounded-lg p-1 transition-colors"
+                      className="text-2xl hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg p-1 transition-colors"
                       title="Изменить иконку"
                     >
                       {currentWorkspace.icon}
@@ -297,13 +297,13 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                           className="fixed inset-0 z-10"
                           onClick={() => setShowIconPicker(false)}
                         />
-                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-20 grid grid-cols-4 gap-1 w-48">
+                        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 z-20 grid grid-cols-4 gap-1 w-48">
                           {WORKSPACE_ICONS.map((icon) => (
                             <button
                               key={icon}
                               onClick={() => selectIcon(icon)}
-                              className={`text-xl p-2 hover:bg-gray-100 rounded transition-colors ${
-                                currentWorkspace.icon === icon ? 'bg-primary-50' : ''
+                              className={`text-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
+                                currentWorkspace.icon === icon ? 'bg-primary-50 dark:bg-primary-900/40' : ''
                               }`}
                             >
                               {icon}
@@ -323,7 +323,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                       onChange={(e) => setEditedName(e.target.value)}
                       onBlur={saveName}
                       onKeyDown={handleNameKeyDown}
-                      className="text-xl font-bold text-gray-900 border border-primary-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="text-xl font-bold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 border border-primary-300 dark:border-primary-600 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   ) : (
                     <button
@@ -331,14 +331,14 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                       className="flex items-center gap-2 group"
                       title="Редактировать название"
                     >
-                      <h1 className="text-xl font-bold text-gray-900">
+                      <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                         {currentWorkspace.name}
                       </h1>
-                      <Pencil className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Pencil className="w-4 h-4 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 ml-10">
+                <p className="text-sm text-gray-500 dark:text-gray-400 ml-10">
                   Настройка полей и структуры
                 </p>
               </div>
@@ -361,13 +361,13 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b bg-white px-6">
+          <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6">
             <button
               onClick={() => setActiveTab('structure')}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'structure'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
               <Settings2 className="w-4 h-4" />
@@ -378,8 +378,8 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 onClick={() => setActiveTab('members')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'members'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 <Users className="w-4 h-4" />
@@ -390,7 +390,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
 
           {/* Content */}
           {activeTab === 'structure' ? (
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
               <div className="max-w-3xl mx-auto space-y-4">
                 {currentWorkspace.sections.map((section) => (
                   <SectionCard
@@ -404,7 +404,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
 
                 <button
                   onClick={handleAddSection}
-                  className="flex items-center justify-center gap-2 w-full p-4 text-gray-500 hover:text-gray-700 border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-xl transition-colors"
+                  className="flex items-center justify-center gap-2 w-full p-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 rounded-xl transition-colors"
                 >
                   <Plus className="w-5 h-5" />
                   <span className="font-medium">Добавить секцию</span>
@@ -412,7 +412,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
               </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
               <WorkspaceMembers workspaceId={workspaceId} />
             </div>
           )}
@@ -424,8 +424,8 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
         {/* Drag Overlay */}
         <DragOverlay>
           {activeItem?.type === 'new-field' && activeItem.fieldType && (
-            <div className="p-3 bg-white border border-primary-300 rounded-lg shadow-lg opacity-90">
-              <span className="text-sm font-medium text-gray-900">
+            <div className="p-3 bg-white dark:bg-gray-800 border border-primary-300 dark:border-primary-600 rounded-lg shadow-lg opacity-90">
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {FIELD_TYPES.find((t) => t.type === activeItem.fieldType)?.label}
               </span>
             </div>

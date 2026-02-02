@@ -231,4 +231,42 @@ export class WorkspaceController {
     // BOM для корректного открытия в Excel
     res.send('\uFEFF' + csv);
   }
+
+  // === Импорт ===
+
+  @Post(':id/import/json')
+  async importJson(
+    @Param('id') id: string,
+    @Body() body: { entities: any[] },
+    @CurrentUser() user: User,
+  ) {
+    const access = await this.workspaceService.checkAccess(
+      id,
+      user.id,
+      user.role,
+      WorkspaceRole.ADMIN,
+    );
+    if (!access) {
+      throw new ForbiddenException('Недостаточно прав для импорта');
+    }
+    return this.workspaceService.importFromJson(id, body.entities, user.id);
+  }
+
+  @Post(':id/import/csv')
+  async importCsv(
+    @Param('id') id: string,
+    @Body() body: { csv: string },
+    @CurrentUser() user: User,
+  ) {
+    const access = await this.workspaceService.checkAccess(
+      id,
+      user.id,
+      user.role,
+      WorkspaceRole.ADMIN,
+    );
+    if (!access) {
+      throw new ForbiddenException('Недостаточно прав для импорта');
+    }
+    return this.workspaceService.importFromCsv(id, body.csv, user.id);
+  }
 }

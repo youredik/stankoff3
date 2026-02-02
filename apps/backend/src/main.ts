@@ -1,7 +1,9 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { WinstonModule } from 'nest-winston';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { winstonConfig } from './common/logger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -9,6 +11,7 @@ async function bootstrap() {
       origin: process.env.FRONTEND_URL || 'http://localhost:3000',
       credentials: true,
     },
+    logger: WinstonModule.createLogger(winstonConfig),
   });
 
   // Cookie parser для работы с HttpOnly cookies

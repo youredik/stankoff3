@@ -110,24 +110,24 @@ export function FilterPanel({
     <>
       <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
 
-      <div className="fixed right-0 top-0 h-full w-80 bg-white shadow-xl z-50 flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-900 shadow-xl z-50 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="font-semibold text-gray-900">Фильтры</h3>
+        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Фильтры</h3>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}
-                className="text-xs text-primary-600 hover:text-primary-700 cursor-pointer"
+                className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 cursor-pointer"
               >
                 Сбросить
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded cursor-pointer"
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>
           </div>
         </div>
@@ -140,12 +140,12 @@ export function FilterPanel({
               onClick={() => toggleSection('search')}
               className="flex items-center justify-between w-full text-left cursor-pointer"
             >
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                 <Search className="w-4 h-4" />
                 <span>Поиск</span>
               </div>
               <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${
+                className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
                   expandedSections.includes('search') ? 'rotate-180' : ''
                 }`}
               />
@@ -157,7 +157,7 @@ export function FilterPanel({
                   value={filters.search}
                   onChange={(e) => updateFilter('search', e.target.value)}
                   placeholder="Поиск по названию..."
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
             )}
@@ -169,17 +169,17 @@ export function FilterPanel({
               onClick={() => toggleSection('assignee')}
               className="flex items-center justify-between w-full text-left cursor-pointer"
             >
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                 <User className="w-4 h-4" />
                 <span>Исполнитель</span>
                 {filters.assigneeIds.length > 0 && (
-                  <span className="text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
                     {filters.assigneeIds.length}
                   </span>
                 )}
               </div>
               <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${
+                className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
                   expandedSections.includes('assignee') ? 'rotate-180' : ''
                 }`}
               />
@@ -189,20 +189,20 @@ export function FilterPanel({
                 {users.map((user) => (
                   <label
                     key={user.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={filters.assigneeIds.includes(user.id)}
                       onChange={() => toggleArrayFilter('assigneeIds', user.id)}
-                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                     />
                     <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white text-xs">
                         {user.firstName[0]}
                       </span>
                     </div>
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
                       {user.firstName} {user.lastName}
                     </span>
                   </label>
@@ -217,17 +217,17 @@ export function FilterPanel({
               onClick={() => toggleSection('priority')}
               className="flex items-center justify-between w-full text-left cursor-pointer"
             >
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                 <Tag className="w-4 h-4" />
                 <span>Приоритет</span>
                 {filters.priorities.length > 0 && (
-                  <span className="text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
                     {filters.priorities.length}
                   </span>
                 )}
               </div>
               <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${
+                className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
                   expandedSections.includes('priority') ? 'rotate-180' : ''
                 }`}
               />
@@ -237,19 +237,19 @@ export function FilterPanel({
                 {PRIORITY_OPTIONS.map((option) => (
                   <label
                     key={option.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={filters.priorities.includes(option.id)}
                       onChange={() => toggleArrayFilter('priorities', option.id)}
-                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                     />
                     <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: option.color }}
                     />
-                    <span className="text-sm text-gray-700">{option.label}</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{option.label}</span>
                   </label>
                 ))}
               </div>
@@ -262,12 +262,12 @@ export function FilterPanel({
               onClick={() => toggleSection('date')}
               className="flex items-center justify-between w-full text-left cursor-pointer"
             >
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                 <Calendar className="w-4 h-4" />
                 <span>Дата создания</span>
               </div>
               <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${
+                className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
                   expandedSections.includes('date') ? 'rotate-180' : ''
                 }`}
               />
@@ -275,21 +275,21 @@ export function FilterPanel({
             {expandedSections.includes('date') && (
               <div className="mt-2 space-y-2">
                 <div>
-                  <label className="text-xs text-gray-500">От</label>
+                  <label className="text-xs text-gray-500 dark:text-gray-400">От</label>
                   <input
                     type="date"
                     value={filters.dateFrom}
                     onChange={(e) => updateFilter('dateFrom', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">До</label>
+                  <label className="text-xs text-gray-500 dark:text-gray-400">До</label>
                   <input
                     type="date"
                     value={filters.dateTo}
                     onChange={(e) => updateFilter('dateTo', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               </div>
@@ -303,17 +303,17 @@ export function FilterPanel({
                 onClick={() => toggleSection(field.id)}
                 className="flex items-center justify-between w-full text-left cursor-pointer"
               >
-                <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                   <Tag className="w-4 h-4" />
                   <span>{field.name}</span>
                   {(filters.customFilters[field.id]?.length || 0) > 0 && (
-                    <span className="text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
                       {filters.customFilters[field.id]?.length}
                     </span>
                   )}
                 </div>
                 <ChevronDown
-                  className={`w-4 h-4 text-gray-400 transition-transform ${
+                  className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
                     expandedSections.includes(field.id) ? 'rotate-180' : ''
                   }`}
                 />
@@ -323,7 +323,7 @@ export function FilterPanel({
                   {field.options.map((option) => (
                     <label
                       key={option.id}
-                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                     >
                       <input
                         type="checkbox"
@@ -334,7 +334,7 @@ export function FilterPanel({
                         onChange={() =>
                           toggleCustomFilter(field.id, option.id)
                         }
-                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                       />
                       {option.color && (
                         <div
@@ -342,7 +342,7 @@ export function FilterPanel({
                           style={{ backgroundColor: option.color }}
                         />
                       )}
-                      <span className="text-sm text-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
                         {option.label}
                       </span>
                     </label>

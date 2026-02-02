@@ -16,15 +16,24 @@ import { Request, Response } from 'express';
 import { S3Service } from './s3.service';
 import { v4 as uuidv4 } from 'uuid';
 
-// Max file size: 10MB
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Max file size: 300MB
+const MAX_FILE_SIZE = 300 * 1024 * 1024;
 
 // Allowed MIME types
 const ALLOWED_MIME_TYPES = [
+  // Images
   'image/jpeg',
   'image/png',
   'image/gif',
   'image/webp',
+  // Video
+  'video/mp4',
+  'video/webm',
+  'video/ogg',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/x-matroska',
+  // Documents
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -51,12 +60,12 @@ export class S3Controller {
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Недопустимый тип файла. Разрешены: изображения, PDF, Word, Excel, текстовые файлы.',
+        'Недопустимый тип файла. Разрешены: изображения, видео, PDF, Word, Excel, текстовые файлы.',
       );
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('Размер файла превышает 10MB');
+      throw new BadRequestException('Размер файла превышает 300MB');
     }
 
     // Fix UTF-8 encoding for filenames (multer encodes as Latin-1)

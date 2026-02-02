@@ -51,30 +51,30 @@ export function PdfViewer({ attachment, onClose }: PdfViewerProps) {
     >
       {/* Header */}
       <div
-        className="h-14 bg-white border-b flex items-center justify-between px-4 flex-shrink-0"
+        className="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 flex-shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="text-gray-900 font-medium truncate max-w-md">
+        <span className="text-gray-900 dark:text-gray-100 font-medium truncate max-w-md">
           {attachment.name}
         </span>
         <div className="flex items-center gap-2">
           <button
             onClick={handleOpenInNewTab}
-            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             title="Открыть в новой вкладке"
           >
             <ExternalLink className="w-5 h-5" />
           </button>
           <button
             onClick={handleDownload}
-            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             title="Скачать"
           >
             <Download className="w-5 h-5" />
           </button>
           <button
             onClick={onClose}
-            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             title="Закрыть"
           >
             <X className="w-5 h-5" />

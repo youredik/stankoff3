@@ -11,6 +11,8 @@ import { WebsocketModule } from './modules/websocket/websocket.module';
 import { S3Module } from './modules/s3/s3.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { EmailModule } from './modules/email/email.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { HealthModule } from './modules/health/health.module';
 import { SeedService } from './seed.service';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
@@ -37,6 +39,8 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     S3Module,
     AuditLogModule,
     EmailModule,
+    AnalyticsModule,
+    HealthModule,
   ],
   providers: [
     SeedService,

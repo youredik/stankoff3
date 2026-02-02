@@ -103,17 +103,17 @@ export function FieldEditor({
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b">
-            <h3 className="text-lg font-semibold text-gray-900">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Настройка поля
             </h3>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>
           </div>
 
@@ -121,30 +121,31 @@ export function FieldEditor({
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Name */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
                 Название поля
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="Введите название"
               />
             </div>
 
             {/* Type */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
                 Тип поля
               </label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as FieldType)}
                 disabled={isSystemField}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500"
+                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-500"
               >
                 <option value="text">Текст</option>
+                <option value="textarea">Многострочный</option>
                 <option value="number">Число</option>
                 <option value="date">Дата</option>
                 <option value="select">Выбор из списка</option>
@@ -154,7 +155,7 @@ export function FieldEditor({
                 <option value="relation">Связь</option>
               </select>
               {isSystemField && (
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                   Тип системного поля изменить нельзя
                 </p>
               )}
@@ -167,23 +168,23 @@ export function FieldEditor({
                 id="required"
                 checked={required}
                 onChange={(e) => setRequired(e.target.checked)}
-                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
               />
-              <label htmlFor="required" className="text-sm text-gray-700">
+              <label htmlFor="required" className="text-sm text-gray-700 dark:text-gray-300">
                 Обязательное поле
               </label>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
                 Описание (необязательно)
               </label>
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="Подсказка для пользователей"
               />
             </div>
@@ -191,10 +192,10 @@ export function FieldEditor({
             {/* Options for select/status */}
             {hasOptions && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-2">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">
                   Варианты
                   {type === 'status' && (
-                    <span className="ml-2 text-gray-400 normal-case">
+                    <span className="ml-2 text-gray-400 dark:text-gray-500 normal-case">
                       (станут колонками канбана)
                     </span>
                   )}
@@ -203,9 +204,9 @@ export function FieldEditor({
                   {options.map((option, index) => (
                     <div
                       key={option.id}
-                      className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"
+                      className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
                     >
-                      <button className="p-1 text-gray-400 cursor-grab">
+                      <button className="p-1 text-gray-400 dark:text-gray-500 cursor-grab">
                         <GripVertical className="w-4 h-4" />
                       </button>
 
@@ -230,13 +231,13 @@ export function FieldEditor({
                         onChange={(e) =>
                           handleUpdateOption(index, { label: e.target.value })
                         }
-                        className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="flex-1 px-2 py-1 text-sm border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                         placeholder="Название варианта"
                       />
 
                       <button
                         onClick={() => handleRemoveOption(index)}
-                        className="p-1 text-gray-400 hover:text-red-600"
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
                         disabled={options.length <= 1}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -247,7 +248,7 @@ export function FieldEditor({
 
                 <button
                   onClick={handleAddOption}
-                  className="mt-2 flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700"
+                  className="mt-2 flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Добавить вариант</span>
@@ -258,13 +259,13 @@ export function FieldEditor({
             {/* Related workspace for relation type */}
             {type === 'relation' && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
                   Связанное рабочее место
                 </label>
                 <select
                   value={relatedWorkspaceId}
                   onChange={(e) => setRelatedWorkspaceId(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">Выберите рабочее место</option>
                   {workspaces.map((ws) => (
@@ -278,10 +279,10 @@ export function FieldEditor({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 px-6 py-4 border-t">
+          <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Отмена
             </button>

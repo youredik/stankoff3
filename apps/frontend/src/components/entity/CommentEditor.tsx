@@ -14,6 +14,7 @@ import {
   Paperclip,
   X,
   FileText,
+  Film,
   Loader2,
 } from 'lucide-react';
 import { filesApi } from '@/lib/api/files';
@@ -32,6 +33,10 @@ function formatFileSize(bytes: number): string {
 
 function isImageMimeType(mimeType: string): boolean {
   return mimeType.startsWith('image/');
+}
+
+function isVideoMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('video/');
 }
 
 export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
@@ -56,7 +61,7 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
       }),
       Mention.configure({
         HTMLAttributes: {
-          class: 'text-primary-600 bg-primary-50 rounded px-0.5',
+          class: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/40 rounded px-0.5',
         },
         suggestion: {
           items: ({ query }) =>
@@ -137,7 +142,7 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
     ],
     editorProps: {
       attributes: {
-        class: 'min-h-[60px] p-3 text-sm text-gray-900 focus:outline-none',
+        class: 'min-h-[60px] p-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none',
       },
       handleKeyDown: (_view, event) => {
         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
@@ -202,7 +207,7 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
       if (!rect) return null;
       return createPortal(
         <div
-          className="fixed z-[100] bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52"
+          className="fixed z-[100] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 w-52"
           style={{ top: rect.bottom + 4, left: rect.left }}
         >
           {mentionState.items.map((user, i) => (
@@ -210,8 +215,8 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
               key={user.id}
               className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 ${
                 i === selectedIndex
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
               }`}
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -235,32 +240,36 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
     })();
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500 bg-white dark:bg-gray-800">
       <EditorContent editor={editor} />
 
       {/* Attachments preview */}
       {attachments.length > 0 && (
-        <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap gap-2">
+        <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-2">
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
               className="relative group"
             >
               {isImageMimeType(attachment.mimeType) ? (
-                <div className="w-16 h-16 rounded overflow-hidden bg-gray-200">
+                <div className="w-16 h-16 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
                   <img
                     src={attachment.thumbnailUrl || attachment.url}
                     alt={attachment.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
+              ) : isVideoMimeType(attachment.mimeType) ? (
+                <div className="w-16 h-16 rounded overflow-hidden bg-gray-800 flex items-center justify-center">
+                  <Film className="w-6 h-6 text-white" />
+                </div>
               ) : (
-                <div className="flex items-center gap-2 bg-gray-100 rounded px-2 py-1">
-                  <FileText className="w-4 h-4 text-gray-500" />
-                  <span className="text-xs text-gray-700 max-w-[100px] truncate">
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded px-2 py-1">
+                  <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-xs text-gray-700 dark:text-gray-300 max-w-[100px] truncate">
                     {attachment.name}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
                     {formatFileSize(attachment.size)}
                   </span>
                 </div>
@@ -283,52 +292,52 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
         multiple
         className="hidden"
         onChange={handleFileSelect}
-        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
       />
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50">
+      <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => editor?.chain().focus().toggleBold().run()}
-            className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${
-              editor?.isActive('bold') ? 'bg-gray-200' : ''
+            className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+              editor?.isActive('bold') ? 'bg-gray-200 dark:bg-gray-700' : ''
             }`}
             title="Жирный (Ctrl+B)"
           >
-            <Bold className="w-4 h-4 text-gray-600" />
+            <Bold className="w-4 h-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
             onClick={() => editor?.chain().focus().toggleItalic().run()}
-            className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${
-              editor?.isActive('italic') ? 'bg-gray-200' : ''
+            className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+              editor?.isActive('italic') ? 'bg-gray-200 dark:bg-gray-700' : ''
             }`}
             title="Курсив (Ctrl+I)"
           >
-            <Italic className="w-4 h-4 text-gray-600" />
+            <Italic className="w-4 h-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
             onClick={handleLinkClick}
-            className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${
-              editor?.isActive('link') ? 'bg-gray-200' : ''
+            className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+              editor?.isActive('link') ? 'bg-gray-200 dark:bg-gray-700' : ''
             }`}
             title="Ссылка"
           >
-            <LinkIcon className="w-4 h-4 text-gray-600" />
+            <LinkIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="p-1.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-50"
+            className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             title="Прикрепить файл"
           >
             {uploading ? (
-              <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />
+              <Loader2 className="w-4 h-4 text-gray-600 dark:text-gray-400 animate-spin" />
             ) : (
-              <Paperclip className="w-4 h-4 text-gray-600" />
+              <Paperclip className="w-4 h-4 text-gray-600 dark:text-gray-400" />
             )}
           </button>
-          <span className="text-xs text-gray-400 ml-2">@ — упоминание</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">@ — упоминание</span>
         </div>
         <button
           onClick={handleSubmit}

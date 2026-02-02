@@ -1,14 +1,175 @@
 'use client';
 
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEntityStore } from '@/store/useEntityStore';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import type { Field, Section } from '@/types';
 
 const PRIORITIES = [
-  { value: 'high' as const, label: 'Высокий', cls: 'bg-red-100 text-red-800 border-red-200' },
-  { value: 'medium' as const, label: 'Средний', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  { value: 'low' as const, label: 'Низкий', cls: 'bg-green-100 text-green-800 border-green-200' },
+  { value: 'high' as const, label: 'Высокий', cls: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800' },
+  { value: 'medium' as const, label: 'Средний', cls: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800' },
+  { value: 'low' as const, label: 'Низкий', cls: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800' },
 ];
+
+// Системные поля, которые обрабатываются отдельно
+const SYSTEM_FIELD_TYPES = ['status'];
+const SYSTEM_FIELD_IDS = ['title', 'assignee', 'priority'];
+
+// Компонент для отображения поля ввода
+function FormField({
+  field,
+  value,
+  users,
+  onChange,
+}: {
+  field: Field;
+  value: any;
+  users: any[];
+  onChange: (value: any) => void;
+}) {
+  // Select поле
+  if (field.type === 'select' && field.options) {
+    return (
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+      >
+        <option value="">Не выбрано</option>
+        {field.options.map((opt) => (
+          <option key={opt.id} value={opt.id}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // User поле
+  if (field.type === 'user') {
+    return (
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+      >
+        <option value="">Не выбрано</option>
+        {users.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.firstName} {u.lastName}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // Date поле
+  if (field.type === 'date') {
+    return (
+      <input
+        type="date"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+      />
+    );
+  }
+
+  // Number поле
+  if (field.type === 'number') {
+    return (
+      <input
+        type="number"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+        placeholder={field.description || ''}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+      />
+    );
+  }
+
+  // Textarea поле
+  if (field.type === 'textarea') {
+    return (
+      <textarea
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.description || ''}
+        rows={3}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+      />
+    );
+  }
+
+  // Text поле (по умолчанию)
+  return (
+    <input
+      type="text"
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={field.description || ''}
+      className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+    />
+  );
+}
+
+// Секция с полями
+function FormSection({
+  section,
+  formData,
+  users,
+  onChange,
+}: {
+  section: Section;
+  formData: Record<string, any>;
+  users: any[];
+  onChange: (fieldId: string, value: any) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  // Фильтруем системные поля
+  const customFields = section.fields.filter(
+    (f) => !SYSTEM_FIELD_TYPES.includes(f.type) && !SYSTEM_FIELD_IDS.includes(f.id)
+  );
+
+  if (customFields.length === 0) return null;
+
+  return (
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+      >
+        {isExpanded ? (
+          <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+        )}
+        <span className="font-medium text-gray-700 dark:text-gray-200 text-sm">{section.name}</span>
+      </button>
+      {isExpanded && (
+        <div className="p-4 space-y-3 bg-white dark:bg-gray-800">
+          {customFields.map((field) => (
+            <div key={field.id}>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
+                {field.name}
+                {field.required && <span className="text-red-500 ml-0.5">*</span>}
+              </label>
+              <FormField
+                field={field}
+                value={formData[field.id]}
+                users={users}
+                onChange={(value) => onChange(field.id, value)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface CreateEntityModalProps {
   workspaceId: string;
@@ -17,19 +178,57 @@ interface CreateEntityModalProps {
 
 export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalProps) {
   const { users, createEntity } = useEntityStore();
+  const { currentWorkspace } = useWorkspaceStore();
+
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [assigneeId, setAssigneeId] = useState('');
+  const [formData, setFormData] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  // Проверяем, есть ли кастомные поля
+  const hasCustomFields = useMemo(() => {
+    if (!currentWorkspace?.sections) return false;
+    return currentWorkspace.sections.some((section) =>
+      section.fields.some(
+        (f) => !SYSTEM_FIELD_TYPES.includes(f.type) && !SYSTEM_FIELD_IDS.includes(f.id)
+      )
+    );
+  }, [currentWorkspace]);
+
+  // Проверяем обязательные поля
+  const requiredFieldsMissing = useMemo(() => {
+    if (!currentWorkspace?.sections) return false;
+    for (const section of currentWorkspace.sections) {
+      for (const field of section.fields) {
+        if (
+          field.required &&
+          !SYSTEM_FIELD_TYPES.includes(field.type) &&
+          !SYSTEM_FIELD_IDS.includes(field.id)
+        ) {
+          const value = formData[field.id];
+          if (value === undefined || value === null || value === '') {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [currentWorkspace, formData]);
+
+  const handleFieldChange = (fieldId: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
   const handleSubmit = async () => {
-    if (!title.trim() || submitting) return;
+    if (!title.trim() || submitting || requiredFieldsMissing) return;
     setSubmitting(true);
     await createEntity({
       workspaceId,
       title: title.trim(),
       priority,
       assigneeId: assigneeId || undefined,
+      data: formData,
     });
     setSubmitting(false);
     onClose();
@@ -39,29 +238,31 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-entity-title"
-          className="bg-white rounded-xl shadow-xl w-[440px] max-w-[90vw]"
+          className={`bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-[90vw] max-h-[85vh] flex flex-col ${
+            hasCustomFields ? 'w-[600px]' : 'w-[440px]'
+          }`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b">
-            <h3 id="create-entity-title" className="text-lg font-semibold text-gray-900">
+          <div className="flex items-center justify-between p-5 border-b dark:border-gray-700 flex-shrink-0">
+            <h3 id="create-entity-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Новая заявка
             </h3>
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded cursor-pointer">
-              <X className="w-5 h-5 text-gray-500" />
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer">
+              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>
           </div>
 
-          {/* Form */}
-          <div className="p-5 space-y-4">
+          {/* Form - scrollable */}
+          <div className="p-5 space-y-4 overflow-y-auto flex-1">
             {/* Title */}
             <div>
-              <label htmlFor="entity-title" className="block text-xs font-medium text-gray-500 uppercase mb-1">
-                Название
+              <label htmlFor="entity-title" className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
+                Название <span className="text-red-500">*</span>
               </label>
               <input
                 id="entity-title"
@@ -69,16 +270,16 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmit()}
                 placeholder="Описание проблемы или задачи"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 autoFocus
               />
             </div>
 
             {/* Priority */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
                 Приоритет
               </label>
               <div className="flex gap-2">
@@ -89,8 +290,8 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
                     onClick={() => setPriority(p.value)}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
                       priority === p.value
-                        ? p.cls + ' ring-2 ring-offset-1 ring-primary-500'
-                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                        ? p.cls + ' ring-2 ring-offset-1 ring-primary-500 dark:ring-offset-gray-900'
+                        : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     {p.label}
@@ -101,13 +302,13 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
 
             {/* Assignee */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
                 Исполнитель
               </label>
               <select
                 value={assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">Не назначить</option>
                 {users.map((u) => (
@@ -117,19 +318,36 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
                 ))}
               </select>
             </div>
+
+            {/* Custom Fields by Sections */}
+            {currentWorkspace?.sections && currentWorkspace.sections.length > 0 && (
+              <div className="space-y-3 pt-2">
+                {currentWorkspace.sections
+                  .sort((a, b) => a.order - b.order)
+                  .map((section) => (
+                    <FormSection
+                      key={section.id}
+                      section={section}
+                      formData={formData}
+                      users={users}
+                      onChange={handleFieldChange}
+                    />
+                  ))}
+              </div>
+            )}
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 p-5 border-t">
+          <div className="flex justify-end gap-2 p-5 border-t dark:border-gray-700 flex-shrink-0">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+              className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
             >
               Отмена
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!title.trim() || submitting}
+              disabled={!title.trim() || submitting || requiredFieldsMissing}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Создаём…' : 'Создать заявку'}

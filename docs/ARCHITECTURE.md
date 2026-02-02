@@ -48,7 +48,7 @@ Stankoff Portal - это корпоративная система управл�
 #### Страницы (App Router)
 - `/` - Редирект на /dashboard
 - `/login` - Страница входа
-- `/dashboard` - Канбан-доска (защищённая)
+- `/dashboard` - Канбан-доска и аналитика (защищённая, переключение через Header)
 - `/workspace/[id]/settings` - Настройки рабочего места (Workspace Builder)
 - `/admin/users` - Управление пользователями (только admin)
 
@@ -65,9 +65,11 @@ Stankoff Portal - это корпоративная система управл�
 - `KanbanBoard.tsx` - Основной контейнер с DndContext, фильтрами и индикатором режима просмотра
 - `KanbanColumn.tsx` - Droppable колонка статуса (динамические из workspace)
 - `KanbanCard.tsx` - Draggable карточка сущности (отключается для viewer)
-- `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями, вложениями и tooltips на заблокированных элементах
-- `CreateEntityModal.tsx` - Создание новой сущности
+- `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями, вложениями, кастомными полями и tooltips на заблокированных элементах
+- `CreateEntityModal.tsx` - Создание новой сущности с поддержкой кастомных полей из структуры workspace
 - `FilterPanel.tsx` - Панель фильтрации по всем полям
+
+> **Кастомные поля:** Поля, определённые в структуре workspace (sections → fields), автоматически отображаются при просмотре и создании сущности. Системные поля (status, title, assignee, priority) обрабатываются отдельно. Значения кастомных полей хранятся в `entity.data` (JSONB).
 
 **Entity**
 - `CommentEditor.tsx` - Rich text редактор с Tiptap, @mentions и вложениями
@@ -82,15 +84,23 @@ Stankoff Portal - это корпоративная система управл�
 - `SectionCard.tsx` - Секция с полями
 
 **Layout**
-- `Header.tsx` - Шапка с поиском и уведомлениями
-- `Sidebar.tsx` - Боковое меню с рабочими местами, бейджами ролей и выпадающим меню (дублировать, архивировать, экспорт)
-- `NotificationPanel.tsx` - Выпадающая панель уведомлений с иконками типов
+- `Header.tsx` - Шапка с поиском, переключателем вида (Канбан/Аналитика) и уведомлениями
+- `Sidebar.tsx` - Боковое меню с рабочими местами, бейджами ролей и выпадающим меню (дублировать, архивировать, экспорт, импорт)
+- `NotificationPanel.tsx` - Выпадающая панель уведомлений с иконками типов и настройкой push-уведомлений
+- `GlobalSearch.tsx` - Глобальный поиск по всем заявкам (Cmd+K)
+
+**Analytics**
+- `AnalyticsDashboard.tsx` - Дашборд с аналитикой по заявкам (общий вид и по workspace)
 
 **UI**
 - `ToastContainer.tsx` - Toast-уведомления с анимациями
 - `MediaLightbox.tsx` - Полноэкранный просмотр изображений с навигацией, зумом и скачиванием
+- `VideoPlayer.tsx` - Полноэкранный просмотр видео с управлением (пауза, звук, полноэкранный режим)
 - `PdfViewer.tsx` - Встроенный просмотр PDF через iframe
-- `AttachmentPreview.tsx` - Универсальный компонент превью вложений с поддержкой изображений, PDF и других файлов
+- `AttachmentPreview.tsx` - Универсальный компонент превью вложений с поддержкой изображений, видео, PDF и других файлов
+- `Skeleton.tsx` - Skeleton loaders для loading states (SkeletonCard, SkeletonColumn, SkeletonSearchResult)
+- `ThemeToggle.tsx` - Переключатель темы (светлая/тёмная/системная)
+- `Breadcrumbs.tsx` - Навигационные хлебные крошки
 
 #### Stores (Zustand)
 
@@ -111,8 +121,9 @@ interface EntityStore {
   updateStatus(id: string, status: string): Promise<void>;
   updateAssignee(id: string, assigneeId: string | null): Promise<void>;
   updateLinkedEntities(id: string, linkedEntityIds: string[]): Promise<void>;
+  updateEntityData(id: string, fieldId: string, value: any): Promise<void>; // Обновление кастомного поля
   addComment(entityId: string, content: string, attachments?: UploadedAttachment[]): Promise<void>;
-  createEntity(data: CreateEntityData): Promise<void>;
+  createEntity(data: CreateEntityData): Promise<void>;  // data может содержать кастомные поля
 }
 ```
 
@@ -168,11 +179,15 @@ interface AppNotification {
 
 interface NotificationStore {
   notifications: AppNotification[];
+  browserNotificationsEnabled: boolean;
+  setBrowserNotificationsEnabled(enabled: boolean): void;
   addNotification(data: { text: string; type?: NotificationType; entityId?: string }): void;
   markAllRead(): void;
   markRead(id: string): void;
 }
 ```
+
+> **Browser Push Notifications:** Store использует persist middleware для сохранения настроек. При включённых push-уведомлениях и наличии разрешения браузера, уведомления показываются через Browser Notification API когда вкладка не активна.
 
 **useAuthStore**
 ```typescript
@@ -192,6 +207,30 @@ interface AuthActions {
 }
 ```
 
+**useThemeStore**
+```typescript
+type Theme = 'light' | 'dark' | 'system';
+
+interface ThemeStore {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+}
+```
+
+> Использует persist middleware для сохранения в localStorage. Тема применяется через CSS класс `dark` на `<html>`. Скрипт в layout.tsx предотвращает flash при загрузке.
+
+**useSidebarStore**
+```typescript
+interface SidebarStore {
+  isOpen: boolean;
+  toggle: () => void;
+  open: () => void;
+  close: () => void;
+}
+```
+
+> Управляет состоянием мобильного sidebar. На desktop sidebar всегда видим, на мобильных открывается по клику на burger menu.
+
 #### Hooks
 
 **useWebSocket**
@@ -201,6 +240,30 @@ interface AuthActions {
 - `status:changed` - Изменение статуса
 - `comment:created` - Новый комментарий
 - `user:assigned` - Назначение ответственного
+
+**useBrowserNotifications**
+Работа с Browser Notification API:
+```typescript
+interface UseBrowserNotificationsReturn {
+  permission: 'default' | 'granted' | 'denied';
+  isSupported: boolean;
+  requestPermission(): Promise<boolean>;
+  showNotification(title: string, options?: BrowserNotificationOptions): void;
+}
+```
+
+Также экспортирует синглтон `browserNotifications` для использования вне React-компонентов (в store). Уведомления показываются только когда вкладка не активна (document.hasFocus() === false).
+
+**useFocusTrap**
+Focus trap для модальных окон:
+```typescript
+function useFocusTrap(
+  containerRef: RefObject<HTMLElement | null>,
+  isActive: boolean
+): void;
+```
+
+> При активации фокус перемещается на первый фокусируемый элемент. Tab/Shift+Tab циклически перемещаются внутри контейнера. При деактивации фокус возвращается на ранее активный элемент.
 
 ### Backend (NestJS 11)
 
@@ -490,6 +553,11 @@ interface EmailService {
 | DELETE | /api/workspaces/:id/members/:userId | Удалить участника |
 | GET | /api/workspaces/:id/export/json | Экспорт workspace в JSON |
 | GET | /api/workspaces/:id/export/csv | Экспорт entities в CSV |
+| POST | /api/workspaces/:id/import/json | Импорт entities из JSON |
+| POST | /api/workspaces/:id/import/csv | Импорт entities из CSV |
+| GET | /api/entities/search | Глобальный поиск (query: q, limit) |
+| GET | /api/analytics/global | Общая аналитика по всем workspace |
+| GET | /api/analytics/workspace/:id | Аналитика по workspace |
 | POST | /api/files/upload | Загрузить файл в S3 |
 | GET | /api/files/signed-url/:key | Получить signed URL для ключа |
 | GET | /api/files/download/*path | Скачать файл через прокси (attachment) |
@@ -881,15 +949,46 @@ services:
 
 ## Мониторинг и логирование
 
-### Текущее состояние
-- Console logging в development
-- Docker logs для контейнеров
+### Health Checks
+
+**HealthModule** предоставляет эндпоинты для проверки состояния системы:
+
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | /api/health | Полная информация о здоровье системы |
+| GET | /api/health/live | Liveness probe для K8s |
+| GET | /api/health/ready | Readiness probe (проверяет БД) |
+
+**Ответ /api/health:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-01-15T10:30:00Z",
+  "uptime": 3600.5,
+  "services": { "database": "healthy" },
+  "memory": { "heapUsed": 120, "heapTotal": 256, "rss": 300 }
+}
+```
+
+### Winston Logging
+
+Структурированное логирование через Winston:
+
+- **Development:** Цветной вывод с timestamp в консоль
+- **Production:** JSON формат для парсинга (ELK, Datadog)
+- **Файлы:** `logs/error.log` (только ошибки), `logs/combined.log` (всё)
+- **Ротация:** 10MB max, 5 файлов
+
+**Уровни логов:**
+- `debug` - детальная отладка (dev only)
+- `info` - информационные сообщения
+- `warn` - предупреждения
+- `error` - ошибки с stack trace
 
 ### Планируется
-- Sentry для отслеживания ошибок
-- Winston для структурированного логирования
-- Prometheus + Grafana для метрик
-- Health check endpoints
+- Sentry для отслеживания ошибок frontend/backend
+- Prometheus метрики
+- Grafana dashboards
 
 ## Масштабирование
 

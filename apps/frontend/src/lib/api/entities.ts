@@ -27,4 +27,56 @@ export const entitiesApi = {
       .then((r) => r.data),
 
   remove: (id: string) => apiClient.delete(`/entities/${id}`),
+
+  search: (query: string, limit = 10) =>
+    apiClient
+      .get<{ results: SearchResult[] }>('/entities/search', {
+        params: { q: query, limit },
+      })
+      .then((r) => r.data.results),
+
+  // Export / Import
+  exportCsv: (workspaceId: string) =>
+    apiClient
+      .get('/entities/export/csv', {
+        params: { workspaceId },
+        responseType: 'blob',
+      })
+      .then((r) => r.data),
+
+  exportJson: (workspaceId: string) =>
+    apiClient
+      .get('/entities/export/json', {
+        params: { workspaceId },
+        responseType: 'blob',
+      })
+      .then((r) => r.data),
+
+  importCsv: (workspaceId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient
+      .post<{ imported: number; errors: string[] }>(
+        '/entities/import/csv',
+        formData,
+        {
+          params: { workspaceId },
+          headers: { 'Content-Type': 'multipart/form-data' },
+        },
+      )
+      .then((r) => r.data);
+  },
 };
+
+export interface SearchResult {
+  id: string;
+  customId: string;
+  title: string;
+  status: string;
+  priority?: string;
+  assignee?: { id: string; firstName: string; lastName: string };
+  workspaceId: string;
+  workspaceName: string;
+  workspaceIcon: string;
+  createdAt: string;
+}

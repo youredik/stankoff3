@@ -17,9 +17,9 @@ const ROLE_LABELS: Record<WorkspaceRole, string> = {
 };
 
 const ROLE_COLORS: Record<WorkspaceRole, string> = {
-  viewer: 'bg-gray-100 text-gray-800',
-  editor: 'bg-blue-100 text-blue-800',
-  admin: 'bg-purple-100 text-purple-800',
+  viewer: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300',
+  editor: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+  admin: 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
 };
 
 export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
@@ -110,8 +110,8 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Участники</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Участники</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {members.length} участников в рабочем месте
           </p>
         </div>
@@ -126,9 +126,9 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
       </div>
 
       {/* Members List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         {members.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
             <p>Нет участников</p>
             <p className="text-sm mt-1">
               Добавьте участников, чтобы они получили доступ к рабочему месту
@@ -136,22 +136,22 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
           </div>
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Пользователь
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Роль
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Действия
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {members.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
+                <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center text-white text-sm font-medium">
@@ -159,10 +159,10 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                         {member.user?.lastName?.[0]}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-gray-900 dark:text-gray-100">
                           {member.user?.firstName} {member.user?.lastName}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                           {member.user?.email}
                         </p>
                       </div>
@@ -174,7 +174,7 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                       onChange={(e) =>
                         handleUpdateRole(member.userId, e.target.value as WorkspaceRole)
                       }
-                      className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
+                      className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
                     >
                       {Object.entries(ROLE_LABELS).map(([value, label]) => (
                         <option key={value} value={value}>
@@ -187,7 +187,7 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                     <button
                       onClick={() => handleRemoveMember(member.userId)}
                       disabled={removing === member.userId}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
                       title="Удалить"
                     >
                       {removing === member.userId ? (
@@ -205,9 +205,9 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
       </div>
 
       {/* Roles Description */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Описание ролей:</h3>
-        <ul className="space-y-1 text-sm text-gray-600">
+      <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание ролей:</h3>
+        <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
           <li>
             <span className="font-medium">Просмотр</span> — только просмотр
             заявок и комментариев
@@ -231,22 +231,22 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
             onClick={() => setShowAddModal(false)}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
-              <div className="px-6 py-4 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Добавить участника
                 </h3>
               </div>
 
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Пользователь
                   </label>
                   <select
                     value={selectedUserId}
                     onChange={(e) => setSelectedUserId(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
                   >
                     <option value="">Выберите пользователя</option>
                     {availableUsers.map((user) => (
@@ -258,7 +258,7 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Роль
                   </label>
                   <select
@@ -266,7 +266,7 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                     onChange={(e) =>
                       setSelectedRole(e.target.value as WorkspaceRole)
                     }
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
                   >
                     {Object.entries(ROLE_LABELS).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -277,10 +277,10 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t flex justify-end gap-3">
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
                 <button
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                 >
                   Отмена
                 </button>

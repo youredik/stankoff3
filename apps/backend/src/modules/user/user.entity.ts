@@ -31,11 +31,11 @@ export class User {
   @Column()
   lastName: string;
 
-  @Column({ nullable: true })
-  avatar: string;
+  @Column({ type: 'varchar', nullable: true })
+  avatar: string | null;
 
-  @Column({ nullable: true })
-  department: string;
+  @Column({ type: 'varchar', nullable: true })
+  department: string | null;
 
   @Column({
     type: 'enum',

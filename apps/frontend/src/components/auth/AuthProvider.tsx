@@ -4,7 +4,6 @@ import { useEffect, ReactNode, useState, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { setAuthInterceptors } from '@/lib/api/client';
-import { authApi } from '@/lib/api/auth';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -14,8 +13,7 @@ function AuthProviderInner({ children }: AuthProviderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading, checkAuth, setAccessToken } =
-    useAuthStore();
+  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
   const [ssoProcessing, setSsoProcessing] = useState(false);
 
   // Устанавливаем interceptors при монтировании
@@ -26,36 +24,66 @@ function AuthProviderInner({ children }: AuthProviderProps) {
     );
   }, []);
 
-  // Обрабатываем access_token из Keycloak SSO callback
+  // Обрабатываем access_token из Keycloak SSO callback (только один раз)
+  const [authChecked, setAuthChecked] = useState(false);
+
   useEffect(() => {
+    if (authChecked) return;
+
     const accessTokenParam = searchParams.get('access_token');
     if (accessTokenParam) {
       setSsoProcessing(true);
-      // Сохраняем токен и загружаем профиль
-      setAccessToken(accessTokenParam);
+      setAuthChecked(true);
 
-      // Очищаем URL от токена
+      // Очищаем URL от токена сразу
       const url = new URL(window.location.href);
       url.searchParams.delete('access_token');
       window.history.replaceState({}, '', url.toString());
 
-      // Загружаем профиль пользователя
-      authApi.me().then((user) => {
-        useAuthStore.setState({
-          user,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        setSsoProcessing(false);
-      }).catch(() => {
-        // Если не удалось загрузить профиль, пробуем checkAuth
-        checkAuth().finally(() => setSsoProcessing(false));
-      });
-    } else {
+      // Сохраняем токен в store и сразу загружаем профиль с этим токеном
+      useAuthStore.setState({ accessToken: accessTokenParam, isLoading: true });
+
+      // Делаем запрос с явно переданным токеном
+      const fetchProfile = async () => {
+        try {
+          // Создаём запрос с токеном напрямую
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${accessTokenParam}`,
+            },
+            credentials: 'include',
+          });
+
+          if (!response.ok) throw new Error('Failed to fetch profile');
+
+          const user = await response.json();
+          // Очищаем флаг SSO redirect при успешной авторизации
+          sessionStorage.removeItem('sso_redirect_attempted');
+          useAuthStore.setState({
+            user,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch {
+          // Токен невалидный - редиректим на логин
+          useAuthStore.setState({
+            user: null,
+            accessToken: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+        } finally {
+          setSsoProcessing(false);
+        }
+      };
+
+      fetchProfile();
+    } else if (!authChecked) {
+      setAuthChecked(true);
       // Стандартная проверка авторизации
       checkAuth();
     }
-  }, [searchParams, setAccessToken, checkAuth]);
+  }, [searchParams, checkAuth, authChecked]);
 
   // Редирект на логин если не авторизован
   useEffect(() => {

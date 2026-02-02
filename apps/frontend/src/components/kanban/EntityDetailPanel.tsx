@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
-import { X, MessageSquare, Clock, Image as ImageIcon, FileText, Paperclip, History } from 'lucide-react';
+import { X, MessageSquare, Clock, Paperclip, History, ChevronDown, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -12,7 +12,7 @@ import { LinkedEntities } from '@/components/entity/LinkedEntities';
 import { ActivityPanel } from '@/components/entity/ActivityPanel';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
-import type { FieldOption, UploadedAttachment } from '@/types';
+import type { FieldOption, UploadedAttachment, Field, Section } from '@/types';
 
 // Default statuses for backwards compatibility
 const DEFAULT_STATUSES: FieldOption[] = [
@@ -23,9 +23,9 @@ const DEFAULT_STATUSES: FieldOption[] = [
 ];
 
 const PRIORITY_COLORS: Record<string, string> = {
-  high: 'bg-red-100 text-red-800 border-red-200',
-  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  low: 'bg-green-100 text-green-800 border-green-200',
+  high: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
+  medium: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+  low: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -33,6 +33,296 @@ const PRIORITY_LABELS: Record<string, string> = {
   medium: 'Средний',
   low: 'Низкий',
 };
+
+// Системные поля, которые не нужно отображать в кастомных полях
+const SYSTEM_FIELD_TYPES = ['status'];
+const SYSTEM_FIELD_IDS = ['title', 'assignee', 'priority'];
+
+// Компонент для отображения значения поля
+function FieldValue({
+  field,
+  value,
+  users,
+  canEdit,
+  onUpdate,
+}: {
+  field: Field;
+  value: any;
+  users: any[];
+  canEdit: boolean;
+  onUpdate: (value: any) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value ?? '');
+
+  const handleSave = () => {
+    onUpdate(editValue);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSave();
+    }
+    if (e.key === 'Escape') {
+      setEditValue(value ?? '');
+      setIsEditing(false);
+    }
+  };
+
+  // Рендер select поля
+  if (field.type === 'select' && field.options) {
+    const selectedOption = field.options.find(o => o.id === value);
+    if (!canEdit) {
+      return selectedOption ? (
+        <span
+          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+          style={{
+            backgroundColor: selectedOption.color ? `${selectedOption.color}20` : '#f3f4f6',
+            color: selectedOption.color || '#374151',
+          }}
+        >
+          {selectedOption.color && (
+            <span
+              className="w-2 h-2 rounded-full mr-1.5"
+              style={{ backgroundColor: selectedOption.color }}
+            />
+          )}
+          {selectedOption.label}
+        </span>
+      ) : (
+        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
+      );
+    }
+    return (
+      <select
+        value={value || ''}
+        onChange={(e) => onUpdate(e.target.value || null)}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+      >
+        <option value="">Не выбрано</option>
+        {field.options.map((opt) => (
+          <option key={opt.id} value={opt.id}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // Рендер user поля
+  if (field.type === 'user') {
+    const selectedUser = users.find(u => u.id === value);
+    if (!canEdit) {
+      return selectedUser ? (
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
+            <span className="text-white text-[10px] font-medium">
+              {selectedUser.firstName[0]}{selectedUser.lastName[0]}
+            </span>
+          </div>
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            {selectedUser.firstName} {selectedUser.lastName}
+          </span>
+        </div>
+      ) : (
+        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
+      );
+    }
+    return (
+      <select
+        value={value || ''}
+        onChange={(e) => onUpdate(e.target.value || null)}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+      >
+        <option value="">Не выбрано</option>
+        {users.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.firstName} {u.lastName}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // Рендер date поля
+  if (field.type === 'date') {
+    if (!canEdit) {
+      return value ? (
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          {format(new Date(value), 'dd.MM.yyyy', { locale: ru })}
+        </span>
+      ) : (
+        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
+      );
+    }
+    return (
+      <input
+        type="date"
+        value={value || ''}
+        onChange={(e) => onUpdate(e.target.value || null)}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+      />
+    );
+  }
+
+  // Рендер number поля
+  if (field.type === 'number') {
+    if (!canEdit) {
+      return value !== undefined && value !== null && value !== '' ? (
+        <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
+      ) : (
+        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
+      );
+    }
+    return (
+      <input
+        type="number"
+        value={value ?? ''}
+        onChange={(e) => onUpdate(e.target.value ? Number(e.target.value) : null)}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        placeholder={field.description || ''}
+      />
+    );
+  }
+
+  // Рендер textarea поля
+  if (field.type === 'textarea') {
+    if (!canEdit) {
+      return value ? (
+        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{value}</p>
+      ) : (
+        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
+      );
+    }
+    if (isEditing) {
+      return (
+        <div>
+          <textarea
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            rows={3}
+            className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
+            autoFocus
+          />
+        </div>
+      );
+    }
+    return (
+      <div
+        onClick={() => setIsEditing(true)}
+        className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 py-1 -mx-2 -my-1"
+      >
+        {value || <span className="text-gray-400 dark:text-gray-500">Нажмите для ввода...</span>}
+      </div>
+    );
+  }
+
+  // Рендер text поля (по умолчанию)
+  if (!canEdit) {
+    return value ? (
+      <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
+    ) : (
+      <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
+    );
+  }
+
+  if (isEditing) {
+    return (
+      <input
+        type="text"
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={() => {
+        setEditValue(value ?? '');
+        setIsEditing(true);
+      }}
+      className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 py-1 -mx-2 -my-1 min-h-[28px] flex items-center"
+    >
+      {value || <span className="text-gray-400 dark:text-gray-500">Нажмите для ввода...</span>}
+    </div>
+  );
+}
+
+// Компонент секции с полями
+function FieldSection({
+  section,
+  entity,
+  users,
+  canEdit,
+  onUpdateField,
+}: {
+  section: Section;
+  entity: any;
+  users: any[];
+  canEdit: boolean;
+  onUpdateField: (fieldId: string, value: any) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  // Фильтруем системные поля
+  const customFields = section.fields.filter(
+    (f) => !SYSTEM_FIELD_TYPES.includes(f.type) && !SYSTEM_FIELD_IDS.includes(f.id)
+  );
+
+  if (customFields.length === 0) return null;
+
+  return (
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+      >
+        {isExpanded ? (
+          <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+        )}
+        <span className="font-medium text-gray-700 dark:text-gray-200">{section.name}</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">({customFields.length} полей)</span>
+      </button>
+      {isExpanded && (
+        <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          {customFields.map((field) => (
+            <div key={field.id} className="px-4 py-3 flex items-start gap-4">
+              <div className="w-1/3 flex-shrink-0">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {field.name}
+                  {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                </span>
+                {field.description && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{field.description}</p>
+                )}
+              </div>
+              <div className="flex-1">
+                <FieldValue
+                  field={field}
+                  value={entity.data?.[field.id]}
+                  users={users}
+                  canEdit={canEdit}
+                  onUpdate={(value) => onUpdateField(field.id, value)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function EntityDetailPanel() {
   const {
@@ -43,6 +333,7 @@ export function EntityDetailPanel() {
     updateStatus,
     updateAssignee,
     updateLinkedEntities,
+    updateEntityData,
     addComment,
   } = useEntityStore();
 
@@ -125,11 +416,16 @@ export function EntityDetailPanel() {
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col pointer-events-auto">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="entity-detail-title"
+          className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col pointer-events-auto"
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-8 py-5 border-b">
+          <div className="flex items-center justify-between px-8 py-5 border-b dark:border-gray-700">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">
+              <span className="text-xs font-mono bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
                 {selectedEntity.customId}
               </span>
               <span
@@ -148,9 +444,10 @@ export function EntityDetailPanel() {
             </div>
             <button
               onClick={deselectEntity}
-              className="p-1 hover:bg-gray-100 rounded cursor-pointer"
+              aria-label="Закрыть панель"
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>
           </div>
 
@@ -159,39 +456,59 @@ export function EntityDetailPanel() {
             {/* Left: title + comments */}
             <div className="flex-1 flex flex-col overflow-y-auto">
               <div className="px-8 py-6">
-                <h2 className="text-2xl font-semibold text-gray-900">
+                <h2 id="entity-detail-title" className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                   {selectedEntity.title}
                 </h2>
 
                 {/* Description from data */}
                 {selectedEntity.data?.description && (
-                  <p className="mt-2 text-gray-600">
+                  <p className="mt-2 text-gray-600 dark:text-gray-400">
                     {selectedEntity.data.description}
                   </p>
+                )}
+
+                {/* Custom Fields by Sections */}
+                {currentWorkspace?.sections && currentWorkspace.sections.length > 0 && (
+                  <div className="mt-6 space-y-4">
+                    {currentWorkspace.sections
+                      .sort((a, b) => a.order - b.order)
+                      .map((section) => (
+                        <FieldSection
+                          key={section.id}
+                          section={section}
+                          entity={selectedEntity}
+                          users={users}
+                          canEdit={canEditEntity}
+                          onUpdateField={(fieldId, value) =>
+                            updateEntityData(selectedEntity.id, fieldId, value)
+                          }
+                        />
+                      ))}
+                  </div>
                 )}
               </div>
 
               {/* Tabs */}
               <div className="px-8 pb-6 flex-1 flex flex-col">
-                <div className="flex items-center gap-4 mb-4 border-b border-gray-200">
+                <div className="flex items-center gap-4 mb-4 border-b border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => setActiveTab('comments')}
                     className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
                       activeTab === 'comments'
-                        ? 'border-primary-600 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
                     <MessageSquare className="w-4 h-4" />
                     <span className="text-sm font-medium">Комментарии</span>
-                    <span className="text-xs text-gray-400">({comments.length})</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">({comments.length})</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('history')}
                     className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
                       activeTab === 'history'
-                        ? 'border-primary-600 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
                     <History className="w-4 h-4" />
@@ -203,7 +520,7 @@ export function EntityDetailPanel() {
                 {activeTab === 'comments' && (
                   <div className="flex-1">
                     {comments.length === 0 && (
-                      <p className="text-xs text-gray-400 italic">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 italic">
                         Пока нет комментариев
                       </p>
                     )}
@@ -219,11 +536,11 @@ export function EntityDetailPanel() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-800">
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
                                 {comment.author.firstName}{' '}
                                 {comment.author.lastName}
                               </span>
-                              <span className="text-sm text-gray-400">
+                              <span className="text-sm text-gray-400 dark:text-gray-500">
                                 {format(
                                   new Date(comment.createdAt),
                                   'dd.MM HH:mm',
@@ -232,7 +549,7 @@ export function EntityDetailPanel() {
                               </span>
                             </div>
                             <div
-                              className="text-gray-600 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-600 [&_a]:underline [&_.mention]:text-primary-600 [&_.mention]:bg-primary-50 [&_.mention]:rounded [&_.mention]:px-0.5"
+                              className="text-gray-600 dark:text-gray-300 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-600 dark:[&_a]:text-primary-400 [&_a]:underline [&_.mention]:text-primary-600 dark:[&_.mention]:text-primary-400 [&_.mention]:bg-primary-50 dark:[&_.mention]:bg-primary-900/30 [&_.mention]:rounded [&_.mention]:px-0.5"
                               dangerouslySetInnerHTML={{ __html: comment.content }}
                             />
                             {/* Attachments */}
@@ -265,17 +582,17 @@ export function EntityDetailPanel() {
 
               {/* Comment editor — pinned to bottom of left column (hidden for viewers) */}
               {canEditEntity && (
-                <div className="border-t px-8 py-5">
+                <div className="border-t dark:border-gray-700 px-8 py-5">
                   <CommentEditor users={users} onSubmit={handleSubmitComment} />
                 </div>
               )}
             </div>
 
             {/* Right sidebar: status, assignee, links, meta */}
-            <div className="w-72 border-l bg-gray-50 p-6 space-y-6 overflow-y-auto">
+            <div className="w-72 border-l dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-6 space-y-6 overflow-y-auto">
               {/* Status */}
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase mb-3">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-3">
                   Статус
                 </p>
                 <div className="flex flex-col gap-1.5">
@@ -289,8 +606,8 @@ export function EntityDetailPanel() {
                         selectedEntity.status === s.id
                           ? 'text-white'
                           : canEditEntity
-                            ? 'text-gray-600 hover:bg-gray-200 cursor-pointer'
-                            : 'text-gray-400 cursor-default'
+                            ? 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer'
+                            : 'text-gray-400 dark:text-gray-500 cursor-default'
                       }`}
                       style={
                         selectedEntity.status === s.id
@@ -312,7 +629,7 @@ export function EntityDetailPanel() {
 
               {/* Assignee */}
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase mb-3">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-3">
                   Исполнитель
                 </p>
                 {canAssign ? (
@@ -321,7 +638,7 @@ export function EntityDetailPanel() {
                     onChange={(e) =>
                       updateAssignee(selectedEntity.id, e.target.value || null)
                     }
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
+                    className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
                   >
                     <option value="">Не назначен</option>
                     {users.map((u) => (
@@ -332,7 +649,7 @@ export function EntityDetailPanel() {
                   </select>
                 ) : (
                   <p
-                    className="text-sm text-gray-700"
+                    className="text-sm text-gray-700 dark:text-gray-300"
                     title="Недостаточно прав для назначения исполнителя"
                   >
                     {selectedEntity.assignee
@@ -354,8 +671,8 @@ export function EntityDetailPanel() {
               {allEntityAttachments.length > 0 && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
-                    <Paperclip className="w-3.5 h-3.5 text-gray-500" />
-                    <p className="text-xs font-medium text-gray-500 uppercase">
+                    <Paperclip className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                       Файлы ({allEntityAttachments.length})
                     </p>
                   </div>
@@ -367,7 +684,7 @@ export function EntityDetailPanel() {
                         <button
                           key={att.id}
                           onClick={() => setGalleryIndex(idx)}
-                          className="aspect-square rounded overflow-hidden bg-gray-200 hover:opacity-80 transition-opacity"
+                          className="aspect-square rounded overflow-hidden bg-gray-200 dark:bg-gray-700 hover:opacity-80 transition-opacity"
                         >
                           <img
                             src={att.thumbnailUrl || att.url}
@@ -379,7 +696,7 @@ export function EntityDetailPanel() {
                       {imageAttachments.length > 6 && (
                         <button
                           onClick={() => setGalleryIndex(6)}
-                          className="aspect-square rounded bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium hover:bg-gray-300 transition-colors"
+                          className="aspect-square rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                         >
                           +{imageAttachments.length - 6}
                         </button>
@@ -404,8 +721,8 @@ export function EntityDetailPanel() {
               )}
 
               {/* Meta */}
-              <div className="pt-3 border-t border-gray-200">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                   <Clock className="w-3.5 h-3.5" />
                   <span>
                     Создано{' '}

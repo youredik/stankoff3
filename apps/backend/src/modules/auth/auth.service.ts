@@ -89,9 +89,11 @@ export class AuthService {
     code: string,
     redirectUri: string,
     state: string,
-  ): Promise<{ accessToken: string; refreshToken: string; user: User }> {
+    iss?: string,
+    sessionState?: string,
+  ): Promise<{ accessToken: string; refreshToken: string; idToken?: string; user: User }> {
     // Обмениваем code на токены от Keycloak
-    const keycloakTokens = await this.keycloakService.exchangeCode(code, redirectUri, state);
+    const keycloakTokens = await this.keycloakService.exchangeCode(code, redirectUri, state, iss, sessionState);
 
     // Находим или создаём пользователя
     const user = await this.findOrCreateUserFromKeycloak(keycloakTokens.userInfo);
@@ -101,6 +103,7 @@ export class AuthService {
 
     return {
       ...tokens,
+      idToken: keycloakTokens.idToken, // Сохраняем для logout
       user,
     };
   }
@@ -172,7 +175,7 @@ export class AuthService {
     };
   }
 
-  getKeycloakLogoutUrl(idToken: string, postLogoutRedirectUri: string): string {
-    return this.keycloakService.getLogoutUrl(idToken, postLogoutRedirectUri);
+  getKeycloakLogoutUrl(postLogoutRedirectUri: string, idTokenHint?: string): string {
+    return this.keycloakService.getLogoutUrl(postLogoutRedirectUri, idTokenHint);
   }
 }

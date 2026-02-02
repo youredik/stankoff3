@@ -34,6 +34,11 @@ export class WorkspaceService {
     return memberships.map((m) => m.workspace);
   }
 
+  // Алиас для findAll — для использования в поиске
+  async getAccessibleWorkspaces(userId: string, userRole: UserRole): Promise<Workspace[]> {
+    return this.findAll(userId, userRole);
+  }
+
   async findOne(id: string): Promise<Workspace | null> {
     return this.workspaceRepository.findOne({ where: { id } });
   }
@@ -296,5 +301,164 @@ export class WorkspaceService {
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 
     return csv;
+  }
+
+  // Импорт из JSON
+  async importFromJson(
+    workspaceId: string,
+    entities: any[],
+    userId: string,
+  ): Promise<{ imported: number; errors: string[] }> {
+    const workspace = await this.findOne(workspaceId);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    const errors: string[] = [];
+    let imported = 0;
+
+    for (let i = 0; i < entities.length; i++) {
+      const item = entities[i];
+      try {
+        // Получаем следующий номер
+        const nextNumber = workspace.lastEntityNumber + 1;
+        workspace.lastEntityNumber = nextNumber;
+
+        const entity = this.entityRepository.create({
+          workspaceId,
+          customId: `${workspace.prefix}-${nextNumber}`,
+          title: item.title || `Импортированная заявка ${nextNumber}`,
+          status: item.status || 'new',
+          priority: item.priority || 'medium',
+          data: item.data || {},
+        });
+
+        await this.entityRepository.save(entity);
+        imported++;
+      } catch (err) {
+        errors.push(`Строка ${i + 1}: ${(err as Error).message}`);
+      }
+    }
+
+    // Сохраняем обновлённый счётчик
+    await this.workspaceRepository.save(workspace);
+
+    return { imported, errors };
+  }
+
+  // Импорт из CSV
+  async importFromCsv(
+    workspaceId: string,
+    csvContent: string,
+    userId: string,
+  ): Promise<{ imported: number; errors: string[] }> {
+    const workspace = await this.findOne(workspaceId);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    const errors: string[] = [];
+    let imported = 0;
+
+    // Парсим CSV
+    const lines = csvContent.split('\n').filter((line) => line.trim());
+    if (lines.length < 2) {
+      return { imported: 0, errors: ['CSV должен содержать заголовок и хотя бы одну строку данных'] };
+    }
+
+    // Парсим заголовки
+    const headers = this.parseCsvLine(lines[0]).map((h) => h.toLowerCase().trim());
+
+    // Ищем индексы нужных колонок
+    const titleIndex = headers.findIndex((h) =>
+      ['название', 'title', 'name', 'заголовок'].includes(h),
+    );
+    const statusIndex = headers.findIndex((h) =>
+      ['статус', 'status'].includes(h),
+    );
+    const priorityIndex = headers.findIndex((h) =>
+      ['приоритет', 'priority'].includes(h),
+    );
+
+    if (titleIndex === -1) {
+      return {
+        imported: 0,
+        errors: ['Не найдена колонка "Название" или "Title"'],
+      };
+    }
+
+    // Импортируем строки
+    for (let i = 1; i < lines.length; i++) {
+      try {
+        const values = this.parseCsvLine(lines[i]);
+        const title = values[titleIndex]?.trim();
+
+        if (!title) {
+          errors.push(`Строка ${i + 1}: пустое название`);
+          continue;
+        }
+
+        // Получаем следующий номер
+        const nextNumber = workspace.lastEntityNumber + 1;
+        workspace.lastEntityNumber = nextNumber;
+
+        const entity = this.entityRepository.create({
+          workspaceId,
+          customId: `${workspace.prefix}-${nextNumber}`,
+          title,
+          status: statusIndex >= 0 ? values[statusIndex]?.trim() || 'new' : 'new',
+          priority: priorityIndex >= 0 ? this.mapPriority(values[priorityIndex]?.trim()) : 'medium',
+          data: {},
+        });
+
+        await this.entityRepository.save(entity);
+        imported++;
+      } catch (err) {
+        errors.push(`Строка ${i + 1}: ${(err as Error).message}`);
+      }
+    }
+
+    // Сохраняем обновлённый счётчик
+    await this.workspaceRepository.save(workspace);
+
+    return { imported, errors };
+  }
+
+  // Парсинг строки CSV с учётом кавычек
+  private parseCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          i++; // Пропускаем следующую кавычку
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+
+    return result;
+  }
+
+  // Маппинг приоритета
+  private mapPriority(value?: string): 'low' | 'medium' | 'high' {
+    if (!value) return 'medium';
+    const lower = value.toLowerCase();
+    if (['high', 'высокий', 'срочный', '3'].includes(lower)) return 'high';
+    if (['low', 'низкий', '1'].includes(lower)) return 'low';
+    return 'medium';
   }
 }

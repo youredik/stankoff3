@@ -19,6 +19,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../user/user.entity';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
+const ID_TOKEN_COOKIE = 'keycloak_id_token';
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 дней
 
 @Controller('auth')
@@ -82,14 +83,37 @@ export class AuthController {
   }
 
   @Post('logout')
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Request() req: { cookies: Record<string, string> },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Получаем id_token для logout hint (позволяет пропустить страницу подтверждения)
+    const idToken = req.cookies?.[ID_TOKEN_COOKIE];
+
     // Очищаем refresh token cookie
     res.clearCookie(REFRESH_TOKEN_COOKIE, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/api/auth',
     });
+
+    // Очищаем id_token cookie
+    res.clearCookie(ID_TOKEN_COOKIE, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/api/auth',
+    });
+
+    const provider = this.authService.getAuthProvider();
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+
+    // Если Keycloak - возвращаем URL для logout из Keycloak
+    if (provider === 'keycloak') {
+      const keycloakLogoutUrl = this.authService.getKeycloakLogoutUrl(frontendUrl + '/login', idToken);
+      return { message: 'Выход выполнен успешно', keycloakLogoutUrl };
+    }
 
     return { message: 'Выход выполнен успешно' };
   }
@@ -123,8 +147,9 @@ export class AuthController {
       throw new BadRequestException('Keycloak SSO не включен');
     }
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const redirectUri = `${frontendUrl}/api/auth/keycloak/callback`;
+    // Callback идёт на backend, не на frontend
+    const backendPort = this.configService.get<string>('BACKEND_PORT') || '3001';
+    const redirectUri = `http://localhost:${backendPort}/api/auth/keycloak/callback`;
 
     const authUrl = await this.authService.getKeycloakAuthUrl(redirectUri);
     res.redirect(authUrl);
@@ -135,6 +160,8 @@ export class AuthController {
   async keycloakCallback(
     @Query('code') code: string,
     @Query('state') state: string,
+    @Query('iss') iss: string,
+    @Query('session_state') sessionState: string,
     @Res({ passthrough: true }) res: Response,
   ) {
     const provider = this.authService.getAuthProvider();
@@ -147,28 +174,46 @@ export class AuthController {
     }
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
-    const redirectUri = `${frontendUrl}/api/auth/keycloak/callback`;
+    const backendPort = this.configService.get<string>('BACKEND_PORT') || '3001';
+    const redirectUri = `http://localhost:${backendPort}/api/auth/keycloak/callback`;
 
     try {
-      const { accessToken, refreshToken, user } = await this.authService.handleKeycloakCallback(
+      console.log('Keycloak callback: code=', code?.substring(0, 20) + '...', 'state=', state?.substring(0, 20) + '...', 'iss=', iss, 'session_state=', sessionState?.substring(0, 10));
+      const { accessToken, refreshToken, idToken } = await this.authService.handleKeycloakCallback(
         code,
         redirectUri,
         state,
+        iss,
+        sessionState,
       );
+      console.log('Keycloak callback: tokens received');
 
       // Устанавливаем refresh token в HttpOnly cookie
       res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax', // lax для cross-origin redirect
         maxAge: COOKIE_MAX_AGE,
         path: '/api/auth',
       });
+
+      // Сохраняем id_token для logout (позволяет пропустить страницу подтверждения)
+      if (idToken) {
+        res.cookie(ID_TOKEN_COOKIE, idToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: COOKIE_MAX_AGE,
+          path: '/api/auth',
+        });
+      }
 
       // Редирект на frontend с access token в query параметре
       // Frontend сохранит токен в памяти и очистит URL
       return res.redirect(`${frontendUrl}/dashboard?access_token=${accessToken}`);
     } catch (error) {
+      console.error('Keycloak callback error:', error);
+      console.error('Error stack:', (error as Error).stack);
       // При ошибке редирект на страницу логина с ошибкой
       return res.redirect(`${frontendUrl}/login?error=sso_failed`);
     }

@@ -61,15 +61,15 @@ export function SectionCard({ section, onEditField }: SectionCardProps) {
 
   return (
     <div
-      className={`bg-white border rounded-xl overflow-hidden transition-colors ${
-        isOver ? 'border-primary-400 ring-2 ring-primary-100' : 'border-gray-200'
+      className={`bg-white dark:bg-gray-900 border rounded-xl overflow-hidden transition-colors ${
+        isOver ? 'border-primary-400 dark:border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/40' : 'border-gray-200 dark:border-gray-700'
       }`}
     >
       {/* Section Header */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="p-1 text-gray-400 hover:text-gray-600"
+          className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
         >
           {isExpanded ? (
             <ChevronDown className="w-4 h-4" />
@@ -85,30 +85,30 @@ export function SectionCard({ section, onEditField }: SectionCardProps) {
             onChange={(e) => setEditName(e.target.value)}
             onBlur={handleSaveName}
             onKeyDown={handleKeyDown}
-            className="flex-1 px-2 py-1 text-sm font-medium border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="flex-1 px-2 py-1 text-sm font-medium border border-primary-300 dark:border-primary-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
             autoFocus
           />
         ) : (
-          <span className="flex-1 text-sm font-semibold text-gray-700">
+          <span className="flex-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
             {section.name}
           </span>
         )}
 
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-gray-400 dark:text-gray-500">
           {section.fields.length} полей
         </span>
 
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsEditing(true)}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded"
+            className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
             title="Переименовать"
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => removeSection(section.id)}
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+            className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
             title="Удалить секцию"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -137,13 +137,13 @@ export function SectionCard({ section, onEditField }: SectionCardProps) {
           </SortableContext>
 
           {section.fields.length === 0 && (
-            <div className="py-8 text-center border-2 border-dashed border-gray-200 rounded-lg">
-              <p className="text-sm text-gray-400">
+            <div className="py-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+              <p className="text-sm text-gray-400 dark:text-gray-500">
                 Перетащите поле сюда или
               </p>
               <button
                 onClick={handleAddQuickField}
-                className="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                className="mt-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
               >
                 добавьте новое
               </button>
@@ -153,7 +153,7 @@ export function SectionCard({ section, onEditField }: SectionCardProps) {
           {section.fields.length > 0 && (
             <button
               onClick={handleAddQuickField}
-              className="mt-3 flex items-center gap-2 w-full p-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 border border-dashed border-gray-300 rounded-lg transition-colors"
+              className="mt-3 flex items-center gap-2 w-full p-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>Добавить поле</span>

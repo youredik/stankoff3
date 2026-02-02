@@ -15,6 +15,11 @@ export interface AuthProviderResponse {
   keycloakEnabled: boolean;
 }
 
+export interface LogoutResponse {
+  message: string;
+  keycloakLogoutUrl?: string;
+}
+
 export const authApi = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
     const { data } = await apiClient.post<LoginResponse>('/auth/login', {
@@ -29,8 +34,9 @@ export const authApi = {
     return data;
   },
 
-  logout: async (): Promise<void> => {
-    await apiClient.post('/auth/logout');
+  logout: async (): Promise<LogoutResponse> => {
+    const { data } = await apiClient.post<LogoutResponse>('/auth/logout');
+    return data;
   },
 
   me: async (): Promise<User> => {

@@ -22,11 +22,11 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
 };
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
-  entity: 'text-blue-500 bg-blue-100',
-  comment: 'text-green-500 bg-green-100',
-  status: 'text-orange-500 bg-orange-100',
-  assignment: 'text-purple-500 bg-purple-100',
-  mention: 'text-pink-500 bg-pink-100',
+  entity: 'text-blue-500 bg-blue-100 dark:bg-blue-900/40',
+  comment: 'text-green-500 bg-green-100 dark:bg-green-900/40',
+  status: 'text-orange-500 bg-orange-100 dark:bg-orange-900/40',
+  assignment: 'text-purple-500 bg-purple-100 dark:bg-purple-900/40',
+  mention: 'text-pink-500 bg-pink-100 dark:bg-pink-900/40',
 };
 
 export function ToastContainer() {
@@ -91,12 +91,12 @@ export function ToastContainer() {
         const Icon = toast.type ? NOTIFICATION_ICONS[toast.type] : Bell;
         const colorClass = toast.type
           ? NOTIFICATION_COLORS[toast.type]
-          : 'text-gray-500 bg-gray-100';
+          : 'text-gray-500 bg-gray-100 dark:bg-gray-800';
 
         return (
           <div
             key={toast.id}
-            className="bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 max-w-sm pointer-events-auto flex items-start gap-3 animate-slide-in"
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg px-4 py-3 max-w-sm pointer-events-auto flex items-start gap-3 animate-slide-in"
             style={{
               animation: 'slideIn 0.3s ease-out',
             }}
@@ -108,14 +108,14 @@ export function ToastContainer() {
               className="flex-1 cursor-pointer"
               onClick={() => handleClick(toast)}
             >
-              <p className="text-sm text-gray-900 font-medium">{toast.text}</p>
+              <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">{toast.text}</p>
               {toast.entityId && (
-                <p className="text-xs text-primary-600 mt-1">Нажмите, чтобы открыть</p>
+                <p className="text-xs text-primary-600 dark:text-primary-400 mt-1">Нажмите, чтобы открыть</p>
               )}
             </div>
             <button
               onClick={() => handleDismiss(toast.id)}
-              className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors flex-shrink-0"
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4" />
             </button>

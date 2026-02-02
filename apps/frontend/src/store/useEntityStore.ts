@@ -20,6 +20,7 @@ interface EntityStore {
   updateStatus: (id: string, status: string) => Promise<void>;
   updateAssignee: (id: string, assigneeId: string | null) => Promise<void>;
   updateLinkedEntities: (id: string, linkedEntityIds: string[]) => Promise<void>;
+  updateEntityData: (id: string, fieldId: string, value: any) => Promise<void>;
 
   selectEntity: (id: string) => Promise<void>;
   deselectEntity: () => void;
@@ -29,6 +30,7 @@ interface EntityStore {
     title: string;
     priority: 'low' | 'medium' | 'high';
     assigneeId?: string;
+    data?: Record<string, any>;
   }) => Promise<void>;
 }
 
@@ -121,6 +123,29 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
     }
   },
 
+  updateEntityData: async (id: string, fieldId: string, value: any) => {
+    const prev = get().entities;
+    const prevSelected = get().selectedEntity;
+    const entity = prev.find((e) => e.id === id);
+    if (!entity) return;
+
+    const newData = { ...entity.data, [fieldId]: value };
+    set({
+      entities: prev.map((e) =>
+        e.id === id ? { ...e, data: newData } : e
+      ),
+    });
+    if (prevSelected?.id === id) {
+      set({ selectedEntity: { ...prevSelected, data: newData } });
+    }
+    try {
+      await entitiesApi.update(id, { data: newData } as any);
+    } catch {
+      set({ entities: prev });
+      if (prevSelected?.id === id) set({ selectedEntity: prevSelected });
+    }
+  },
+
   selectEntity: async (id: string) => {
     const local = get().entities.find((e) => e.id === id);
     if (local) set({ selectedEntity: local, comments: [] });
@@ -177,7 +202,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         status: initialStatus,
         priority: data.priority,
         assigneeId: data.assigneeId,
-        data: {},
+        data: data.data || {},
       } as any);
       // Проверяем, не была ли сущность уже добавлена через WebSocket
       const currentEntities = get().entities;

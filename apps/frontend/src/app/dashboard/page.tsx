@@ -10,17 +10,32 @@ import { workspacesApi } from '@/lib/api/workspaces';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 const STORAGE_KEY = 'stankoff-selected-workspace';
+const VIEW_KEY = 'stankoff-dashboard-view';
 
 const KanbanBoard = dynamic(
   () => import('@/components/kanban/KanbanBoard').then((m) => m.KanbanBoard),
   { ssr: false },
 );
 
+const AnalyticsDashboard = dynamic(
+  () => import('@/components/analytics/AnalyticsDashboard').then((m) => m.AnalyticsDashboard),
+  { ssr: false },
+);
+
+export type DashboardView = 'kanban' | 'analytics';
+
 function DashboardContent() {
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
+  const [currentView, setCurrentView] = useState<DashboardView>('kanban');
   useWebSocket();
 
   useEffect(() => {
+    // Restore view preference
+    const savedView = localStorage.getItem(VIEW_KEY) as DashboardView;
+    if (savedView === 'kanban' || savedView === 'analytics') {
+      setCurrentView(savedView);
+    }
+
     workspacesApi.getAll().then((workspaces) => {
       if (workspaces.length > 0) {
         // Восстанавливаем сохранённое рабочее место или берём первое
@@ -36,10 +51,15 @@ function DashboardContent() {
     localStorage.setItem(STORAGE_KEY, id);
   }, []);
 
+  const handleViewChange = useCallback((view: DashboardView) => {
+    setCurrentView(view);
+    localStorage.setItem(VIEW_KEY, view);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <ToastContainer />
-      <Header />
+      <Header currentView={currentView} onViewChange={handleViewChange} />
 
       <div className="flex">
         <Sidebar
@@ -47,9 +67,14 @@ function DashboardContent() {
           onWorkspaceChange={handleWorkspaceChange}
         />
 
-        <main className="flex-1 p-6">
-          {selectedWorkspace && (
-            <KanbanBoard workspaceId={selectedWorkspace} />
+        <main className="flex-1">
+          {currentView === 'kanban' && selectedWorkspace && (
+            <div className="p-6">
+              <KanbanBoard workspaceId={selectedWorkspace} />
+            </div>
+          )}
+          {currentView === 'analytics' && (
+            <AnalyticsDashboard />
           )}
         </main>
       </div>

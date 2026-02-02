@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut, Eye, Copy, Archive, Download, ArchiveRestore } from 'lucide-react';
+import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut, Eye, Copy, Archive, Download, Upload, ArchiveRestore, X } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useSidebarStore } from '@/store/useSidebarStore';
 import { workspacesApi } from '@/lib/api/workspaces';
+import { ImportModal } from '@/components/workspace/ImportModal';
 import type { Workspace } from '@/types';
 
 interface SidebarProps {
@@ -14,9 +16,9 @@ interface SidebarProps {
 }
 
 const ROLE_CONFIG = {
-  admin: { label: 'Админ', bg: 'bg-purple-100', text: 'text-purple-700' },
-  editor: { label: 'Редактор', bg: 'bg-blue-100', text: 'text-blue-700' },
-  viewer: { label: 'Просмотр', bg: 'bg-gray-100', text: 'text-gray-600', icon: true },
+  admin: { label: 'Админ', bg: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-700 dark:text-purple-300' },
+  editor: { label: 'Редактор', bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300' },
+  viewer: { label: 'Просмотр', bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-300', icon: true },
 } as const;
 
 export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) {
@@ -26,6 +28,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
   const { user, logout } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [importWorkspaceId, setImportWorkspaceId] = useState<string | null>(null);
 
   // Проверка прав администратора
   const isAdmin = user?.role === 'admin';
@@ -104,18 +107,66 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     window.open(workspacesApi.exportCsv(id), '_blank');
   };
 
+  const handleImport = (id: string) => {
+    setMenuOpen(null);
+    setImportWorkspaceId(id);
+  };
+
+  const { isOpen, close } = useSidebarStore();
+
+  // Close sidebar on workspace change (mobile)
+  const handleWorkspaceChange = (id: string) => {
+    onWorkspaceChange(id);
+    close();
+  };
+
   return (
-    <aside className="w-72 bg-white border-r border-gray-200 min-h-screen flex flex-col">
+    <>
+    {/* Import Modal */}
+    {importWorkspaceId && (
+      <ImportModal
+        workspaceId={importWorkspaceId}
+        onClose={() => setImportWorkspaceId(null)}
+      />
+    )}
+
+    {/* Mobile overlay */}
+    {isOpen && (
+      <div
+        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        onClick={close}
+      />
+    )}
+
+    <aside
+      className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
+        min-h-screen flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}
+    >
       {/* Logo */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
+      <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Stankoff</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Портал управления</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">Stankoff</h1>
-            <p className="text-xs text-gray-500">Портал управления</p>
-          </div>
+          {/* Close button for mobile */}
+          <button
+            onClick={close}
+            aria-label="Закрыть меню"
+            className="lg:hidden p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -144,10 +195,10 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
 
           {workspaces.length === 0 && (
             <div className="px-3 py-8 text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-gray-100 flex items-center justify-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                 <span className="text-2xl opacity-50">📭</span>
               </div>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-400 dark:text-gray-500">
                 Нет рабочих мест
               </p>
             </div>
@@ -162,22 +213,22 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
               key={workspace.id}
               className={`group relative flex items-center rounded-lg transition-colors ${
                 selectedWorkspace === workspace.id
-                  ? 'bg-primary-50'
-                  : 'hover:bg-gray-50'
+                  ? 'bg-primary-50 dark:bg-primary-900/30'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800'
               }`}
             >
               <button
-                onClick={() => onWorkspaceChange(workspace.id)}
+                onClick={() => handleWorkspaceChange(workspace.id)}
                 className={`flex-1 flex items-center gap-3 px-3 py-2.5 cursor-pointer ${
                   selectedWorkspace === workspace.id
-                    ? 'text-primary-700'
-                    : 'text-gray-700'
+                    ? 'text-primary-700 dark:text-primary-400'
+                    : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
                 <span className={`text-xl ${workspace.isArchived ? 'opacity-50' : ''}`}>{workspace.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className={`font-medium truncate ${workspace.isArchived ? 'text-gray-400' : ''}`}>{workspace.name}</span>
+                    <span className={`font-medium truncate ${workspace.isArchived ? 'text-gray-400 dark:text-gray-500' : ''}`}>{workspace.name}</span>
                     {workspace.isArchived && (
                       <Archive className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                     )}
@@ -203,7 +254,10 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                       e.stopPropagation();
                       setMenuOpen(menuOpen === workspace.id ? null : workspace.id);
                     }}
-                    className="p-1.5 mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    aria-label="Меню рабочего места"
+                    aria-expanded={menuOpen === workspace.id}
+                    aria-haspopup="true"
+                    className="p-1.5 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
@@ -214,56 +268,63 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                         className="fixed inset-0 z-10"
                         onClick={() => setMenuOpen(null)}
                       />
-                      <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-soft-lg py-1 w-48">
+                      <div role="menu" aria-label="Действия с рабочим местом" className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-soft-lg py-1 w-48">
                         <button
                           onClick={() => handleEditWorkspace(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                         >
-                          <Pencil className="w-4 h-4 text-gray-400" />
+                          <Pencil className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Настроить</span>
                         </button>
                         <button
                           onClick={() => handleDuplicateWorkspace(workspace)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                         >
-                          <Copy className="w-4 h-4 text-gray-400" />
+                          <Copy className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Дублировать</span>
                         </button>
                         <button
                           onClick={() => handleArchiveWorkspace(workspace)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                         >
                           {workspace.isArchived ? (
                             <>
-                              <ArchiveRestore className="w-4 h-4 text-gray-400" />
+                              <ArchiveRestore className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                               <span>Разархивировать</span>
                             </>
                           ) : (
                             <>
-                              <Archive className="w-4 h-4 text-gray-400" />
+                              <Archive className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                               <span>Архивировать</span>
                             </>
                           )}
                         </button>
-                        <div className="h-px bg-gray-200 my-1" />
+                        <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                         <button
                           onClick={() => handleExportJson(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                         >
-                          <Download className="w-4 h-4 text-gray-400" />
+                          <Download className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Экспорт JSON</span>
                         </button>
                         <button
                           onClick={() => handleExportCsv(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                         >
-                          <Download className="w-4 h-4 text-gray-400" />
+                          <Download className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Экспорт CSV</span>
                         </button>
-                        <div className="h-px bg-gray-200 my-1" />
+                        <button
+                          onClick={() => handleImport(workspace.id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                        >
+                          <Upload className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                          <span>Импорт</span>
+                        </button>
+                        <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                         <button
                           onClick={() => handleDeleteWorkspace(workspace.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors cursor-pointer"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                           <span>Удалить</span>
@@ -280,13 +341,13 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
 
         {/* Bottom section - только для админов */}
         {isAdmin && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+            <div className="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
               Администрирование
             </div>
             <button
               onClick={() => router.push('/admin/users')}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors cursor-pointer"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 rounded-lg transition-colors cursor-pointer"
             >
               <Users className="w-5 h-5" />
               <span className="font-medium">Пользователи</span>
@@ -296,18 +357,19 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
       </nav>
 
       {/* User section */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center text-white text-sm font-medium">
             {getInitials()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{getFullName()}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{getFullName()}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
           </div>
           <button
             onClick={handleLogout}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Выйти из системы"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             title="Выйти"
           >
             <LogOut className="w-4 h-4" />
@@ -315,5 +377,6 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
         </div>
       </div>
     </aside>
+    </>
   );
 }

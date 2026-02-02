@@ -12,13 +12,30 @@ export const metadata: Metadata = {
   description: 'Система управления цифровыми рабочими местами',
 };
 
+// Script to prevent theme flash
+const themeScript = `
+  (function() {
+    try {
+      const stored = localStorage.getItem('stankoff-theme');
+      const theme = stored ? JSON.parse(stored).state?.theme : 'system';
+      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch (e) {}
+  })();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru">
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         {children}
       </body>

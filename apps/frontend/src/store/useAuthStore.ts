@@ -25,7 +25,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   user: null,
   accessToken: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: true, // Начинаем с true чтобы не было редиректа до проверки авторизации
   error: null,
 
   login: async (email: string, password: string) => {
@@ -55,10 +55,24 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   logout: async () => {
     try {
-      await authApi.logout();
+      const response = await authApi.logout();
+
+      // Очищаем состояние
+      set({
+        user: null,
+        accessToken: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+
+      // Если есть Keycloak logout URL - редиректим на него
+      if (response.keycloakLogoutUrl) {
+        window.location.href = response.keycloakLogoutUrl;
+        return;
+      }
     } catch {
-      // Игнорируем ошибки при logout
-    } finally {
+      // Игнорируем ошибки при logout, но всё равно очищаем состояние
       set({
         user: null,
         accessToken: null,
@@ -87,6 +101,12 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   checkAuth: async () => {
+    // Если уже авторизован - не проверяем снова
+    if (get().isAuthenticated && get().user) {
+      set({ isLoading: false });
+      return;
+    }
+
     set({ isLoading: true });
     try {
       // Пробуем получить профиль - если есть валидный refresh token в cookie,

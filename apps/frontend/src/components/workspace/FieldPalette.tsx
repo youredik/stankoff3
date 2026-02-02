@@ -96,16 +96,16 @@ function DraggableFieldType({ config }: DraggableFieldTypeProps) {
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-grab hover:border-primary-300 hover:bg-primary-50 transition-colors ${
+      className={`flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-grab hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
-      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-600">
+      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-600 dark:text-gray-400">
         {config.icon}
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-medium text-gray-900">{config.label}</p>
-        <p className="text-xs text-gray-500 truncate">{config.description}</p>
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{config.label}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{config.description}</p>
       </div>
     </div>
   );
@@ -113,11 +113,11 @@ function DraggableFieldType({ config }: DraggableFieldTypeProps) {
 
 export function FieldPalette() {
   return (
-    <div className="w-64 bg-gray-50 border-l border-gray-200 p-4 overflow-y-auto">
-      <h3 className="text-sm font-semibold text-gray-700 uppercase mb-4">
+    <div className="w-64 bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 p-4 overflow-y-auto">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 uppercase mb-4">
         Типы полей
       </h3>
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
         Перетащите поле в секцию для добавления
       </p>
       <div className="space-y-2">

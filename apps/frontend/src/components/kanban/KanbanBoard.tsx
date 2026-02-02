@@ -10,7 +10,8 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { Plus, Filter, Settings, Loader2, X, Eye } from 'lucide-react';
+import { Plus, Filter, Settings, X, Eye } from 'lucide-react';
+import { SkeletonColumn } from '@/components/ui/Skeleton';
 import { useRouter } from 'next/navigation';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard } from './KanbanCard';
@@ -151,8 +152,11 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
   if (loading && entities.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        <SkeletonColumn />
+        <SkeletonColumn />
+        <SkeletonColumn />
+        <SkeletonColumn />
       </div>
     );
   }
@@ -166,10 +170,10 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
               <span className="text-3xl">{currentWorkspace.icon}</span>
             )}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {currentWorkspace?.name || 'Загрузка...'}
               </h2>
-              <p className="text-gray-500 mt-1">
+              <p className="text-gray-500 dark:text-gray-400 mt-1">
                 {filteredEntities.length === entities.length
                   ? `${entities.length} заявок`
                   : `${filteredEntities.length} из ${entities.length} заявок`}
@@ -179,10 +183,12 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           <div className="flex gap-3">
             <button
               onClick={() => setShowFilters(true)}
+              aria-label="Открыть фильтры"
+              aria-expanded={showFilters}
               className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors cursor-pointer ${
                 activeFilterCount > 0
-                  ? 'border-primary-300 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 hover:bg-gray-50'
+                  ? 'border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
               }`}
             >
               <Filter className="w-5 h-5" />
@@ -196,7 +202,8 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
             {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                aria-label="Сбросить все фильтры"
+                className="flex items-center gap-1 px-3 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
                 <span>Сбросить</span>
@@ -206,7 +213,8 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
             {isAdmin && (
               <button
                 onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                aria-label="Настройки рабочего места"
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
               >
                 <Settings className="w-5 h-5" />
                 <span>Настройки</span>
@@ -216,6 +224,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
             {canEditEntities && (
               <button
                 onClick={() => setShowCreateModal(true)}
+                aria-label="Создать новую заявку"
                 className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
               >
                 <Plus className="w-5 h-5" />
@@ -228,7 +237,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
       {/* Индикатор режима просмотра */}
       {!canEditEntities && currentRole && (
-        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100 text-gray-600 rounded-lg border border-gray-200">
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">
           <Eye className="w-4 h-4" />
           <span className="text-sm">Режим просмотра — вы можете просматривать заявки, но не можете их редактировать</span>
         </div>
