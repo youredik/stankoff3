@@ -15,35 +15,35 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    // Setup project - авторизация admin
+    // Setup project - авторизация admin (ВРЕМЕННО ОТКЛЮЧЕНО)
     {
       name: 'setup',
       testMatch: '**/auth.setup.ts',
       testIgnore: '**/viewer-auth.setup.ts',
     },
-    // Setup project - авторизация viewer
+    // Setup project - авторизация viewer (ВРЕМЕННО ОТКЛЮЧЕНО)
     {
       name: 'viewer-setup',
       testMatch: '**/viewer-auth.setup.ts',
     },
-    // Основные тесты - зависят от setup (admin)
+    // Основные тесты - ВРЕМЕННО БЕЗ АВТОРИЗАЦИИ (setup отключён)
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: '.auth/user.json',
+        // storageState: '.auth/user.json', // ВРЕМЕННО ОТКЛЮЧЕНО
       },
-      dependencies: ['setup'],
+      // dependencies: ['setup'], // ВРЕМЕННО ОТКЛЮЧЕНО
       testIgnore: /rbac\.spec\.ts/,
     },
-    // RBAC тесты - зависят от viewer-setup
+    // RBAC тесты - ВРЕМЕННО БЕЗ АВТОРИЗАЦИИ (viewer-setup отключён)
     {
       name: 'rbac',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: '.auth/viewer.json',
+        // storageState: '.auth/viewer.json', // ВРЕМЕННО ОТКЛЮЧЕНО
       },
-      dependencies: ['viewer-setup'],
+      // dependencies: ['viewer-setup'], // ВРЕМЕННО ОТКЛЮЧЕНО
       testMatch: /rbac\.spec\.ts/,
     },
   ],

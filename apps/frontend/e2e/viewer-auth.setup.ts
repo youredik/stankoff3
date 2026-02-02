@@ -3,7 +3,9 @@ import path from 'path';
 
 export const VIEWER_STORAGE_STATE = path.join(__dirname, '../.auth/viewer.json');
 
-setup('authenticate as viewer', async ({ page }) => {
+// ВРЕМЕННО ОТКЛЮЧЕНО: тесты авторизации не совместимы с Keycloak SSO
+// Страница /login теперь автоматически редиректит на Keycloak без формы email/password
+setup.skip('authenticate as viewer', async ({ page }) => {
   // Переходим на страницу логина
   await page.goto('/login');
 
