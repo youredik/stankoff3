@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import {
   Bold,
   Italic,
+  Strikethrough,
   Link as LinkIcon,
   Paperclip,
   X,
@@ -315,6 +316,15 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
             title="Курсив (Ctrl+I)"
           >
             <Italic className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </button>
+          <button
+            onClick={() => editor?.chain().focus().toggleStrike().run()}
+            className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+              editor?.isActive('strike') ? 'bg-gray-200 dark:bg-gray-700' : ''
+            }`}
+            title="Зачёркнутый (Ctrl+Shift+S)"
+          >
+            <Strikethrough className="w-4 h-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
             onClick={handleLinkClick}
