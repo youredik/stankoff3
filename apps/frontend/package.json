@@ -16,6 +16,7 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@bpmn-io/properties-panel": "^3.36.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^9.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -27,6 +28,9 @@
     "@tiptap/react": "^3.18.0",
     "@tiptap/starter-kit": "^3.18.0",
     "axios": "^1.7.9",
+    "bpmn-js": "^18.11.0",
+    "bpmn-js-properties-panel": "^5.48.0",
+    "camunda-bpmn-moddle": "^7.0.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.468.0",
