@@ -8,8 +8,8 @@
 
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand, @dnd-kit, Tiptap, Socket.IO Client
 - **Backend:** NestJS 11, TypeORM, PostgreSQL, Socket.IO, AWS SDK v3 (S3)
-- **Инфраструктура:** Docker Compose, Yandex Object Storage, GitHub Actions CI/CD, Nginx, Let's Encrypt SSL
-- **Деплой:** GitHub Container Registry (GHCR), Docker multi-platform builds (AMD64)
+- **Инфраструктура:** Docker Swarm (preprod), Docker Compose (dev), Yandex Object Storage, GitHub Actions CI/CD, Nginx, Let's Encrypt SSL
+- **Деплой:** GitHub Container Registry (GHCR), Docker multi-platform builds (AMD64), Zero-downtime deployment (Swarm start-first)
 
 ## Структура проекта
 
@@ -194,6 +194,33 @@ Push в ветку
 
 **Docker образы:** `ghcr.io/youredik/stankoff3/frontend:preprod`, `ghcr.io/youredik/stankoff3/backend:preprod`
 
+### Docker Swarm (Zero-Downtime Deployment)
+
+Preprod использует Docker Swarm для zero-downtime деплоя:
+
+```yaml
+deploy:
+  update_config:
+    order: start-first      # Сначала стартует новый контейнер
+    failure_action: rollback # При ошибке — откат
+  restart_policy:
+    condition: any
+```
+
+**Как это работает:**
+1. Swarm создаёт новый контейнер
+2. Ждёт пока healthcheck пройдёт
+3. Перенаправляет трафик на новый контейнер
+4. Удаляет старый контейнер
+
+**Известные проблемы:**
+- **IPv6/IPv4:** На сервере `localhost` резолвится в IPv6 (`::1`), но nginx слушает только IPv4. Используй `127.0.0.1` вместо `localhost` в healthcheck
+- **nginx proxy_pass с переменными:** При использовании переменной в `proxy_pass` (для динамического DNS в Swarm) nginx НЕ добавляет автоматически оставшуюся часть URI. Используй `proxy_pass http://$var;` без пути
+
+**Файлы конфигурации:**
+- `docker-compose.preprod.yml` — Swarm stack для preprod
+- `nginx/nginx.preprod.conf` — Nginx с динамическим DNS resolver
+
 ### SSL сертификаты
 
 - **Preprod:** Let's Encrypt через Certbot (автообновление каждые 12 часов)
@@ -224,9 +251,10 @@ npm run test:e2e:ui      # Интерактивный UI для тестов
 git push origin develop  # Автоматический деплой на preprod
 git push origin main     # Автоматический деплой на production (пока отключен)
 
-# Проверка preprod сервера
-ssh -l youredik 51.250.117.178 "cd /opt/stankoff-portal && docker compose -f docker-compose.preprod.yml ps"
-ssh -l youredik 51.250.117.178 "cd /opt/stankoff-portal && docker compose -f docker-compose.preprod.yml logs -f backend"
+# Проверка preprod сервера (Docker Swarm)
+ssh -l youredik 51.250.117.178 "docker stack services stankoff-preprod"           # Статус сервисов
+ssh -l youredik 51.250.117.178 "docker service logs stankoff-preprod_backend -f"  # Логи backend
+ssh -l youredik 51.250.117.178 "docker service logs stankoff-preprod_frontend -f" # Логи frontend
 curl https://preprod.stankoff.ru/api/health  # Health check
 
 # Сборка Docker образов (локально для тестирования)

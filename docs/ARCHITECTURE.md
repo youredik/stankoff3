@@ -242,6 +242,8 @@ interface SidebarStore {
 - `comment:created` - Новый комментарий
 - `user:assigned` - Назначение ответственного
 
+> **URL подключения:** В браузере используется `window.location.origin` (динамически определяется текущий хост). Nginx проксирует `/socket.io/` на backend. Это позволяет работать на любом окружении (localhost, preprod, production) без изменения конфигурации.
+
 **useBrowserNotifications**
 Работа с Browser Notification API:
 ```typescript
