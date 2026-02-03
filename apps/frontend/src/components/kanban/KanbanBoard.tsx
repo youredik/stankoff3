@@ -248,17 +248,29 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {columns.map((column) => (
-            <KanbanColumn
-              key={column.id}
-              id={column.id}
-              title={column.label}
-              color={column.color}
-              cards={getColumnCards(column.id)}
-              canEdit={canEditEntities}
-            />
-          ))}
+        <div
+          className="relative rounded-xl overflow-hidden min-h-[calc(100vh-220px)]"
+          style={{
+            backgroundImage: 'url(/kanban-bg.svg)',
+            backgroundSize: '200px 200px',
+            backgroundRepeat: 'repeat',
+          }}
+        >
+          {/* Overlay for light/dark mode */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50/60 via-gray-100/50 to-gray-50/60 dark:from-gray-900/70 dark:via-gray-800/60 dark:to-gray-900/70 pointer-events-none" />
+
+          <div className="relative flex gap-4 overflow-x-auto p-4">
+            {columns.map((column) => (
+              <KanbanColumn
+                key={column.id}
+                id={column.id}
+                title={column.label}
+                color={column.color}
+                cards={getColumnCards(column.id)}
+                canEdit={canEditEntities}
+              />
+            ))}
+          </div>
         </div>
 
         <DragOverlay>
