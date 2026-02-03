@@ -1,14 +1,11 @@
-version: '3.8'
-
 # Preprod environment for preprod.stankoff.ru
-# Uses images from GitHub Container Registry with :preprod tag
+# Supports both Docker Compose and Docker Swarm (stack deploy)
+# Zero-downtime deployment via Swarm with order: start-first
 
 services:
   # Nginx reverse proxy
   nginx:
     image: nginx:alpine
-    container_name: stankoff-preprod-nginx
-    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -17,9 +14,6 @@ services:
       - certbot-conf:/etc/letsencrypt:ro
       - certbot-www:/var/www/certbot:ro
       - nginx-cache:/var/cache/nginx
-    depends_on:
-      - frontend
-      - backend
     networks:
       - stankoff-preprod-network
     healthcheck:
@@ -28,24 +22,38 @@ services:
       timeout: 10s
       retries: 3
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
 
   # Certbot for Let's Encrypt SSL certificates
   certbot:
     image: certbot/certbot
-    container_name: stankoff-preprod-certbot
-    restart: unless-stopped
     volumes:
       - certbot-conf:/etc/letsencrypt
       - certbot-www:/var/www/certbot
     networks:
       - stankoff-preprod-network
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done;'"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
 
   # Frontend Next.js (from GHCR)
   frontend:
     image: ghcr.io/youredik/stankoff3/frontend:preprod
-    container_name: stankoff-preprod-frontend
-    restart: unless-stopped
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://preprod.stankoff.ru/api}
@@ -53,25 +61,32 @@ services:
       - NEXT_PUBLIC_KEYCLOAK_URL=${NEXT_PUBLIC_KEYCLOAK_URL:-https://preprod.stankoff.ru/auth}
       - NEXT_PUBLIC_KEYCLOAK_REALM=${NEXT_PUBLIC_KEYCLOAK_REALM:-stankoff}
       - NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=${NEXT_PUBLIC_KEYCLOAK_CLIENT_ID:-stankoff-portal}
-    expose:
-      - "3000"
     networks:
       - stankoff-preprod-network
-    depends_on:
-      backend:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       start_period: 60s
       retries: 3
+    stop_grace_period: 30s
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
 
   # Backend NestJS (from GHCR)
   backend:
     image: ghcr.io/youredik/stankoff3/backend:preprod
-    container_name: stankoff-preprod-backend
-    restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -99,27 +114,34 @@ services:
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
       # TypeORM
       - TYPEORM_SYNC=${TYPEORM_SYNC:-false}
-    expose:
-      - "3001"
     volumes:
       - backend-logs:/app/logs
     networks:
       - stankoff-preprod-network
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
       interval: 30s
       timeout: 10s
-      start_period: 5s
+      start_period: 10s
       retries: 3
+    stop_grace_period: 30s
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
 
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: stankoff-preprod-postgres
-    restart: unless-stopped
     environment:
       - POSTGRES_DB=${DATABASE_NAME:-stankoff_preprod}
       - POSTGRES_USER=${DATABASE_USER:-postgres}
@@ -128,8 +150,6 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./backups:/backups
       - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
-    expose:
-      - "5432"
     networks:
       - stankoff-preprod-network
     healthcheck:
@@ -137,6 +157,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
 
 volumes:
   postgres-data:
@@ -152,4 +180,5 @@ volumes:
 
 networks:
   stankoff-preprod-network:
-    driver: bridge
+    driver: overlay
+    attachable: true

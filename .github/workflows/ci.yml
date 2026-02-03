@@ -274,31 +274,40 @@ jobs:
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Pull latest preprod images
-            docker compose -f docker-compose.preprod.yml pull
+            docker pull ghcr.io/youredik/stankoff3/backend:preprod
+            docker pull ghcr.io/youredik/stankoff3/frontend:preprod
 
-            # Restart services with new images
-            docker compose -f docker-compose.preprod.yml up -d --remove-orphans
+            # Export environment variables for docker stack
+            set -a
+            source .env.preprod
+            set +a
+
+            # Deploy stack with zero-downtime (start-first strategy)
+            docker stack deploy -c docker-compose.preprod.yml stankoff-preprod --with-registry-auth
 
             # Cleanup old images
             docker image prune -f
 
-            # Health check с retry (до 60 секунд)
-            echo "Waiting for backend to start..."
-            for i in {1..12}; do
-              if curl -sf http://localhost:3001/api/health; then
-                echo "Backend is healthy!"
+            # Health check с retry (до 90 секунд для Swarm rolling update)
+            echo "Waiting for services to be healthy..."
+            for i in {1..18}; do
+              if curl -sf http://localhost/api/health; then
+                echo "Services are healthy!"
                 break
               fi
-              if [ $i -eq 12 ]; then
-                echo "Backend failed to start within 60 seconds"
-                docker compose -f docker-compose.preprod.yml logs --tail=50 backend
+              if [ $i -eq 18 ]; then
+                echo "Services failed to start within 90 seconds"
+                docker service logs stankoff-preprod_backend --tail=50
                 exit 1
               fi
-              echo "Attempt $i/12 - waiting 5s..."
+              echo "Attempt $i/18 - waiting 5s..."
               sleep 5
             done
 
-            echo "Preprod deployment complete!"
+            # Show service status
+            docker stack services stankoff-preprod
+
+            echo "Preprod deployment complete (zero-downtime)!"
 
       - name: Notify deployment success
         run: |
