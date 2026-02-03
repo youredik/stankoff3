@@ -104,6 +104,8 @@ services:
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-stankoff}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-stankoff-portal}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
+      # Camunda / Zeebe
+      - ZEEBE_ADDRESS=${ZEEBE_ADDRESS:-camunda:26500}
       # TypeORM
       - TYPEORM_SYNC=${TYPEORM_SYNC:-false}
     volumes:
@@ -154,6 +156,36 @@ services:
         condition: any
         delay: 5s
 
+  # Camunda 8 Platform (Zeebe + Operate + Tasklist)
+  camunda:
+    image: camunda/camunda:8.8.9
+    environment:
+      - CAMUNDA_OPERATE_CSRFPREVENTIONENABLED=false
+      - CAMUNDA_TASKLIST_CSRFPREVENTIONENABLED=false
+      - CAMUNDA_DATABASE_URL=jdbc:postgresql://postgres:5432/${DATABASE_NAME:-stankoff_preprod}
+      - CAMUNDA_DATABASE_USERNAME=${DATABASE_USER:-postgres}
+      - CAMUNDA_DATABASE_PASSWORD=${DATABASE_PASSWORD:-postgres}
+    volumes:
+      - camunda-data:/usr/local/camunda/data
+    networks:
+      - stankoff-preprod-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+      restart_policy:
+        condition: any
+        delay: 5s
+
 volumes:
   # IMPORTANT: Use external volume to preserve data across Swarm redeployments
   # The volume was originally created by Docker Compose with this name
@@ -171,6 +203,8 @@ volumes:
   certbot-www:
     external: true
     name: stankoff-portal_certbot-www
+  # Camunda data
+  camunda-data:
 
 networks:
   stankoff-preprod-network:
