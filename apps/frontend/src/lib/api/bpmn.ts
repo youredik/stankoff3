@@ -3,6 +3,8 @@ import type {
   ProcessDefinition,
   ProcessInstance,
   BpmnHealthStatus,
+  ProcessDefinitionStatistics,
+  WorkspaceProcessStatistics,
 } from '@/types';
 
 export const bpmnApi = {
@@ -70,5 +72,16 @@ export const bpmnApi = {
         correlationKey,
         variables,
       })
+      .then((r) => r.data),
+
+  // Statistics
+  getDefinitionStatistics: (definitionId: string) =>
+    apiClient
+      .get<ProcessDefinitionStatistics>(`/bpmn/statistics/definition/${definitionId}`)
+      .then((r) => r.data),
+
+  getWorkspaceStatistics: (workspaceId: string) =>
+    apiClient
+      .get<WorkspaceProcessStatistics>(`/bpmn/statistics/workspace/${workspaceId}`)
       .then((r) => r.data),
 };

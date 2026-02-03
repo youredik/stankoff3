@@ -101,6 +101,18 @@ export class BpmnController {
     );
   }
 
+  // ==================== Statistics ====================
+
+  @Get('statistics/definition/:id')
+  async getDefinitionStatistics(@Param('id') id: string) {
+    return this.bpmnService.getDefinitionStatistics(id);
+  }
+
+  @Get('statistics/workspace/:workspaceId')
+  async getWorkspaceStatistics(@Param('workspaceId') workspaceId: string) {
+    return this.bpmnService.getWorkspaceStatistics(workspaceId);
+  }
+
   // ==================== Messages ====================
 
   @Post('message/:messageName')

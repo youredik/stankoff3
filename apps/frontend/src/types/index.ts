@@ -234,3 +234,20 @@ export interface BpmnHealthStatus {
   connected: boolean;
   brokers?: number;
 }
+
+export interface ProcessDefinitionStatistics {
+  total: number;
+  active: number;
+  completed: number;
+  terminated: number;
+  incident: number;
+  avgDurationMs: number | null;
+}
+
+export interface WorkspaceProcessStatistics {
+  definitions: number;
+  deployedDefinitions: number;
+  totalInstances: number;
+  activeInstances: number;
+  completedInstances: number;
+}

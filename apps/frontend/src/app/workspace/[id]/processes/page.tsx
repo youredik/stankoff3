@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, AlertCircle, CheckCircle, FileCode, Play } from 'lucide-react';
+import { ArrowLeft, AlertCircle, CheckCircle, FileCode, Play, BarChart3 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
 import { ProcessList, ProcessInstanceList } from '@/components/bpmn';
 import { bpmnApi } from '@/lib/api/bpmn';
 import type { ProcessDefinition, ProcessInstance, BpmnHealthStatus } from '@/types';
 
-// Dynamic import for ProcessEditor (uses bpmn-js which is browser-only)
+// Dynamic imports for browser-only components
 const ProcessEditor = dynamic(
   () => import('@/components/bpmn/ProcessEditor').then((mod) => mod.ProcessEditor),
   {
@@ -22,7 +22,20 @@ const ProcessEditor = dynamic(
   },
 );
 
+const ProcessDetailView = dynamic(
+  () => import('@/components/bpmn/ProcessDetailView').then((mod) => mod.ProcessDetailView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+        <span className="text-gray-500">Загрузка...</span>
+      </div>
+    ),
+  },
+);
+
 type Tab = 'definitions' | 'instances';
+type ViewMode = 'list' | 'edit' | 'detail';
 
 export default function ProcessesPage() {
   const params = useParams();
@@ -30,10 +43,10 @@ export default function ProcessesPage() {
   const workspaceId = params.id as string;
 
   const [activeTab, setActiveTab] = useState<Tab>('definitions');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [definitions, setDefinitions] = useState<ProcessDefinition[]>([]);
   const [instances, setInstances] = useState<ProcessInstance[]>([]);
   const [selectedDefinition, setSelectedDefinition] = useState<ProcessDefinition | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingInstances, setIsLoadingInstances] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -84,6 +97,17 @@ export default function ProcessesPage() {
     }
   }, [activeTab, loadInstances]);
 
+  // Handle selecting a definition - show detail view if deployed, edit view if not
+  const handleSelectDefinition = (def: ProcessDefinition) => {
+    setSelectedDefinition(def);
+    setViewMode(def.deployedKey ? 'detail' : 'edit');
+  };
+
+  // Switch to edit mode
+  const handleEditDefinition = () => {
+    setViewMode('edit');
+  };
+
   // Save new or updated definition
   const handleSave = async (data: {
     name: string;
@@ -107,7 +131,7 @@ export default function ProcessesPage() {
       });
 
       setSelectedDefinition(saved);
-      setIsCreating(false);
+      // Stay in edit mode after save
     } catch (err) {
       console.error('Failed to save process:', err);
       throw err;
@@ -132,6 +156,8 @@ export default function ProcessesPage() {
 
       if (selectedDefinition?.id === deployed.id) {
         setSelectedDefinition(deployed);
+        // Switch to detail view after deploy
+        setViewMode('detail');
       }
     } catch (err) {
       console.error('Failed to deploy process:', err);
@@ -141,114 +167,135 @@ export default function ProcessesPage() {
     }
   };
 
-  // Close editor and go back to list
-  const handleCloseEditor = () => {
+  // Close and go back to list
+  const handleBack = () => {
     setSelectedDefinition(null);
-    setIsCreating(false);
+    setViewMode('list');
   };
 
-  const showEditor = isCreating || selectedDefinition;
+  // Create new definition
+  const handleCreateNew = () => {
+    setSelectedDefinition(null);
+    setViewMode('edit');
+  };
+
+  const showList = viewMode === 'list';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
       <Header />
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Бизнес-процессы
-            </h1>
-          </div>
+        {/* Top bar - only show when in list mode */}
+        {showList && (
+          <>
+            <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Бизнес-процессы
+                </h1>
+              </div>
 
-          {/* Camunda connection status */}
-          {health && (
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-                health.connected
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                  : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-              }`}
-            >
-              {health.connected ? (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  Camunda подключена
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-4 h-4" />
-                  Camunda недоступна
-                </>
+              {/* Camunda connection status */}
+              {health && (
+                <div
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+                    health.connected
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                      : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                  }`}
+                >
+                  {health.connected ? (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Camunda подключена
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4" />
+                      Camunda недоступна
+                    </>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Tabs (only show when not in editor) */}
-        {!showEditor && (
-          <div className="flex items-center gap-4 px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setActiveTab('definitions')}
-              className={`flex items-center gap-2 py-3 border-b-2 transition-colors ${
-                activeTab === 'definitions'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <FileCode className="w-4 h-4" />
-              <span className="text-sm font-medium">Определения</span>
-              <span className="text-xs text-gray-400">({definitions.length})</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('instances')}
-              className={`flex items-center gap-2 py-3 border-b-2 transition-colors ${
-                activeTab === 'instances'
-                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <Play className="w-4 h-4" />
-              <span className="text-sm font-medium">Экземпляры</span>
-              <span className="text-xs text-gray-400">({instances.length})</span>
-            </button>
-          </div>
+            {/* Tabs */}
+            <div className="flex items-center gap-4 px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setActiveTab('definitions')}
+                className={`flex items-center gap-2 py-3 border-b-2 transition-colors ${
+                  activeTab === 'definitions'
+                    ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <FileCode className="w-4 h-4" />
+                <span className="text-sm font-medium">Определения</span>
+                <span className="text-xs text-gray-400">({definitions.length})</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('instances')}
+                className={`flex items-center gap-2 py-3 border-b-2 transition-colors ${
+                  activeTab === 'instances'
+                    ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Play className="w-4 h-4" />
+                <span className="text-sm font-medium">Экземпляры</span>
+                <span className="text-xs text-gray-400">({instances.length})</span>
+              </button>
+            </div>
+          </>
         )}
 
         {/* Content */}
         <div className="flex-1 overflow-hidden">
-          {error && (
+          {error && showList && (
             <div className="m-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
               {error}
             </div>
           )}
 
-          {showEditor ? (
+          {viewMode === 'edit' && (
             <ProcessEditor
               initialName={selectedDefinition?.name}
               initialDescription={selectedDefinition?.description}
               initialXml={selectedDefinition?.bpmnXml}
               onSave={handleSave}
               onDeploy={health?.connected ? () => handleDeploy() : undefined}
-              onClose={handleCloseEditor}
+              onClose={handleBack}
               isDeployed={!!selectedDefinition?.deployedKey}
               isSaving={isSaving}
               isDeploying={isDeploying}
             />
-          ) : (
+          )}
+
+          {viewMode === 'detail' && selectedDefinition && (
+            <ProcessDetailView
+              definition={selectedDefinition}
+              onBack={handleBack}
+              onEdit={handleEditDefinition}
+              onDeploy={() => handleDeploy()}
+              isDeploying={isDeploying}
+              canDeploy={health?.connected}
+            />
+          )}
+
+          {showList && (
             <div className="p-6 max-w-4xl mx-auto overflow-y-auto h-full">
               {activeTab === 'definitions' && (
                 <ProcessList
                   definitions={definitions}
-                  onSelect={setSelectedDefinition}
-                  onCreateNew={() => setIsCreating(true)}
+                  onSelect={handleSelectDefinition}
+                  onCreateNew={handleCreateNew}
                   onDeploy={handleDeploy}
                   isLoading={isLoading}
                 />

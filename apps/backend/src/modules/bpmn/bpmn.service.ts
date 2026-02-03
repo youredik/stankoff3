@@ -242,6 +242,122 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  // ==================== Statistics ====================
+
+  async getDefinitionStatistics(definitionId: string): Promise<{
+    total: number;
+    active: number;
+    completed: number;
+    terminated: number;
+    incident: number;
+    avgDurationMs: number | null;
+  }> {
+    const definition = await this.findDefinition(definitionId);
+
+    const stats = await this.processInstanceRepository
+      .createQueryBuilder('instance')
+      .select('instance.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect(
+        'AVG(EXTRACT(EPOCH FROM (instance.completedAt - instance.startedAt)) * 1000)',
+        'avgDuration',
+      )
+      .where('instance.processDefinitionId = :definitionId', { definitionId })
+      .groupBy('instance.status')
+      .getRawMany();
+
+    const result = {
+      total: 0,
+      active: 0,
+      completed: 0,
+      terminated: 0,
+      incident: 0,
+      avgDurationMs: null as number | null,
+    };
+
+    let totalDuration = 0;
+    let completedCount = 0;
+
+    for (const row of stats) {
+      const count = parseInt(row.count, 10);
+      result.total += count;
+
+      switch (row.status) {
+        case ProcessInstanceStatus.ACTIVE:
+          result.active = count;
+          break;
+        case ProcessInstanceStatus.COMPLETED:
+          result.completed = count;
+          completedCount = count;
+          if (row.avgDuration) {
+            totalDuration = parseFloat(row.avgDuration) * count;
+          }
+          break;
+        case ProcessInstanceStatus.TERMINATED:
+          result.terminated = count;
+          break;
+        case ProcessInstanceStatus.INCIDENT:
+          result.incident = count;
+          break;
+      }
+    }
+
+    if (completedCount > 0) {
+      result.avgDurationMs = Math.round(totalDuration / completedCount);
+    }
+
+    return result;
+  }
+
+  async getWorkspaceStatistics(workspaceId: string): Promise<{
+    definitions: number;
+    deployedDefinitions: number;
+    totalInstances: number;
+    activeInstances: number;
+    completedInstances: number;
+  }> {
+    const [definitions, deployedDefinitions] = await Promise.all([
+      this.processDefinitionRepository.count({ where: { workspaceId } }),
+      this.processDefinitionRepository.count({
+        where: { workspaceId, deployedKey: undefined },
+      }).then((notDeployed) =>
+        this.processDefinitionRepository
+          .count({ where: { workspaceId } })
+          .then((total) => total - notDeployed),
+      ),
+    ]);
+
+    const instanceStats = await this.processInstanceRepository
+      .createQueryBuilder('instance')
+      .select('instance.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('instance.workspaceId = :workspaceId', { workspaceId })
+      .groupBy('instance.status')
+      .getRawMany();
+
+    let totalInstances = 0;
+    let activeInstances = 0;
+    let completedInstances = 0;
+
+    for (const row of instanceStats) {
+      const count = parseInt(row.count, 10);
+      totalInstances += count;
+      if (row.status === ProcessInstanceStatus.ACTIVE) {
+        activeInstances = count;
+      } else if (row.status === ProcessInstanceStatus.COMPLETED) {
+        completedInstances = count;
+      }
+    }
+
+    return {
+      definitions,
+      deployedDefinitions,
+      totalInstances,
+      activeInstances,
+      completedInstances,
+    };
+  }
+
   // ==================== Messages ====================
 
   async sendMessage(
