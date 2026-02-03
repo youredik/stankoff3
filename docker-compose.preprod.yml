@@ -155,11 +155,22 @@ services:
         delay: 5s
 
 volumes:
+  # IMPORTANT: Use external volume to preserve data across Swarm redeployments
+  # The volume was originally created by Docker Compose with this name
   postgres-data:
+    external: true
+    name: stankoff-portal_postgres-data
   backend-logs:
   nginx-cache:
+    external: true
+    name: stankoff-portal_nginx-cache
+  # SSL certificates - use external volumes to preserve across redeployments
   certbot-conf:
+    external: true
+    name: stankoff-portal_certbot-conf
   certbot-www:
+    external: true
+    name: stankoff-portal_certbot-www
 
 networks:
   stankoff-preprod-network:
