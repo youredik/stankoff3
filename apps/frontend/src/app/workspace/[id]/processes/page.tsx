@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, AlertCircle, CheckCircle, FileCode, Play, BarChart3 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
-import { ProcessList, ProcessInstanceList } from '@/components/bpmn';
+import { ProcessList, ProcessInstanceList, TemplateSelector } from '@/components/bpmn';
 import { bpmnApi } from '@/lib/api/bpmn';
 import type { ProcessDefinition, ProcessInstance, BpmnHealthStatus } from '@/types';
 
@@ -53,6 +53,12 @@ export default function ProcessesPage() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [health, setHealth] = useState<BpmnHealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [templateData, setTemplateData] = useState<{
+    name: string;
+    description: string;
+    bpmnXml: string;
+  } | null>(null);
 
   // Load definitions and health status
   const loadData = useCallback(async () => {
@@ -170,13 +176,28 @@ export default function ProcessesPage() {
   // Close and go back to list
   const handleBack = () => {
     setSelectedDefinition(null);
+    setTemplateData(null);
     setViewMode('list');
   };
 
-  // Create new definition
+  // Create new definition - show template selector first
   const handleCreateNew = () => {
+    setShowTemplateSelector(true);
+  };
+
+  // Handle template selection
+  const handleTemplateSelect = (
+    template: { name: string; description: string; bpmnXml: string } | null,
+  ) => {
+    setShowTemplateSelector(false);
     setSelectedDefinition(null);
+    setTemplateData(template);
     setViewMode('edit');
+  };
+
+  // Handle closing template selector
+  const handleCloseTemplateSelector = () => {
+    setShowTemplateSelector(false);
   };
 
   const showList = viewMode === 'list';
@@ -266,9 +287,9 @@ export default function ProcessesPage() {
 
           {viewMode === 'edit' && (
             <ProcessEditor
-              initialName={selectedDefinition?.name}
-              initialDescription={selectedDefinition?.description}
-              initialXml={selectedDefinition?.bpmnXml}
+              initialName={selectedDefinition?.name || templateData?.name}
+              initialDescription={selectedDefinition?.description || templateData?.description}
+              initialXml={selectedDefinition?.bpmnXml || templateData?.bpmnXml}
               onSave={handleSave}
               onDeploy={health?.connected ? () => handleDeploy() : undefined}
               onClose={handleBack}
@@ -317,6 +338,14 @@ export default function ProcessesPage() {
           )}
         </div>
       </main>
+
+      {/* Template selector modal */}
+      {showTemplateSelector && (
+        <TemplateSelector
+          onSelect={handleTemplateSelect}
+          onClose={handleCloseTemplateSelector}
+        />
+      )}
     </div>
   );
 }
