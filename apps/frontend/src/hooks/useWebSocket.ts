@@ -36,13 +36,20 @@ function getStatusLabel(statusId: string): string {
   return statusId;
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
+// В браузере используем текущий origin, на сервере — fallback для SSR
+const getWsUrl = () => {
+  if (typeof window !== 'undefined') {
+    // В браузере — подключаемся к текущему хосту
+    return window.location.origin;
+  }
+  return process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
+};
 
 export function useWebSocket() {
   const accessToken = useAuthStore((state) => state.accessToken);
 
   useEffect(() => {
-    const socket = io(WS_URL, {
+    const socket = io(getWsUrl(), {
       transports: ['websocket', 'polling'],
       auth: { token: accessToken },
     });
