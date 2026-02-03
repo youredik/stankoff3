@@ -14,6 +14,7 @@ import { EmailModule } from './modules/email/email.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { HealthModule } from './modules/health/health.module';
 import { AutomationModule } from './modules/automation/automation.module';
+import { SearchModule } from './modules/search/search.module';
 import { SeedService } from './seed.service';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
@@ -43,6 +44,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     AnalyticsModule,
     HealthModule,
     AutomationModule,
+    SearchModule,
   ],
   providers: [
     SeedService,

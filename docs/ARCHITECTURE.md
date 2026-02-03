@@ -625,7 +625,9 @@ interface RuleAction {
 | GET | /api/workspaces/:id/export/csv | Экспорт entities в CSV |
 | POST | /api/workspaces/:id/import/json | Импорт entities из JSON |
 | POST | /api/workspaces/:id/import/csv | Импорт entities из CSV |
-| GET | /api/entities/search | Глобальный поиск (query: q, limit) |
+| GET | /api/search | Глобальный FTS поиск (query: q, workspaceId, types, limit) |
+| GET | /api/search/entities | FTS поиск по заявкам |
+| GET | /api/search/comments | FTS поиск по комментариям |
 | GET | /api/analytics/global | Общая аналитика по всем workspace |
 | GET | /api/analytics/workspace/:id | Аналитика по workspace |
 | POST | /api/files/upload | Загрузить файл в S3 |
@@ -798,17 +800,117 @@ UNIQUE(workspaceId, userId)
 ### Индексы
 
 ```sql
+-- ====== ENTITIES ======
 -- Глобально уникальный номер заявки
-CREATE UNIQUE INDEX idx_entities_customid ON entities(customId);
+CREATE UNIQUE INDEX idx_entities_customid ON entities("customId");
 
--- Быстрый поиск сущностей по workspace
-CREATE INDEX idx_entities_workspace ON entities(workspaceId);
+-- Канбан доска (фильтр по workspace + группировка по status)
+CREATE INDEX idx_entities_workspace_status ON entities("workspaceId", status);
 
--- Быстрый поиск по статусу
-CREATE INDEX idx_entities_status ON entities(status);
+-- Сортировка по дате внутри workspace
+CREATE INDEX idx_entities_workspace_created ON entities("workspaceId", "createdAt" DESC);
 
--- Быстрый поиск комментариев по entity
-CREATE INDEX idx_comments_entity ON comments(entityId);
+-- Аналитика по исполнителям
+CREATE INDEX idx_entities_workspace_assignee ON entities("workspaceId", "assigneeId");
+
+-- Фильтр "мои задачи" (partial index)
+CREATE INDEX idx_entities_assignee ON entities("assigneeId") WHERE "assigneeId" IS NOT NULL;
+
+-- Сортировка по последней активности
+CREATE INDEX idx_entities_last_activity ON entities("workspaceId", "lastActivityAt" DESC NULLS LAST);
+
+-- Поиск по динамическим полям (GIN для JSONB)
+CREATE INDEX idx_entities_data_gin ON entities USING GIN (data jsonb_path_ops);
+
+-- Поиск по связанным заявкам
+CREATE INDEX idx_entities_linked_gin ON entities USING GIN ("linkedEntityIds");
+
+-- Полнотекстовый поиск
+CREATE INDEX idx_entities_search ON entities USING GIN ("searchVector");
+
+-- ====== COMMENTS ======
+-- Загрузка комментариев по заявке
+CREATE INDEX idx_comments_entity_created ON comments("entityId", "createdAt");
+
+-- Фильтр по автору
+CREATE INDEX idx_comments_author ON comments("authorId");
+
+-- Поиск по упомянутым пользователям
+CREATE INDEX idx_comments_mentions_gin ON comments USING GIN ("mentionedUserIds");
+
+-- Полнотекстовый поиск
+CREATE INDEX idx_comments_search ON comments USING GIN ("searchVector");
+
+-- ====== AUDIT_LOGS ======
+-- Поиск по JSONB details
+CREATE INDEX idx_audit_details_gin ON audit_logs USING GIN (details jsonb_path_ops);
+
+-- B-tree на description внутри JSONB
+CREATE INDEX idx_audit_description ON audit_logs ((details->>'description'));
+```
+
+### Полнотекстовый поиск (FTS)
+
+PostgreSQL Full-Text Search с русским языком:
+
+**Поля tsvector:**
+- `entities.searchVector` — title (вес A), customId (A), status (B), priority (B), data (C)
+- `comments.searchVector` — content
+
+**Триггеры:**
+- `entities_search_vector_trigger` — автоматическое обновление при INSERT/UPDATE
+- `comments_search_vector_trigger` — автоматическое обновление при INSERT/UPDATE
+
+**API поиска:**
+```
+GET /api/search?q=текст&workspaceId=uuid&types=entity,comment&limit=50
+GET /api/search/entities?q=текст
+GET /api/search/comments?q=текст
+```
+
+### Кэшированные поля
+
+| Таблица | Поле | Назначение | Обновление |
+|---------|------|------------|------------|
+| entities | commentCount | Количество комментариев | Триггер на comments |
+| entities | lastActivityAt | Последняя активность | Триггер на entities/comments |
+| entities | firstResponseAt | Время первого ответа (SLA) | Триггер на comments |
+| entities | resolvedAt | Когда закрыта | Устанавливается при смене статуса |
+
+### Materialized Views
+
+Для быстрой аналитики без GROUP BY на больших таблицах:
+
+| View | Описание | Ключ |
+|------|----------|------|
+| mv_workspace_stats | Статистика по workspace и статусам | (workspaceId, status) |
+| mv_assignee_stats | Статистика по исполнителям | (workspaceId, assigneeId) |
+| mv_daily_activity | Активность по дням | (workspaceId, activity_date) |
+
+**Обновление:**
+```typescript
+// Каждые 5 минут через cron или endpoint
+await analyticsService.refreshMaterializedViews();
+```
+
+### Миграции
+
+**Файлы миграций:** `apps/backend/src/migrations/`
+
+| Timestamp | Название | Описание |
+|-----------|----------|----------|
+| 1738600000000 | InitialSchema | Baseline текущей схемы |
+| 1770126681086 | AddAnalyticsIndexes | B-tree и GIN индексы |
+| 1770126700000 | AddFullTextSearch | tsvector, триггеры, FTS индексы |
+| 1770126800000 | AddCachedFields | commentCount, lastActivityAt и т.д. |
+| 1770126900000 | AddMaterializedViews | mv_workspace_stats и др. |
+
+**Команды:**
+```bash
+npm run migration:generate -- src/migrations/Name  # Сгенерировать
+npm run migration:run                              # Применить
+npm run migration:revert                           # Откатить
+npm run migration:show                             # Статус
 ```
 
 ## Безопасность

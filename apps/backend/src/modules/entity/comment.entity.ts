@@ -6,11 +6,13 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { WorkspaceEntity } from './entity.entity';
 import { User } from '../user/user.entity';
 
 @Entity('comments')
+@Index('idx_comments_entity_created', ['entityId', 'createdAt'])
 export class Comment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -29,6 +31,7 @@ export class Comment {
   author: User;
 
   @Column()
+  @Index('idx_comments_author')
   authorId: string;
 
   @Column('text')
@@ -52,4 +55,8 @@ export class Comment {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // Full-text search vector (автоматически обновляется триггером)
+  @Column({ type: 'tsvector', select: false, nullable: true })
+  searchVector: string;
 }

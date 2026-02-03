@@ -161,13 +161,58 @@ stankoff-portal/
 - Инструкции по установке: `keycloak-theme/README.md`
 - Поддерживает русский и английский языки
 
-### TypeORM синхронизация
+### База данных и миграции
 
-- **Preprod:** `TYPEORM_SYNC=true` — автоматическое создание схемы БД
-- **Production:** `TYPEORM_SYNC=false` — только миграции
-- **Development:** `TYPEORM_SYNC=true` — для удобства разработки
+**ВАЖНО:** `synchronize: false` **везде** (dev, preprod, production). Все изменения схемы БД — только через миграции!
 
-**ВАЖНО:** Переменная должна быть в `environment` секции docker-compose, а не только в `.env` файле.
+**Команды миграций:**
+```bash
+cd apps/backend
+
+# Сгенерировать миграцию после изменения entity
+npm run migration:generate -- src/migrations/DescriptiveName
+
+# Применить все pending миграции
+npm run migration:run
+
+# Откатить последнюю миграцию
+npm run migration:revert
+
+# Показать статус миграций
+npm run migration:show
+```
+
+**Workflow разработчика:**
+1. Изменить entity файл (добавить поле, индекс и т.д.)
+2. `npm run migration:generate -- src/migrations/AddNewField`
+3. Проверить сгенерированный SQL в файле миграции
+4. `npm run migration:run` — применить локально
+5. Закоммитить entity + миграцию **вместе**
+6. При деплое миграции применятся автоматически (`migrationsRun: true`)
+
+**Правила для миграций:**
+- TypeORM генерирует B-tree индексы автоматически через `@Index()` декоратор
+- GIN индексы (для JSONB) добавляй **вручную** в SQL миграции
+- Не смешивай данные и схему — данные заполняй через seed
+- Миграция должна быть **идемпотентной** (можно запустить повторно)
+- Используй `IF EXISTS` / `IF NOT EXISTS` в SQL
+
+**Полнотекстовый поиск:**
+- Таблицы `entities` и `comments` имеют колонку `searchVector` (tsvector)
+- Триггеры автоматически обновляют поисковый вектор при INSERT/UPDATE
+- API: `GET /api/search?q=текст&workspaceId=uuid`
+
+**Кэшированные поля в entities:**
+- `commentCount` — количество комментариев (обновляется триггером)
+- `lastActivityAt` — последняя активность
+- `firstResponseAt` — время первого ответа (SLA)
+- `resolvedAt` — когда заявка закрыта
+
+**Materialized Views:**
+- `mv_workspace_stats` — статистика по workspace и статусам
+- `mv_assignee_stats` — статистика по исполнителям
+- `mv_daily_activity` — активность по дням
+- Обновлять через `AnalyticsService.refreshMaterializedViews()` (каждые 5 минут)
 
 ### CI/CD Pipeline
 
@@ -283,6 +328,11 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `GET/POST /api/comments/entity/:id` — комментарии
 - `GET/POST/PUT /api/workspaces` — рабочие места
 - `POST /api/files/upload` — загрузка файлов
+
+**Поиск:**
+- `GET /api/search?q=текст` — глобальный поиск по заявкам и комментариям
+- `GET /api/search/entities?q=текст` — поиск только по заявкам
+- `GET /api/search/comments?q=текст` — поиск только по комментариям
 
 ## WebSocket события
 

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { User } from '../user/user.entity';
@@ -54,6 +54,8 @@ export interface GlobalAnalytics {
 
 @Injectable()
 export class AnalyticsService {
+  private readonly logger = new Logger(AnalyticsService.name);
+
   constructor(
     @InjectRepository(WorkspaceEntity)
     private readonly entityRepository: Repository<WorkspaceEntity>,
@@ -61,6 +63,7 @@ export class AnalyticsService {
     private readonly workspaceRepository: Repository<Workspace>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async getGlobalAnalytics(workspaceIds: string[]): Promise<GlobalAnalytics> {
@@ -300,5 +303,82 @@ export class AnalyticsService {
       if (option) return option.label;
     }
     return statusId;
+  }
+
+  // ============================================
+  // Materialized Views
+  // ============================================
+
+  /**
+   * Обновление всех materialized views.
+   * Рекомендуется вызывать каждые 5 минут через внешний cron или endpoint.
+   * Пример: curl -X POST /api/analytics/refresh-views
+   */
+  async refreshMaterializedViews(): Promise<void> {
+    try {
+      this.logger.log('Refreshing materialized views...');
+
+      // CONCURRENTLY позволяет читать view во время обновления
+      await this.dataSource.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_workspace_stats');
+      await this.dataSource.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_assignee_stats');
+      await this.dataSource.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_daily_activity');
+
+      this.logger.log('Materialized views refreshed successfully');
+    } catch (error) {
+      // Views могут не существовать на dev окружении
+      this.logger.warn(`Failed to refresh materialized views: ${error.message}`);
+    }
+  }
+
+  /**
+   * Получить быструю статистику из materialized view
+   */
+  async getQuickWorkspaceStats(workspaceId: string): Promise<any[]> {
+    try {
+      return await this.dataSource.query(
+        'SELECT * FROM mv_workspace_stats WHERE "workspaceId" = $1',
+        [workspaceId],
+      );
+    } catch {
+      // Fallback на обычный запрос если view не существует
+      return this.entityRepository
+        .createQueryBuilder('entity')
+        .select('entity.status', 'status')
+        .addSelect('COUNT(*)', 'total_count')
+        .where('entity.workspaceId = :workspaceId', { workspaceId })
+        .groupBy('entity.status')
+        .getRawMany();
+    }
+  }
+
+  /**
+   * Получить статистику по исполнителям из materialized view
+   */
+  async getQuickAssigneeStats(workspaceId: string): Promise<any[]> {
+    try {
+      return await this.dataSource.query(
+        'SELECT * FROM mv_assignee_stats WHERE "workspaceId" = $1',
+        [workspaceId],
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Получить активность по дням из materialized view
+   */
+  async getQuickDailyActivity(workspaceId: string, days = 30): Promise<any[]> {
+    try {
+      return await this.dataSource.query(
+        `SELECT * FROM mv_daily_activity
+         WHERE "workspaceId" = $1
+         AND activity_date >= NOW() - INTERVAL '${days} days'
+         ORDER BY activity_date DESC`,
+        [workspaceId],
+      );
+    } catch {
+      return [];
+    }
   }
 }

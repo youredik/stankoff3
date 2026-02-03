@@ -14,6 +14,9 @@ import { User } from '../user/user.entity';
 import { Comment } from './comment.entity';
 
 @Entity('entities')
+@Index('idx_entities_workspace_status', ['workspaceId', 'status'])
+@Index('idx_entities_workspace_created', ['workspaceId', 'createdAt'])
+@Index('idx_entities_workspace_assignee', ['workspaceId', 'assigneeId'])
 export class WorkspaceEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -43,6 +46,7 @@ export class WorkspaceEntity {
   assignee: User;
 
   @Column({ nullable: true })
+  @Index('idx_entities_assignee')
   assigneeId: string | null;
 
   @Column('jsonb', { default: {} })
@@ -59,4 +63,28 @@ export class WorkspaceEntity {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // ============================================
+  // Кэшированные поля для аналитики
+  // ============================================
+
+  // Количество комментариев (обновляется триггером)
+  @Column({ default: 0 })
+  commentCount: number;
+
+  // Последняя активность (комментарий или изменение)
+  @Column({ type: 'timestamp', nullable: true })
+  lastActivityAt: Date;
+
+  // Время первого ответа (для SLA метрик)
+  @Column({ type: 'timestamp', nullable: true })
+  firstResponseAt: Date;
+
+  // Когда заявка была закрыта/решена
+  @Column({ type: 'timestamp', nullable: true })
+  resolvedAt: Date;
+
+  // Full-text search vector (автоматически обновляется триггером)
+  @Column({ type: 'tsvector', select: false, nullable: true })
+  searchVector: string;
 }
