@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, CheckCircle, FileCode, Play } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
-import { ProcessList } from '@/components/bpmn';
+import { ProcessList, ProcessInstanceList } from '@/components/bpmn';
 import { bpmnApi } from '@/lib/api/bpmn';
-import type { ProcessDefinition, BpmnHealthStatus } from '@/types';
+import type { ProcessDefinition, ProcessInstance, BpmnHealthStatus } from '@/types';
 
 // Dynamic import for ProcessEditor (uses bpmn-js which is browser-only)
 const ProcessEditor = dynamic(
@@ -22,15 +22,20 @@ const ProcessEditor = dynamic(
   },
 );
 
+type Tab = 'definitions' | 'instances';
+
 export default function ProcessesPage() {
   const params = useParams();
   const router = useRouter();
   const workspaceId = params.id as string;
 
+  const [activeTab, setActiveTab] = useState<Tab>('definitions');
   const [definitions, setDefinitions] = useState<ProcessDefinition[]>([]);
+  const [instances, setInstances] = useState<ProcessInstance[]>([]);
   const [selectedDefinition, setSelectedDefinition] = useState<ProcessDefinition | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingInstances, setIsLoadingInstances] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [health, setHealth] = useState<BpmnHealthStatus | null>(null);
@@ -55,9 +60,29 @@ export default function ProcessesPage() {
     }
   }, [workspaceId]);
 
+  // Load instances
+  const loadInstances = useCallback(async () => {
+    try {
+      setIsLoadingInstances(true);
+      const inst = await bpmnApi.getWorkspaceInstances(workspaceId);
+      setInstances(inst);
+    } catch (err) {
+      console.error('Failed to load instances:', err);
+    } finally {
+      setIsLoadingInstances(false);
+    }
+  }, [workspaceId]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load instances when tab changes
+  useEffect(() => {
+    if (activeTab === 'instances') {
+      loadInstances();
+    }
+  }, [activeTab, loadInstances]);
 
   // Save new or updated definition
   const handleSave = async (data: {
@@ -167,6 +192,36 @@ export default function ProcessesPage() {
           )}
         </div>
 
+        {/* Tabs (only show when not in editor) */}
+        {!showEditor && (
+          <div className="flex items-center gap-4 px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('definitions')}
+              className={`flex items-center gap-2 py-3 border-b-2 transition-colors ${
+                activeTab === 'definitions'
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <FileCode className="w-4 h-4" />
+              <span className="text-sm font-medium">Определения</span>
+              <span className="text-xs text-gray-400">({definitions.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('instances')}
+              className={`flex items-center gap-2 py-3 border-b-2 transition-colors ${
+                activeTab === 'instances'
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <Play className="w-4 h-4" />
+              <span className="text-sm font-medium">Экземпляры</span>
+              <span className="text-xs text-gray-400">({instances.length})</span>
+            </button>
+          </div>
+        )}
+
         {/* Content */}
         <div className="flex-1 overflow-hidden">
           {error && (
@@ -188,14 +243,29 @@ export default function ProcessesPage() {
               isDeploying={isDeploying}
             />
           ) : (
-            <div className="p-6 max-w-4xl mx-auto">
-              <ProcessList
-                definitions={definitions}
-                onSelect={setSelectedDefinition}
-                onCreateNew={() => setIsCreating(true)}
-                onDeploy={handleDeploy}
-                isLoading={isLoading}
-              />
+            <div className="p-6 max-w-4xl mx-auto overflow-y-auto h-full">
+              {activeTab === 'definitions' && (
+                <ProcessList
+                  definitions={definitions}
+                  onSelect={setSelectedDefinition}
+                  onCreateNew={() => setIsCreating(true)}
+                  onDeploy={handleDeploy}
+                  isLoading={isLoading}
+                />
+              )}
+
+              {activeTab === 'instances' && (
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Запущенные процессы
+                  </h2>
+                  <ProcessInstanceList
+                    instances={instances}
+                    isLoading={isLoadingInstances}
+                    emptyMessage="Нет запущенных процессов в этом workspace"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
