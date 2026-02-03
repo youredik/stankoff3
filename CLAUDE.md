@@ -216,6 +216,8 @@ deploy:
 **Известные проблемы:**
 - **IPv6/IPv4:** На сервере `localhost` резолвится в IPv6 (`::1`), но nginx слушает только IPv4. Используй `127.0.0.1` вместо `localhost` в healthcheck
 - **nginx proxy_pass с переменными:** При использовании переменной в `proxy_pass` (для динамического DNS в Swarm) nginx НЕ добавляет автоматически оставшуюся часть URI. Используй `proxy_pass http://$var;` без пути
+- **Именование томов:** Docker Swarm добавляет префикс стека к томам (`stankoff-preprod_postgres-data`). Чтобы использовать существующие тома с данными, объяви их как `external: true` с указанием оригинального имени
+- **Пароль PostgreSQL:** При инициализации БД пароль сохраняется в данных PostgreSQL. Если том уже существует, переменная `POSTGRES_PASSWORD` игнорируется. При смене пароля в `.env.preprod` нужно вручную выполнить `ALTER USER postgres WITH PASSWORD 'new_password';`
 
 **Файлы конфигурации:**
 - `docker-compose.preprod.yml` — Swarm stack для preprod

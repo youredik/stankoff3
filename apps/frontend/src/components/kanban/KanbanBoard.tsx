@@ -259,7 +259,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           {/* Overlay for light/dark mode */}
           <div className="absolute inset-0 bg-gradient-to-br from-gray-50/60 via-gray-100/50 to-gray-50/60 dark:from-gray-900/70 dark:via-gray-800/60 dark:to-gray-900/70 pointer-events-none" />
 
-          <div className="relative flex gap-4 overflow-x-auto p-4">
+          <div className="relative flex overflow-x-auto py-4">
             {columns.map((column) => (
               <KanbanColumn
                 key={column.id}
