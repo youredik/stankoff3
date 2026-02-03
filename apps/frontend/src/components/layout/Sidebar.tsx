@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut, Eye, Copy, Archive, Download, Upload, ArchiveRestore, X } from 'lucide-react';
+import { Plus, Users, MoreVertical, Pencil, Trash2, Sparkles, LogOut, Eye, Copy, Archive, Download, Upload, ArchiveRestore, X, GitBranch } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
@@ -275,6 +275,16 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                         >
                           <Pencil className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>Настроить</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMenuOpen(null);
+                            router.push(`/workspace/${workspace.id}/processes`);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                        >
+                          <GitBranch className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                          <span>Бизнес-процессы</span>
                         </button>
                         <button
                           onClick={() => handleDuplicateWorkspace(workspace)}

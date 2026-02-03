@@ -191,3 +191,71 @@ export interface AuditLog {
   details: AuditLogDetails;
   createdAt: string;
 }
+
+// BPMN Process Types
+export interface ProcessDefinition {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  processId: string;
+  bpmnXml: string;
+  version: number;
+  deployedKey?: string;
+  isActive: boolean;
+  isDefault: boolean;
+  createdBy?: User;
+  createdById?: string;
+  createdAt: string;
+  updatedAt: string;
+  deployedAt?: string;
+}
+
+export type ProcessInstanceStatus = 'active' | 'completed' | 'terminated' | 'incident';
+
+export interface ProcessInstance {
+  id: string;
+  workspaceId: string;
+  entityId?: string;
+  processDefinitionId: string;
+  processDefinitionKey: string;
+  processInstanceKey: string;
+  businessKey?: string;
+  status: ProcessInstanceStatus;
+  variables: Record<string, unknown>;
+  startedBy?: User;
+  startedById?: string;
+  startedAt: string;
+  completedAt?: string;
+  updatedAt: string;
+}
+
+export interface BpmnHealthStatus {
+  connected: boolean;
+  brokers?: number;
+}
+
+export interface ProcessDefinitionStatistics {
+  total: number;
+  active: number;
+  completed: number;
+  terminated: number;
+  incident: number;
+  avgDurationMs: number | null;
+}
+
+export interface WorkspaceProcessStatistics {
+  definitions: number;
+  deployedDefinitions: number;
+  totalInstances: number;
+  activeInstances: number;
+  completedInstances: number;
+}
+
+export interface BpmnTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  bpmnXml: string;
+}

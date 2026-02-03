@@ -6,8 +6,9 @@
 
 ## Стек технологий
 
-- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand, @dnd-kit, Tiptap, Socket.IO Client
-- **Backend:** NestJS 11, TypeORM, PostgreSQL, Socket.IO, AWS SDK v3 (S3)
+- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand, @dnd-kit, Tiptap, Socket.IO Client, bpmn-js
+- **Backend:** NestJS 11, TypeORM, PostgreSQL, Socket.IO, AWS SDK v3 (S3), @camunda8/sdk
+- **BPMN:** Camunda 8 Platform, Zeebe workflow engine, BPMN 2.0
 - **Инфраструктура:** Docker Swarm (preprod), Docker Compose (dev), Yandex Object Storage, GitHub Actions CI/CD, Nginx, Let's Encrypt SSL
 - **Деплой:** GitHub Container Registry (GHCR), Docker multi-platform builds (AMD64), Zero-downtime deployment (Swarm start-first)
 
@@ -99,7 +100,8 @@ stankoff-portal/
 - Используй `'use client'` только когда нужны хуки или браузерные API
 - Состояние храни в Zustand stores
 - Стили — Tailwind CSS классы, без отдельных CSS файлов
-- Компоненты размещай по функциональности: `kanban/`, `entity/`, `workspace/`, `layout/`, `ui/`
+- Компоненты размещай по функциональности: `kanban/`, `entity/`, `workspace/`, `layout/`, `ui/`, `bpmn/`
+- Компоненты с bpmn-js используй только с `dynamic(() => import(...), { ssr: false })` — библиотека требует браузерных API
 
 **API запросы:**
 - **ВАЖНО:** Всегда используй относительные пути для API запросов (начинающиеся с `/api/`)
@@ -288,6 +290,11 @@ npm run dev:backend      # Только backend (порт 3001)
 # База данных
 npm run db:seed          # Заполнить тестовыми данными
 
+# Camunda / Zeebe (BPMN)
+docker compose -f docker-compose.camunda.yml up -d  # Запустить Camunda (Zeebe + Operate + Tasklist)
+# UI: http://localhost:8088 (demo/demo)
+# gRPC: localhost:26500
+
 # E2E тесты (Playwright)
 cd apps/frontend
 npm run test:e2e         # Запуск всех тестов (с автоочисткой)
@@ -333,6 +340,16 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `GET /api/search?q=текст` — глобальный поиск по заявкам и комментариям
 - `GET /api/search/entities?q=текст` — поиск только по заявкам
 - `GET /api/search/comments?q=текст` — поиск только по комментариям
+
+**BPMN (бизнес-процессы):**
+- `GET /api/bpmn/health` — статус подключения к Camunda/Zeebe
+- `GET /api/bpmn/definitions?workspaceId=...` — список определений процессов
+- `POST /api/bpmn/definitions` — создать/обновить определение
+- `POST /api/bpmn/definitions/:id/deploy` — развернуть процесс в Zeebe
+- `GET /api/bpmn/instances/workspace/:id` — экземпляры процессов workspace
+- `GET /api/bpmn/instances/entity/:id` — процессы для сущности (заявки)
+- `POST /api/bpmn/instances` — запустить процесс
+- `GET /api/bpmn/statistics/definition/:id` — статистика по процессу
 
 ## WebSocket события
 

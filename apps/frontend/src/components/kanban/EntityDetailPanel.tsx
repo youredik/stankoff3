@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
-import { X, MessageSquare, Clock, Paperclip, History, ChevronDown, ChevronRight, Upload, Link2, ExternalLink } from 'lucide-react';
+import { X, MessageSquare, Clock, Paperclip, History, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -14,6 +14,9 @@ import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment, Field, Section, Attachment } from '@/types';
 import { filesApi } from '@/lib/api/files';
+import { bpmnApi } from '@/lib/api/bpmn';
+import { StartProcessModal, ProcessInstanceList } from '@/components/bpmn';
+import type { ProcessInstance } from '@/types';
 
 // Default statuses for backwards compatibility
 const DEFAULT_STATUSES: FieldOption[] = [
@@ -451,6 +454,9 @@ export function EntityDetailPanel() {
 
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'comments' | 'history'>('comments');
+  const [showStartProcess, setShowStartProcess] = useState(false);
+  const [processInstances, setProcessInstances] = useState<ProcessInstance[]>([]);
+  const [loadingProcesses, setLoadingProcesses] = useState(false);
 
   // Get status options from workspace
   const statuses = useMemo(() => {
@@ -501,6 +507,37 @@ export function EntityDetailPanel() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedEntity, deselectEntity]);
+
+  // Load process instances for this entity
+  useEffect(() => {
+    if (!selectedEntity?.id) {
+      setProcessInstances([]);
+      return;
+    }
+
+    const loadProcesses = async () => {
+      setLoadingProcesses(true);
+      try {
+        const instances = await bpmnApi.getEntityInstances(selectedEntity.id);
+        setProcessInstances(instances);
+      } catch (err) {
+        // Silently fail - BPMN might not be available
+        console.debug('BPMN not available:', err);
+        setProcessInstances([]);
+      } finally {
+        setLoadingProcesses(false);
+      }
+    };
+
+    loadProcesses();
+  }, [selectedEntity?.id]);
+
+  const handleProcessStarted = async () => {
+    if (!selectedEntity?.id) return;
+    // Reload process instances after starting a new one
+    const instances = await bpmnApi.getEntityInstances(selectedEntity.id);
+    setProcessInstances(instances);
+  };
 
   if (!selectedEntity) return null;
 
@@ -880,11 +917,58 @@ export function EntityDetailPanel() {
                     </span>
                   </div>
                 </div>
+
+                {/* Processes */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <GitBranch className="w-3.5 h-3.5 text-gray-500" />
+                      <p className="text-xs font-medium text-gray-500 uppercase">
+                        Процессы
+                      </p>
+                    </div>
+                    {canEditEntity && (
+                      <button
+                        onClick={() => setShowStartProcess(true)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded transition-colors"
+                      >
+                        <Play className="w-3 h-3" />
+                        Запустить
+                      </button>
+                    )}
+                  </div>
+                  {loadingProcesses ? (
+                    <div className="flex justify-center py-2">
+                      <div className="animate-spin w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full" />
+                    </div>
+                  ) : processInstances.length > 0 ? (
+                    <ProcessInstanceList
+                      instances={processInstances}
+                      showEntityLink={false}
+                      emptyMessage="Нет процессов"
+                    />
+                  ) : (
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Нет запущенных процессов
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Start Process Modal */}
+      {showStartProcess && currentWorkspace && (
+        <StartProcessModal
+          workspaceId={currentWorkspace.id}
+          entityId={selectedEntity.id}
+          entityTitle={selectedEntity.title}
+          onClose={() => setShowStartProcess(false)}
+          onStarted={handleProcessStarted}
+        />
+      )}
 
       {/* Галерея для просмотра медиа из сайдбара */}
       {galleryIndex !== null && mediaAttachments.length > 0 && (

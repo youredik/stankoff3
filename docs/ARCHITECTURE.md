@@ -50,6 +50,7 @@ Stankoff Portal - это корпоративная система управл�
 - `/login` - Страница входа
 - `/dashboard` - Канбан-доска и аналитика (защищённая, переключение через Header)
 - `/workspace/[id]/settings` - Настройки рабочего места (Workspace Builder)
+- `/workspace/[id]/processes` - Управление бизнес-процессами (определения, экземпляры, редактор BPMN)
 - `/admin/users` - Управление пользователями (только admin)
 
 #### Компоненты
@@ -102,6 +103,20 @@ Stankoff Portal - это корпоративная система управл�
 - `Skeleton.tsx` - Skeleton loaders для loading states (SkeletonCard, SkeletonColumn, SkeletonSearchResult)
 - `ThemeToggle.tsx` - Переключатель темы (светлая/тёмная/системная)
 - `Breadcrumbs.tsx` - Навигационные хлебные крошки
+
+**BPMN (Бизнес-процессы)**
+- `BpmnModeler.tsx` - Визуальный редактор BPMN диаграмм (bpmn-js Modeler, dynamic import SSR=false)
+- `BpmnViewer.tsx` - Просмотр BPMN диаграмм без редактирования (bpmn-js NavigatedViewer)
+- `BpmnHeatMap.tsx` - Визуализация статистики на диаграмме (цветовые маркеры активных/завершённых/ошибочных элементов)
+- `ProcessEditor.tsx` - Полный редактор процесса (BpmnModeler + форма названия/описания + действия сохранения/деплоя)
+- `ProcessList.tsx` - Список определений процессов workspace с возможностью создания и деплоя
+- `ProcessInstanceList.tsx` - Список экземпляров процессов (запущенных/завершённых) с раскрываемыми деталями
+- `ProcessStatisticsCard.tsx` - Карточка аналитики процесса (активные/завершённые/ошибки/среднее время)
+- `ProcessDetailView.tsx` - Детальный просмотр развёрнутого процесса (BpmnHeatMap + статистика)
+- `StartProcessModal.tsx` - Модальное окно запуска процесса на сущности
+- `TemplateSelector.tsx` - Модальное окно выбора шаблона при создании нового процесса (пустой или из предзаготовленных шаблонов)
+
+> **Dynamic Imports:** Все компоненты с bpmn-js используют `dynamic(() => import(...), { ssr: false })`, так как библиотека требует браузерных API (DOM, Canvas).
 
 #### Stores (Zustand)
 
@@ -566,6 +581,62 @@ interface RuleAction {
 
 > **Выполнение правил:** При срабатывании триггера (создание, изменение статуса и т.д.) AutomationService находит все включённые правила для workspace, проверяет условия и выполняет действия. Правила выполняются в порядке приоритета.
 
+**BpmnModule**
+Интеграция с Camunda 8 Platform для управления бизнес-процессами (BPMN 2.0).
+
+```
+bpmn/
+├── bpmn.module.ts
+├── bpmn.controller.ts       # API для определений и экземпляров
+├── bpmn.service.ts          # Логика работы с процессами
+├── camunda/
+│   └── camunda.service.ts   # Интеграция с Zeebe через @camunda8/sdk
+├── dto/
+│   ├── create-process-definition.dto.ts
+│   ├── start-process.dto.ts
+│   └── send-message.dto.ts
+└── entities/
+    ├── process-definition.entity.ts
+    └── process-instance.entity.ts
+```
+
+```typescript
+interface ProcessDefinition {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  processId: string;        // BPMN Process ID (из XML)
+  bpmnXml: string;          // Исходный BPMN XML
+  version: number;
+  deployedKey?: string;     // Zeebe deployment key
+  deployedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ProcessInstance {
+  id: string;
+  definitionId: string;
+  entityId?: string;        // Связанная сущность (заявка)
+  workspaceId: string;
+  zeebeKey: string;         // Zeebe process instance key
+  status: 'active' | 'completed' | 'terminated' | 'incident';
+  variables: Record<string, any>;
+  startedAt: Date;
+  endedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Camunda Integration:**
+- Zeebe gRPC API через `@camunda8/sdk`
+- Конфигурация: `ZEEBE_ADDRESS`, `ZEEBE_CLIENT_ID`, `ZEEBE_CLIENT_SECRET`
+- Deployment: деплой BPMN XML в Zeebe кластер
+- Process Instance: создание и отслеживание экземпляров
+- Message Correlation: отправка сообщений в процессы
+
 **Функции Workspace**
 
 Дополнительные операции с рабочими местами:
@@ -641,6 +712,17 @@ interface RuleAction {
 | PUT | /api/automation/:id | Обновить правило (workspace admin) |
 | PATCH | /api/automation/:id/toggle | Включить/выключить правило |
 | DELETE | /api/automation/:id | Удалить правило (workspace admin) |
+| GET | /api/bpmn/health | Статус подключения к Camunda/Zeebe |
+| GET | /api/bpmn/definitions?workspaceId=:id | Список определений процессов |
+| GET | /api/bpmn/definitions/:id | Детали определения процесса |
+| POST | /api/bpmn/definitions | Создать/обновить определение процесса |
+| POST | /api/bpmn/definitions/:id/deploy | Развернуть процесс в Zeebe |
+| GET | /api/bpmn/instances/workspace/:workspaceId | Экземпляры процессов workspace |
+| GET | /api/bpmn/instances/entity/:entityId | Экземпляры процессов для сущности |
+| POST | /api/bpmn/instances | Запустить экземпляр процесса |
+| POST | /api/bpmn/instances/:id/message | Отправить сообщение в процесс |
+| GET | /api/bpmn/statistics/definition/:id | Статистика по определению процесса |
+| GET | /api/bpmn/statistics/workspace/:workspaceId | Общая статистика процессов workspace |
 
 ## Потоки данных
 
