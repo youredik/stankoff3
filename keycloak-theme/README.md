@@ -153,15 +153,70 @@ loginTitle=Ваш кастомный заголовок
 3. В realm settings установить **Internationalization** → **Enabled**
 4. Добавить `ru` в **Supported Locales**
 
-## Обновление темы
+## Автоматический деплой темы (рекомендуется)
+
+### Вариант 1: SSH деплой скрипт
+
+**Самый удобный способ** - автоматический деплой через SSH:
+
+1. Отредактируйте `deploy.sh`:
+   ```bash
+   KEYCLOAK_HOST="new.stankoff.ru"           # Адрес Keycloak сервера
+   KEYCLOAK_USER="youredik"                  # SSH пользователь
+   KEYCLOAK_THEMES_DIR="/opt/keycloak/themes" # Путь к themes директории
+   ```
+
+2. Запустите скрипт:
+   ```bash
+   cd keycloak-theme
+   ./deploy.sh
+   ```
+
+3. Скрипт автоматически:
+   - Создаст JAR архив
+   - Скопирует тему на Keycloak сервер через rsync
+   - Предложит перезапустить Keycloak
+
+**Теперь при любых изменениях** просто запускайте `./deploy.sh` - тема обновится автоматически!
+
+### Вариант 2: Docker volume (если Keycloak в Docker)
+
+Если Keycloak запущен в Docker контейнере, можно примонтировать директорию с темой:
+
+```yaml
+# docker-compose.yml или docker run
+services:
+  keycloak:
+    volumes:
+      - ./keycloak-theme/stankoff-portal:/opt/keycloak/themes/stankoff-portal:ro
+```
+
+При этом изменения в теме будут применяться автоматически (может потребоваться перезапуск).
+
+### Вариант 3: Hot reload (development)
+
+Для разработки можно включить hot reload в Keycloak:
+
+```bash
+# Запустить Keycloak в development режиме
+kc.sh start-dev --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false
+```
+
+При изменении CSS/HTML изменения применятся после обновления страницы (F5).
+
+## Обновление темы (ручной способ)
+
+Если не используете автоматический деплой:
 
 1. Внести изменения в файлы темы
-2. Если используется JAR файл - пересобрать:
+2. Пересобрать JAR файл:
    ```bash
+   cd keycloak-theme
    jar -cvf stankoff-portal-theme.jar -C stankoff-portal .
    ```
-3. Перезагрузить тему в Admin Console или перезапустить Keycloak
-4. Очистить кэш браузера
+3. Загрузить в Keycloak Admin Console (Realm Settings → Themes → Import)
+4. Или скопировать на сервер вручную через scp
+5. Очистить кэш браузера (Ctrl+Shift+R)
 
 ## Дополнительная информация
 
