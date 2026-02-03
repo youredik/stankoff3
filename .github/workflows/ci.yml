@@ -277,11 +277,21 @@ jobs:
             # Cleanup old images
             docker image prune -f
 
-            # Wait for services to start
-            sleep 15
-
-            # Health check
-            curl -f http://localhost:3001/api/health || exit 1
+            # Health check с retry (до 60 секунд)
+            echo "Waiting for backend to start..."
+            for i in {1..12}; do
+              if curl -sf http://localhost:3001/api/health; then
+                echo "Backend is healthy!"
+                break
+              fi
+              if [ $i -eq 12 ]; then
+                echo "Backend failed to start within 60 seconds"
+                docker compose -f docker-compose.preprod.yml logs --tail=50 backend
+                exit 1
+              fi
+              echo "Attempt $i/12 - waiting 5s..."
+              sleep 5
+            done
 
             echo "Preprod deployment complete!"
 
@@ -325,11 +335,21 @@ jobs:
             # Cleanup old images
             docker image prune -f
 
-            # Wait for services to start
-            sleep 15
-
-            # Health check
-            curl -f http://localhost:3001/api/health || exit 1
+            # Health check с retry (до 60 секунд)
+            echo "Waiting for backend to start..."
+            for i in {1..12}; do
+              if curl -sf http://localhost:3001/api/health; then
+                echo "Backend is healthy!"
+                break
+              fi
+              if [ $i -eq 12 ]; then
+                echo "Backend failed to start within 60 seconds"
+                docker compose -f docker-compose.prod.yml logs --tail=50 backend
+                exit 1
+              fi
+              echo "Attempt $i/12 - waiting 5s..."
+              sleep 5
+            done
 
             echo "Production deployment complete!"
 
