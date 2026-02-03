@@ -180,5 +180,4 @@ volumes:
 
 networks:
   stankoff-preprod-network:
-    driver: overlay
-    attachable: true
+    driver: bridge
