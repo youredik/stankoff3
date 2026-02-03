@@ -267,6 +267,7 @@ jobs:
           host: ${{ secrets.PREPROD_HOST }}
           username: ${{ secrets.PREPROD_USER }}
           key: ${{ secrets.PREPROD_SSH_KEY }}
+          command_timeout: 15m
           script: |
             cd /opt/stankoff-portal
 
@@ -289,9 +290,10 @@ jobs:
             docker image prune -f
 
             # Health check с retry (до 90 секунд для rolling update)
+            # IMPORTANT: Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
             echo "Waiting for services to be healthy..."
             for i in {1..18}; do
-              if curl -sf http://localhost/api/health; then
+              if curl -sf http://127.0.0.1/api/health; then
                 echo "Services are healthy!"
                 break
               fi
