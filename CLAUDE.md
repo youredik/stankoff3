@@ -290,6 +290,11 @@ npm run dev:backend      # Только backend (порт 3001)
 # База данных
 npm run db:seed          # Заполнить тестовыми данными
 
+# Camunda / Zeebe (BPMN)
+docker compose -f docker-compose.camunda.yml up -d  # Запустить Camunda (Zeebe + Operate + Tasklist)
+# UI: http://localhost:8088 (demo/demo)
+# gRPC: localhost:26500
+
 # E2E тесты (Playwright)
 cd apps/frontend
 npm run test:e2e         # Запуск всех тестов (с автоочисткой)

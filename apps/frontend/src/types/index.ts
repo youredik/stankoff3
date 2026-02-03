@@ -251,3 +251,11 @@ export interface WorkspaceProcessStatistics {
   activeInstances: number;
   completedInstances: number;
 }
+
+export interface BpmnTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  bpmnXml: string;
+}

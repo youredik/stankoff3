@@ -2,21 +2,28 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { BpmnService } from './bpmn.service';
+import { BpmnTemplatesService } from './bpmn-templates.service';
 import { ProcessDefinition } from './entities/process-definition.entity';
 import { ProcessInstance } from './entities/process-instance.entity';
 
 @Controller('bpmn')
 @UseGuards(JwtAuthGuard)
 export class BpmnController {
-  constructor(private readonly bpmnService: BpmnService) {}
+  constructor(
+    private readonly bpmnService: BpmnService,
+    private readonly templatesService: BpmnTemplatesService,
+  ) {}
 
   // ==================== Health ====================
 
@@ -130,5 +137,47 @@ export class BpmnController {
       body.variables,
     );
     return { success: true };
+  }
+
+  // ==================== Instance Management ====================
+
+  @Post('instances/:processInstanceKey/cancel')
+  async cancelInstance(
+    @Param('processInstanceKey') processInstanceKey: string,
+  ): Promise<{ success: boolean }> {
+    await this.bpmnService.cancelInstance(processInstanceKey);
+    return { success: true };
+  }
+
+  // ==================== Definitions Management ====================
+
+  @Delete('definition/:id')
+  async deleteDefinition(@Param('id') id: string): Promise<{ success: boolean }> {
+    await this.bpmnService.deleteDefinition(id);
+    return { success: true };
+  }
+
+  // ==================== Templates ====================
+
+  @Get('templates')
+  async getTemplates(@Query('category') category?: string) {
+    if (category) {
+      return this.templatesService.getTemplatesByCategory(category);
+    }
+    return this.templatesService.getTemplatesList();
+  }
+
+  @Get('templates/categories')
+  async getTemplateCategories() {
+    return this.templatesService.getCategories();
+  }
+
+  @Get('templates/:id')
+  async getTemplate(@Param('id') id: string) {
+    const template = this.templatesService.getTemplate(id);
+    if (!template) {
+      throw new NotFoundException(`Template ${id} not found`);
+    }
+    return template;
   }
 }

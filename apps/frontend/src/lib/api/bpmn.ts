@@ -5,6 +5,7 @@ import type {
   BpmnHealthStatus,
   ProcessDefinitionStatistics,
   WorkspaceProcessStatistics,
+  BpmnTemplate,
 } from '@/types';
 
 export const bpmnApi = {
@@ -84,4 +85,30 @@ export const bpmnApi = {
     apiClient
       .get<WorkspaceProcessStatistics>(`/bpmn/statistics/workspace/${workspaceId}`)
       .then((r) => r.data),
+
+  // Instance Management
+  cancelInstance: (processInstanceKey: string) =>
+    apiClient
+      .post<{ success: boolean }>(`/bpmn/instances/${processInstanceKey}/cancel`)
+      .then((r) => r.data),
+
+  // Definition Management
+  deleteDefinition: (id: string) =>
+    apiClient
+      .delete<{ success: boolean }>(`/bpmn/definition/${id}`)
+      .then((r) => r.data),
+
+  // Templates
+  getTemplates: (category?: string) =>
+    apiClient
+      .get<Omit<BpmnTemplate, 'bpmnXml'>[]>('/bpmn/templates', {
+        params: category ? { category } : undefined,
+      })
+      .then((r) => r.data),
+
+  getTemplateCategories: () =>
+    apiClient.get<string[]>('/bpmn/templates/categories').then((r) => r.data),
+
+  getTemplate: (id: string) =>
+    apiClient.get<BpmnTemplate>(`/bpmn/templates/${id}`).then((r) => r.data),
 };

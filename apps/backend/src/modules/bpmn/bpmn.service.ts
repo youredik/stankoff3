@@ -4,6 +4,8 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,57 +15,118 @@ import {
   ProcessInstance,
   ProcessInstanceStatus,
 } from './entities/process-instance.entity';
+import { BpmnWorkersService } from './bpmn-workers.service';
 
 @Injectable()
 export class BpmnService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BpmnService.name);
-  private camunda: Camunda8;
-  private zeebeClient: ReturnType<Camunda8['getZeebeGrpcApiClient']>;
+  private camunda: Camunda8 | null = null;
+  private zeebeClient: ReturnType<Camunda8['getZeebeGrpcApiClient']> | null = null;
   private isConnected = false;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 5;
+  private readonly reconnectDelay = 5000; // 5 seconds
+  private reconnectTimeout: NodeJS.Timeout | null = null;
 
   constructor(
     @InjectRepository(ProcessDefinition)
     private processDefinitionRepository: Repository<ProcessDefinition>,
     @InjectRepository(ProcessInstance)
     private processInstanceRepository: Repository<ProcessInstance>,
+    @Inject(forwardRef(() => BpmnWorkersService))
+    private workersService: BpmnWorkersService,
   ) {}
 
   async onModuleInit() {
-    const zeebeAddress = process.env.ZEEBE_ADDRESS || 'localhost:26500';
+    await this.connect();
+  }
 
-    this.logger.log(`Initializing Camunda SDK, Zeebe address: ${zeebeAddress}`);
+  async onModuleDestroy() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+    if (this.zeebeClient) {
+      try {
+        await this.zeebeClient.close();
+        this.logger.log('Zeebe client closed');
+      } catch (error) {
+        this.logger.warn(`Error closing Zeebe client: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Connect to Zeebe with auto-reconnect support
+   */
+  private async connect(): Promise<void> {
+    const zeebeAddress = process.env.ZEEBE_ADDRESS || 'localhost:26500';
+    const zeebeRestAddress = process.env.ZEEBE_REST_ADDRESS || 'http://localhost:8088';
+
+    this.logger.log(`Connecting to Zeebe at ${zeebeAddress}...`);
 
     try {
+      // Determine auth strategy based on environment variables
+      const clientId = process.env.ZEEBE_CLIENT_ID;
+      const clientSecret = process.env.ZEEBE_CLIENT_SECRET;
+      const authStrategy = clientId && clientSecret ? 'OAUTH' : 'NONE';
+
       this.camunda = new Camunda8({
         ZEEBE_GRPC_ADDRESS: zeebeAddress,
-        ZEEBE_REST_ADDRESS:
-          process.env.ZEEBE_REST_ADDRESS || 'http://localhost:8088',
-        CAMUNDA_AUTH_STRATEGY: 'NONE',
+        ZEEBE_REST_ADDRESS: zeebeRestAddress,
+        CAMUNDA_AUTH_STRATEGY: authStrategy,
         CAMUNDA_SECURE_CONNECTION: process.env.CAMUNDA_SECURE_CONNECTION === 'true',
+        ...(authStrategy === 'OAUTH' && {
+          ZEEBE_CLIENT_ID: clientId,
+          ZEEBE_CLIENT_SECRET: clientSecret,
+          CAMUNDA_OAUTH_URL: process.env.CAMUNDA_OAUTH_URL,
+        }),
       });
 
       this.zeebeClient = this.camunda.getZeebeGrpcApiClient();
 
       const topology = await this.zeebeClient.topology();
       this.isConnected = true;
+      this.reconnectAttempts = 0;
+
       this.logger.log(
-        `Connected to Zeebe cluster: ${topology.brokers.length} broker(s)`,
+        `Connected to Zeebe cluster: ${topology.brokers.length} broker(s), partitions: ${topology.partitionsCount}`,
       );
 
-      await this.registerWorkers();
+      // Pass the client to workers service
+      this.workersService.setZeebeClient(this.zeebeClient);
     } catch (error) {
-      this.logger.warn(
-        `Failed to connect to Zeebe: ${error.message}. BPMN features will be unavailable.`,
-      );
       this.isConnected = false;
+      this.reconnectAttempts++;
+
+      if (this.reconnectAttempts <= this.maxReconnectAttempts) {
+        this.logger.warn(
+          `Failed to connect to Zeebe (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}): ${error.message}. Retrying in ${this.reconnectDelay / 1000}s...`,
+        );
+        this.scheduleReconnect();
+      } else {
+        this.logger.warn(
+          `Failed to connect to Zeebe after ${this.maxReconnectAttempts} attempts. BPMN features will be unavailable. Error: ${error.message}`,
+        );
+      }
     }
   }
 
-  async onModuleDestroy() {
-    if (this.zeebeClient) {
-      await this.zeebeClient.close();
-      this.logger.log('Zeebe client closed');
+  private scheduleReconnect(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
     }
+    this.reconnectTimeout = setTimeout(() => {
+      this.connect();
+    }, this.reconnectDelay);
+  }
+
+  /**
+   * Manually trigger reconnection
+   */
+  async reconnect(): Promise<boolean> {
+    this.reconnectAttempts = 0;
+    await this.connect();
+    return this.isConnected;
   }
 
   // ==================== Health Check ====================
@@ -75,6 +138,8 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
   async getHealth(): Promise<{
     connected: boolean;
     brokers?: number;
+    partitions?: number;
+    clusterSize?: number;
   }> {
     if (!this.isConnected || !this.zeebeClient) {
       return { connected: false };
@@ -85,8 +150,12 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
       return {
         connected: true,
         brokers: topology.brokers.length,
+        partitions: topology.partitionsCount,
+        clusterSize: topology.clusterSize,
       };
     } catch {
+      this.isConnected = false;
+      this.scheduleReconnect();
       return { connected: false };
     }
   }
@@ -123,6 +192,21 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     },
     createdById?: string,
   ): Promise<ProcessDefinition> {
+    // Check if definition with same processId exists in workspace
+    const existing = await this.processDefinitionRepository.findOne({
+      where: { workspaceId, processId: data.processId },
+    });
+
+    if (existing) {
+      // Update existing definition
+      existing.name = data.name;
+      existing.description = data.description ?? existing.description;
+      existing.bpmnXml = data.bpmnXml;
+      existing.isDefault = data.isDefault ?? existing.isDefault;
+      return this.processDefinitionRepository.save(existing);
+    }
+
+    // Create new definition
     const definition = this.processDefinitionRepository.create({
       workspaceId,
       ...data,
@@ -134,7 +218,7 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
   async deployDefinition(id: string): Promise<ProcessDefinition> {
     const definition = await this.findDefinition(id);
 
-    if (!this.isConnected) {
+    if (!this.isConnected || !this.zeebeClient) {
       throw new Error('Zeebe is not connected. Cannot deploy process.');
     }
 
@@ -152,10 +236,28 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log(
-      `Deployed process ${definition.processId}, key: ${definition.deployedKey}`,
+      `Deployed process ${definition.processId}, key: ${definition.deployedKey}, version: ${definition.version}`,
     );
 
     return definition;
+  }
+
+  async deleteDefinition(id: string): Promise<void> {
+    const definition = await this.findDefinition(id);
+
+    // Check if there are active instances
+    const activeInstances = await this.processInstanceRepository.count({
+      where: { processDefinitionId: id, status: ProcessInstanceStatus.ACTIVE },
+    });
+
+    if (activeInstances > 0) {
+      throw new Error(
+        `Cannot delete process definition with ${activeInstances} active instance(s)`,
+      );
+    }
+
+    await this.processDefinitionRepository.remove(definition);
+    this.logger.log(`Deleted process definition ${id}`);
   }
 
   // ==================== Process Instances ====================
@@ -177,7 +279,7 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    if (!this.isConnected) {
+    if (!this.isConnected || !this.zeebeClient) {
       throw new Error('Zeebe is not connected. Cannot start process.');
     }
 
@@ -215,6 +317,7 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     return this.processInstanceRepository.find({
       where: { entityId },
       order: { startedAt: 'DESC' },
+      relations: ['processDefinition'],
     });
   }
 
@@ -224,6 +327,7 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     return this.processInstanceRepository.find({
       where: { workspaceId },
       order: { startedAt: 'DESC' },
+      relations: ['processDefinition'],
       take: 100,
     });
   }
@@ -237,9 +341,26 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
       {
         status,
         completedAt:
-          status === ProcessInstanceStatus.COMPLETED ? new Date() : undefined,
+          status === ProcessInstanceStatus.COMPLETED ||
+          status === ProcessInstanceStatus.TERMINATED
+            ? new Date()
+            : undefined,
       },
     );
+  }
+
+  async cancelInstance(processInstanceKey: string): Promise<void> {
+    if (!this.isConnected || !this.zeebeClient) {
+      throw new Error('Zeebe is not connected. Cannot cancel instance.');
+    }
+
+    await this.zeebeClient.cancelProcessInstance(processInstanceKey as unknown as string);
+    await this.updateInstanceStatus(
+      processInstanceKey,
+      ProcessInstanceStatus.TERMINATED,
+    );
+
+    this.logger.log(`Cancelled process instance ${processInstanceKey}`);
   }
 
   // ==================== Statistics ====================
@@ -252,7 +373,8 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     incident: number;
     avgDurationMs: number | null;
   }> {
-    const definition = await this.findDefinition(definitionId);
+    // Validate definition exists
+    await this.findDefinition(definitionId);
 
     const stats = await this.processInstanceRepository
       .createQueryBuilder('instance')
@@ -318,13 +440,11 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
   }> {
     const [definitions, deployedDefinitions] = await Promise.all([
       this.processDefinitionRepository.count({ where: { workspaceId } }),
-      this.processDefinitionRepository.count({
-        where: { workspaceId, deployedKey: undefined },
-      }).then((notDeployed) =>
-        this.processDefinitionRepository
-          .count({ where: { workspaceId } })
-          .then((total) => total - notDeployed),
-      ),
+      this.processDefinitionRepository
+        .createQueryBuilder('def')
+        .where('def.workspaceId = :workspaceId', { workspaceId })
+        .andWhere('def.deployedKey IS NOT NULL')
+        .getCount(),
     ]);
 
     const instanceStats = await this.processInstanceRepository
@@ -365,7 +485,7 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     correlationKey: string,
     variables?: Record<string, any>,
   ): Promise<void> {
-    if (!this.isConnected) {
+    if (!this.isConnected || !this.zeebeClient) {
       throw new Error('Zeebe is not connected. Cannot send message.');
     }
 
@@ -379,87 +499,5 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(
       `Published message ${messageName} with correlation key ${correlationKey}`,
     );
-  }
-
-  // ==================== Workers ====================
-
-  private async registerWorkers() {
-    if (!this.zeebeClient) return;
-
-    // Worker: Update entity status
-    this.zeebeClient.createWorker({
-      taskType: 'update-entity-status',
-      taskHandler: async (job) => {
-        const { entityId, newStatus } = job.variables as {
-          entityId: string;
-          newStatus: string;
-        };
-
-        this.logger.log(
-          `[Worker] update-entity-status: entity=${entityId}, status=${newStatus}`,
-        );
-
-        // TODO: Inject EntityService and call updateStatus
-        // For now, just complete the job
-        return job.complete({ statusUpdated: true, updatedAt: new Date().toISOString() });
-      },
-    });
-
-    // Worker: Send notification
-    this.zeebeClient.createWorker({
-      taskType: 'send-notification',
-      taskHandler: async (job) => {
-        const { userId, message, entityId } = job.variables as {
-          userId: string;
-          message: string;
-          entityId: string;
-        };
-
-        this.logger.log(
-          `[Worker] send-notification: user=${userId}, entity=${entityId}`,
-        );
-
-        // TODO: Inject NotificationService
-        return job.complete({ notificationSent: true });
-      },
-    });
-
-    // Worker: Send email
-    this.zeebeClient.createWorker({
-      taskType: 'send-email',
-      taskHandler: async (job) => {
-        const { to, subject } = job.variables as {
-          to: string;
-          subject: string;
-          body: string;
-        };
-
-        this.logger.log(`[Worker] send-email: to=${to}, subject=${subject}`);
-
-        // TODO: Inject EmailService
-        return job.complete({ emailSent: true });
-      },
-    });
-
-    // Worker: Log activity
-    this.zeebeClient.createWorker({
-      taskType: 'log-activity',
-      taskHandler: async (job) => {
-        const { entityId, action, details } = job.variables as {
-          entityId: string;
-          action: string;
-          details: Record<string, any>;
-        };
-
-        this.logger.log(
-          `[Worker] log-activity: entity=${entityId}, action=${action}`,
-        );
-
-        // TODO: Inject AuditLogService
-        return job.complete({ logged: true });
-      },
-    });
-
-    this.logger.log('BPMN workers registered: update-entity-status, send-notification, send-email, log-activity');
   }
 }
