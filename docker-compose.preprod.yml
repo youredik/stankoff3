@@ -156,15 +156,15 @@ services:
         condition: any
         delay: 5s
 
-  # Camunda 8 Platform (Zeebe + Operate + Tasklist)
+  # Camunda 8 Platform (Zeebe + Operate + Tasklist + embedded Elasticsearch)
   camunda:
     image: camunda/camunda:8.8.9
     environment:
       - CAMUNDA_OPERATE_CSRFPREVENTIONENABLED=false
       - CAMUNDA_TASKLIST_CSRFPREVENTIONENABLED=false
-      - CAMUNDA_DATABASE_URL=jdbc:postgresql://postgres:5432/${DATABASE_NAME:-stankoff_preprod}
-      - CAMUNDA_DATABASE_USERNAME=${DATABASE_USER:-postgres}
-      - CAMUNDA_DATABASE_PASSWORD=${DATABASE_PASSWORD:-postgres}
+      # Use embedded storage (RocksDB + Elasticsearch)
+      - ZEEBE_BROKER_CLUSTER_PARTITIONSCOUNT=1
+      - ZEEBE_BROKER_CLUSTER_REPLICATIONFACTOR=1
     volumes:
       - camunda-data:/usr/local/camunda/data
     networks:
@@ -173,18 +173,18 @@ services:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
-      start_period: 120s
-      retries: 5
+      start_period: 180s
+      retries: 10
     deploy:
       replicas: 1
       resources:
         limits:
-          memory: 2G
+          memory: 3G
         reservations:
-          memory: 1G
+          memory: 2G
       restart_policy:
         condition: any
-        delay: 5s
+        delay: 10s
 
 volumes:
   # IMPORTANT: Use external volume to preserve data across Swarm redeployments
