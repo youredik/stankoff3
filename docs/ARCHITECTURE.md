@@ -1007,6 +1007,11 @@ workspace_id | user_id | role
 - Realm для production: `stankoff` (TBD)
 - Client ID: `stankoff-portal`
 
+**⚠️ КРИТИЧЕСКИ ВАЖНО:**
+- Realm `stankoff` используется для **другого проекта** и **НЕ ДОЛЖЕН** изменяться или использоваться в этом проекте
+- Для preprod окружения **обязательно** использовать realm `stankoff-preprod`
+- Для production окружения будет создан отдельный realm (не `stankoff`!)
+
 **API эндпоинты Keycloak:**
 | Метод | URL | Описание |
 |-------|-----|----------|
