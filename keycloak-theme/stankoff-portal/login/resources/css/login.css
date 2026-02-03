@@ -1,0 +1,529 @@
+/*
+ * Stankoff Portal - Keycloak Login Theme
+ * Корпоративный стиль с бирюзовыми акцентами
+ */
+
+/* ========================================
+   Шрифты и основные переменные
+   ======================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap&subset=cyrillic');
+
+:root {
+  /* Цвета бренда */
+  --primary: #06b6d4;
+  --primary-hover: #0891b2;
+  --primary-light: #22d3ee;
+
+  /* Фон и текст */
+  --background: #f7f8fa;
+  --card-bg: #ffffff;
+  --text-primary: #1a1d26;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  /* Границы */
+  --border-color: #e2e8f0;
+  --border-radius: 4px;
+
+  /* Тени */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 20px rgba(34, 211, 238, 0.15);
+
+  /* Переходы */
+  --transition: all 0.2s ease;
+}
+
+/* ========================================
+   Глобальные стили
+   ======================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #f7f8fa 0%, #e5e7eb 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========================================
+   Контейнер страницы логина
+   ======================================== */
+
+.login-pf-page {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+#kc-header {
+  display: none;
+}
+
+#kc-container-wrapper {
+  width: 100%;
+}
+
+/* ========================================
+   Карточка логина
+   ======================================== */
+
+#kc-content {
+  background: var(--card-bg);
+  border-radius: 6px;
+  padding: 2.5rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+}
+
+/* ========================================
+   Заголовок
+   ======================================== */
+
+#kc-page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+#kc-header-wrapper {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+#kc-header-wrapper .kc-logo-text {
+  color: var(--primary);
+  font-size: 28px;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.instruction {
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+/* ========================================
+   Форма
+   ======================================== */
+
+#kc-form {
+  margin-top: 1.5rem;
+}
+
+#kc-form-wrapper {
+  width: 100%;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+/* ========================================
+   Лейблы
+   ======================================== */
+
+label {
+  display: block;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+label.required::after {
+  content: " *";
+  color: #ef4444;
+}
+
+/* ========================================
+   Поля ввода
+   ======================================== */
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+.pf-c-form-control {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+  outline: none;
+}
+
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="email"]:hover,
+.pf-c-form-control:hover {
+  border-color: var(--primary);
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+.pf-c-form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+input[type="email"]::placeholder {
+  color: var(--text-muted);
+}
+
+/* ========================================
+   Кнопки
+   ======================================== */
+
+.btn,
+button,
+input[type="submit"],
+.pf-c-button {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #ffffff;
+  background: var(--primary);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+.btn:hover,
+button:hover,
+input[type="submit"]:hover,
+.pf-c-button:hover {
+  background: var(--primary-hover);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.btn:active,
+button:active,
+input[type="submit"]:active,
+.pf-c-button:active {
+  transform: translateY(0);
+}
+
+.btn:disabled,
+button:disabled,
+input[type="submit"]:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Вторичная кнопка */
+.btn-secondary,
+.pf-c-button.pf-m-secondary {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.btn-secondary:hover,
+.pf-c-button.pf-m-secondary:hover {
+  background: rgba(6, 182, 212, 0.05);
+  border-color: var(--primary-hover);
+  color: var(--primary-hover);
+}
+
+/* ========================================
+   Чекбоксы
+   ======================================== */
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.checkbox label {
+  display: flex;
+  align-items: center;
+  font-weight: 400;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 0.5rem;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+/* ========================================
+   Ссылки
+   ======================================== */
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: var(--transition);
+  font-weight: 500;
+}
+
+a:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+#kc-form-options {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+#kc-registration {
+  margin-top: 1.5rem;
+  text-align: center;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+#kc-registration span {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* ========================================
+   Сообщения (ошибки, успех, предупреждения)
+   ======================================== */
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 1.5rem;
+  font-size: 14px;
+  border-left: 4px solid;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-error,
+.pf-c-alert.pf-m-danger {
+  background: #fef2f2;
+  border-left-color: #ef4444;
+  color: #991b1b;
+}
+
+.alert-warning {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+  color: #92400e;
+}
+
+.alert-success,
+.pf-c-alert.pf-m-success {
+  background: #ecfdf5;
+  border-left-color: #10b981;
+  color: #065f46;
+}
+
+.alert-info,
+.pf-c-alert.pf-m-info {
+  background: #ecfeff;
+  border-left-color: var(--primary);
+  color: #155e75;
+}
+
+.kc-feedback-text {
+  font-weight: 500;
+}
+
+/* ========================================
+   Social providers (если используются)
+   ======================================== */
+
+#kc-social-providers {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+#kc-social-providers ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#kc-social-providers li {
+  margin-bottom: 0.75rem;
+}
+
+.social-link,
+.zocial {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  text-align: center;
+  transition: var(--transition);
+  font-weight: 500;
+}
+
+.social-link:hover,
+.zocial:hover {
+  border-color: var(--primary);
+  background: rgba(6, 182, 212, 0.05);
+  text-decoration: none;
+}
+
+/* ========================================
+   Информация о проекте
+   ======================================== */
+
+#kc-info {
+  margin-top: 2rem;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+#kc-info-wrapper {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* ========================================
+   Locale Selector
+   ======================================== */
+
+#kc-locale {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+#kc-locale-dropdown {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--card-bg);
+  cursor: pointer;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+#kc-locale-dropdown:hover {
+  border-color: var(--primary);
+}
+
+/* ========================================
+   Responsive
+   ======================================== */
+
+@media (max-width: 480px) {
+  body {
+    padding: 1rem;
+  }
+
+  #kc-content {
+    padding: 1.5rem;
+  }
+
+  #kc-page-title {
+    font-size: 20px;
+  }
+
+  .btn,
+  button,
+  input[type="submit"] {
+    padding: 0.625rem 1rem;
+    font-size: 13px;
+  }
+}
+
+/* ========================================
+   Дополнительные улучшения
+   ======================================== */
+
+/* Loading состояние для кнопок */
+.btn.loading::after,
+button.loading::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Плавное появление формы */
+#kc-content-wrapper {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Улучшенный focus для accessibility */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

@@ -1012,6 +1012,26 @@ workspace_id | user_id | role
 - Для preprod окружения **обязательно** использовать realm `stankoff-preprod`
 - Для production окружения будет создан отдельный realm (не `stankoff`!)
 
+**Кастомная тема Keycloak:**
+
+Создана кастомная тема страницы входа в корпоративном стиле Stankoff Portal:
+
+- **Директория:** `keycloak-theme/stankoff-portal/`
+- **Дизайн:** Бирюзовые акценты (#06b6d4), минималистичный стиль, шрифт Inter
+- **Локализация:** Русский и английский языки
+- **Применение:** Только к realm `stankoff-preprod` (не к `stankoff`!)
+- **Инструкции:** См. `keycloak-theme/README.md`
+
+Структура темы:
+```
+keycloak-theme/stankoff-portal/login/
+├── theme.properties                    # Конфигурация темы
+├── resources/css/login.css             # CSS стили
+└── messages/messages_ru.properties     # Русская локализация
+```
+
+Для установки темы см. инструкции в `keycloak-theme/README.md`.
+
 **API эндпоинты Keycloak:**
 | Метод | URL | Описание |
 |-------|-----|----------|

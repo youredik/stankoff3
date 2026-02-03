@@ -154,6 +154,13 @@ stankoff-portal/
 - Для preprod окружения **обязательно** использовать realm `stankoff-preprod`
 - Для production окружения будет создан отдельный realm (TBD)
 
+**Кастомная тема Keycloak:**
+- Создана тема в корпоративном стиле с бирюзовыми акцентами
+- Директория: `keycloak-theme/stankoff-portal/`
+- Применяется только к realm `stankoff-preprod` (не к `stankoff`!)
+- Инструкции по установке: `keycloak-theme/README.md`
+- Поддерживает русский и английский языки
+
 ### TypeORM синхронизация
 
 - **Preprod:** `TYPEORM_SYNC=true` — автоматическое создание схемы БД
