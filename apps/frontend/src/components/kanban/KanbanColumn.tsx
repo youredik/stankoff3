@@ -18,7 +18,7 @@ export function KanbanColumn({ id, title, color, cards, canEdit = true }: Kanban
 
   return (
     <div
-      className={`flex-shrink-0 w-80 px-4 border-r border-gray-200/50 dark:border-gray-700/30 last:border-r-0 transition-colors ${
+      className={`flex-shrink-0 w-80 px-4 border-r border-gray-300 dark:border-gray-600 last:border-r-0 transition-colors ${
         isOver ? 'bg-primary-100/50 dark:bg-primary-900/20' : ''
       }`}
     >

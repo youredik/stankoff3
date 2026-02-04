@@ -10,7 +10,6 @@ import {
   Res,
   ForbiddenException,
   NotFoundException,
-  Header,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { WorkspaceService } from './workspace.service';
@@ -172,6 +171,30 @@ export class WorkspaceController {
     @Body() body: { isArchived: boolean },
   ): Promise<Workspace> {
     return this.workspaceService.setArchived(id, body.isArchived);
+  }
+
+  @Patch(':id/section')
+  @Roles(UserRole.ADMIN)
+  async setSection(
+    @Param('id') id: string,
+    @Body() body: { sectionId: string | null },
+  ): Promise<Workspace> {
+    return this.workspaceService.setSection(id, body.sectionId);
+  }
+
+  @Patch(':id/show-in-menu')
+  @Roles(UserRole.ADMIN)
+  async setShowInMenu(
+    @Param('id') id: string,
+    @Body() body: { showInMenu: boolean },
+  ): Promise<Workspace> {
+    return this.workspaceService.setShowInMenu(id, body.showInMenu);
+  }
+
+  @Post('reorder')
+  @Roles(UserRole.ADMIN)
+  async reorder(@Body() body: { workspaceIds: string[] }): Promise<void> {
+    return this.workspaceService.reorderInSection(body.workspaceIds);
   }
 
   @Get(':id/export/json')

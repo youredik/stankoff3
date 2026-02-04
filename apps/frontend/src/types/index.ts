@@ -28,12 +28,16 @@ export interface Field {
   relatedWorkspaceId?: string;  // Для relation типа
 }
 
-export interface Section {
+// Секция внутри структуры workspace (группа полей)
+export interface WorkspaceSection {
   id: string;
   name: string;
   fields: Field[];
   order: number;
 }
+
+// Устаревший alias - используйте WorkspaceSection
+export type Section = WorkspaceSection;
 
 export interface Workspace {
   id: string;
@@ -42,7 +46,11 @@ export interface Workspace {
   prefix: string; // Префикс для номеров заявок: TP, REK и т.д.
   lastEntityNumber: number; // Последний использованный номер
   isArchived?: boolean; // Архивирован ли workspace
-  sections: Section[];
+  sectionId?: string | null; // ID раздела (MenuSection)
+  section?: MenuSection | null; // Раздел, к которому принадлежит workspace
+  showInMenu: boolean; // Показывать в боковом меню
+  orderInSection: number; // Порядок внутри раздела
+  sections: WorkspaceSection[]; // Структура полей workspace
   members?: WorkspaceMember[];
   createdAt: Date;
   updatedAt: Date;
@@ -56,6 +64,30 @@ export interface WorkspaceMember {
   userId: string;
   user?: User;
   role: WorkspaceRole;
+  createdAt: Date;
+}
+
+// Раздел меню для группировки workspaces
+export interface MenuSection {
+  id: string;
+  name: string;
+  description?: string | null;
+  icon: string;
+  order: number;
+  workspaces?: Workspace[];
+  members?: MenuSectionMember[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type MenuSectionRole = 'viewer' | 'admin';
+
+export interface MenuSectionMember {
+  id: string;
+  sectionId: string;
+  userId: string;
+  user?: User;
+  role: MenuSectionRole;
   createdAt: Date;
 }
 

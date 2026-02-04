@@ -62,26 +62,56 @@ export function BpmnHeatMap({
   useEffect(() => {
     if (!containerRef.current || !xml) return;
 
-    const viewer = new BpmnJS({
-      container: containerRef.current,
-    });
+    const container = containerRef.current;
+    let cancelled = false;
+    let retryCount = 0;
+    const maxRetries = 30; // ~500ms max wait time
 
-    viewerRef.current = viewer;
+    const initViewer = () => {
+      if (cancelled) return;
 
-    viewer
-      .importXML(xml)
-      .then(() => {
-        const canvas = viewer.get('canvas') as { zoom: (level: string) => void };
-        canvas.zoom('fit-viewport');
-        setIsReady(true);
-      })
-      .catch((err: Error) => {
-        console.error('Failed to import BPMN for heat map:', err);
+      // Wait for container to have dimensions before initializing bpmn-js
+      if (!container.offsetWidth || !container.offsetHeight) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          requestAnimationFrame(initViewer);
+        } else {
+          console.warn('BpmnHeatMap: container has no dimensions after max retries');
+        }
+        return;
+      }
+
+      const viewer = new BpmnJS({
+        container: container,
       });
 
+      viewerRef.current = viewer;
+
+      viewer
+        .importXML(xml)
+        .then(() => {
+          if (cancelled) {
+            viewer.destroy();
+            return;
+          }
+          const canvas = viewer.get('canvas') as { zoom: (level: string) => void };
+          canvas.zoom('fit-viewport');
+          setIsReady(true);
+        })
+        .catch((err: Error) => {
+          console.error('Failed to import BPMN for heat map:', err);
+        });
+    };
+
+    // Start initialization on next frame to ensure container is rendered
+    requestAnimationFrame(initViewer);
+
     return () => {
-      viewer.destroy();
-      viewerRef.current = null;
+      cancelled = true;
+      if (viewerRef.current) {
+        viewerRef.current.destroy();
+        viewerRef.current = null;
+      }
       setIsReady(false);
     };
   }, [xml]);

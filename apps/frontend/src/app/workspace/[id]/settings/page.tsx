@@ -3,6 +3,7 @@
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
+import { ToastContainer } from '@/components/ui/ToastContainer';
 
 // Dynamic import to avoid SSR issues with dnd-kit
 const WorkspaceBuilder = dynamic(
@@ -27,6 +28,7 @@ export default function WorkspaceSettingsPage() {
           onBack={() => router.push('/dashboard')}
         />
       </main>
+      <ToastContainer />
     </div>
   );
 }

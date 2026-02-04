@@ -44,26 +44,44 @@ export function BpmnModeler({
 }: BpmnModelerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<BpmnJS | null>(null);
+  const loadedXmlRef = useRef<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Initialize modeler
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Wait for container to have dimensions
+    const container = containerRef.current;
+    if (container.clientWidth === 0 || container.clientHeight === 0) {
+      // Retry after a short delay if container has no dimensions yet
+      if (retryCount < 10) {
+        const timeoutId = setTimeout(() => {
+          setRetryCount((c) => c + 1);
+        }, 100);
+        return () => clearTimeout(timeoutId);
+      }
+      return;
+    }
+
     const modeler = new BpmnJS({
-      container: containerRef.current,
-      keyboard: {
-        bindTo: document,
-      },
+      container,
     });
 
     modelerRef.current = modeler;
+    let isDestroyed = false;
 
     // Load initial diagram
     const initialXml = xml || EMPTY_BPMN;
+
     modeler
       .importXML(initialXml)
       .then(() => {
+        // Check if modeler was destroyed during async import
+        if (isDestroyed || modelerRef.current !== modeler) return;
+
+        loadedXmlRef.current = initialXml;
         setIsReady(true);
         // Fit to viewport
         const canvas = modeler.get('canvas') as { zoom: (level: string) => void };
@@ -81,14 +99,17 @@ export function BpmnModeler({
         }
       })
       .catch((err: Error) => {
+        // Ignore errors if modeler was destroyed
+        if (isDestroyed) return;
         console.error('Failed to import BPMN:', err);
       });
 
     // Listen to changes
     modeler.on('commandStack.changed', () => {
+      if (isDestroyed) return;
       if (onXmlChange) {
         modeler.saveXML({ format: true }).then(({ xml: newXml }) => {
-          if (newXml) {
+          if (newXml && !isDestroyed) {
             onXmlChange(newXml);
           }
         });
@@ -106,16 +127,23 @@ export function BpmnModeler({
     });
 
     return () => {
+      isDestroyed = true;
       modeler.destroy();
       modelerRef.current = null;
+      loadedXmlRef.current = null;
+      setIsReady(false);
     };
-  }, []); // Only run once on mount
+  }, [retryCount]); // Re-run when retrying
 
-  // Update XML when prop changes
+  // Update XML when prop changes (but skip if same XML already loaded)
   useEffect(() => {
     if (!modelerRef.current || !isReady || !xml) return;
+    // Skip if this XML was already loaded
+    if (loadedXmlRef.current === xml) return;
 
-    modelerRef.current.importXML(xml).catch((err: Error) => {
+    modelerRef.current.importXML(xml).then(() => {
+      loadedXmlRef.current = xml;
+    }).catch((err: Error) => {
       console.error('Failed to update BPMN:', err);
     });
   }, [xml, isReady]);
@@ -145,7 +173,8 @@ export function BpmnModeler({
   return (
     <div
       ref={containerRef}
-      className={`bpmn-modeler w-full h-full min-h-[500px] bg-white dark:bg-gray-900 ${className}`}
+      style={{ height: '100%', minHeight: '500px' }}
+      className={`bpmn-modeler w-full bg-white dark:bg-gray-900 ${className}`}
     />
   );
 }

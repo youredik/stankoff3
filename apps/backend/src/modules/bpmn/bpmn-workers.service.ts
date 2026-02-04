@@ -170,7 +170,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'send-email',
       taskHandler: async (job) => {
-        const { to, subject, body, entityId } = job.variables as {
+        const { to, subject, body, entityId: _entityId } = job.variables as {
           to: string;
           subject: string;
           body: string;

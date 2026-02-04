@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BpmnTemplatesService, BpmnTemplate } from './bpmn-templates.service';
+import { BpmnTemplatesService } from './bpmn-templates.service';
 
 describe('BpmnTemplatesService', () => {
   let service: BpmnTemplatesService;

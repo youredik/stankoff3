@@ -16,11 +16,14 @@ import { HealthModule } from './modules/health/health.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { SearchModule } from './modules/search/search.module';
 import { BpmnModule } from './modules/bpmn/bpmn.module';
+import { SectionModule } from './modules/section/section.module';
 import { SeedService } from './seed.service';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
 import { Workspace } from './modules/workspace/workspace.entity';
 import { WorkspaceMember } from './modules/workspace/workspace-member.entity';
+import { Section } from './modules/section/section.entity';
+import { SectionMember } from './modules/section/section-member.entity';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -32,7 +35,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     }),
 
     TypeOrmModule.forRoot(typeOrmConfig),
-    TypeOrmModule.forFeature([User, WorkspaceEntity, Workspace, WorkspaceMember]),
+    TypeOrmModule.forFeature([User, WorkspaceEntity, Workspace, WorkspaceMember, Section, SectionMember]),
 
     WorkspaceModule,
     EntityModule,
@@ -47,6 +50,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     AutomationModule,
     SearchModule,
     BpmnModule,
+    SectionModule,
   ],
   providers: [
     SeedService,

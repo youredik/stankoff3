@@ -3,7 +3,6 @@
 import { useEffect, ReactNode, useState, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
-import { setAuthInterceptors } from '@/lib/api/client';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -19,27 +18,33 @@ function AuthProviderInner({ children }: AuthProviderProps) {
 
   // Ждём восстановления из localStorage (Zustand persist)
   useEffect(() => {
-    // Небольшая задержка для гарантии что persist восстановил данные
-    const timer = setTimeout(() => setHydrated(true), 50);
-    return () => clearTimeout(timer);
-  }, []);
+    // Проверяем сразу, если уже hydrated
+    if (useAuthStore.persist.hasHydrated()) {
+      console.log('[AuthProvider] Already hydrated');
+      setHydrated(true);
+      return;
+    }
 
-  // Устанавливаем interceptors при монтировании
-  useEffect(() => {
-    setAuthInterceptors(
-      () => useAuthStore.getState().accessToken,
-      () => useAuthStore.getState().refreshTokens(),
-    );
+    // Подписываемся на завершение hydration
+    const unsubFinishHydration = useAuthStore.persist.onFinishHydration(() => {
+      console.log('[AuthProvider] Hydration finished, token:', useAuthStore.getState().accessToken ? 'present' : 'null');
+      setHydrated(true);
+    });
+
+    return () => {
+      unsubFinishHydration();
+    };
   }, []);
 
   // Обрабатываем access_token из Keycloak SSO callback (только один раз)
   const [authChecked, setAuthChecked] = useState(false);
+  // Извлекаем значение один раз для стабильной зависимости
+  const accessTokenParam = searchParams.get('access_token');
 
   useEffect(() => {
     // Ждём hydration перед проверкой авторизации
     if (!hydrated || authChecked) return;
 
-    const accessTokenParam = searchParams.get('access_token');
     if (accessTokenParam) {
       setSsoProcessing(true);
       setAuthChecked(true);
@@ -97,16 +102,15 @@ function AuthProviderInner({ children }: AuthProviderProps) {
         useAuthStore.setState({ isLoading: false, isAuthenticated: false });
       }
     }
-  }, [hydrated, searchParams, checkAuth, authChecked]);
+  }, [hydrated, accessTokenParam, checkAuth, authChecked]);
 
   // Редирект на логин если не авторизован
   useEffect(() => {
     // Не редиректим если в URL есть access_token (обрабатывается выше)
-    const hasAccessToken = searchParams.get('access_token');
-    if (!isLoading && !ssoProcessing && !isAuthenticated && pathname !== '/login' && !hasAccessToken) {
+    if (!isLoading && !ssoProcessing && !isAuthenticated && pathname !== '/login' && !accessTokenParam) {
       router.push('/login');
     }
-  }, [isLoading, ssoProcessing, isAuthenticated, pathname, router, searchParams]);
+  }, [isLoading, ssoProcessing, isAuthenticated, pathname, router, accessTokenParam]);
 
   // Показываем загрузку пока ждём hydration, проверяем авторизацию или обрабатываем SSO
   if (!hydrated || isLoading || ssoProcessing) {

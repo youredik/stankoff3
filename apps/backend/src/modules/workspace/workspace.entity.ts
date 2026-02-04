@@ -5,9 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { WorkspaceMember } from './workspace-member.entity';
+import { Section } from '../section/section.entity';
 
 @Entity('workspaces')
 export class Workspace {
@@ -28,6 +31,19 @@ export class Workspace {
 
   @Column({ default: false })
   isArchived: boolean; // Архивирован ли workspace
+
+  @Column({ type: 'uuid', nullable: true })
+  sectionId: string | null; // FK на раздел (может быть без раздела)
+
+  @Column({ default: true })
+  showInMenu: boolean; // Показывать в боковом меню
+
+  @Column({ default: 0 })
+  orderInSection: number; // Порядок внутри раздела
+
+  @ManyToOne(() => Section, (section) => section.workspaces, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'sectionId' })
+  section: Section | null;
 
   @Column('jsonb', { default: [] })
   sections: {

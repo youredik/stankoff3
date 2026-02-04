@@ -11,6 +11,7 @@ import {
 import { WorkspaceEntity } from '../../entity/entity.entity';
 import { Workspace } from '../../workspace/workspace.entity';
 import { User } from '../../user/user.entity';
+import { ProcessDefinition } from './process-definition.entity';
 
 export enum ProcessInstanceStatus {
   ACTIVE = 'active',
@@ -43,6 +44,10 @@ export class ProcessInstance {
 
   @Column()
   processDefinitionId: string;
+
+  @ManyToOne(() => ProcessDefinition, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'processDefinitionId' })
+  processDefinition: ProcessDefinition;
 
   @Column()
   processDefinitionKey: string;

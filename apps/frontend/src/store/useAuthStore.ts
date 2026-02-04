@@ -43,6 +43,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         error: null,
       });
 
+      // Очищаем localStorage напрямую перед редиректом
+      // (persist middleware может не успеть синхронизироваться)
+      localStorage.removeItem('auth-storage');
+
       // Если есть Keycloak logout URL - редиректим на него
       if (response.keycloakLogoutUrl) {
         window.location.href = response.keycloakLogoutUrl;
@@ -57,15 +61,20 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         isLoading: false,
         error: null,
       });
+      // Очищаем localStorage и при ошибках
+      localStorage.removeItem('auth-storage');
     }
   },
 
   refreshTokens: async () => {
+    console.log('[AuthStore] refreshTokens called');
     try {
       const response = await authApi.refresh();
+      console.log('[AuthStore] refresh success, new token received');
       set({ accessToken: response.accessToken });
       return true;
-    } catch {
+    } catch (err) {
+      console.log('[AuthStore] refresh failed:', err);
       // Refresh token истёк - выходим
       set({
         user: null,

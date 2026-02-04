@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, AlertCircle, CheckCircle, FileCode, Play, BarChart3 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
+import { ToastContainer } from '@/components/ui/ToastContainer';
 import { ProcessList, ProcessInstanceList, TemplateSelector } from '@/components/bpmn';
 import { bpmnApi } from '@/lib/api/bpmn';
 import type { ProcessDefinition, ProcessInstance, BpmnHealthStatus } from '@/types';
@@ -346,6 +347,8 @@ export default function ProcessesPage() {
           onClose={handleCloseTemplateSelector}
         />
       )}
+
+      <ToastContainer />
     </div>
   );
 }

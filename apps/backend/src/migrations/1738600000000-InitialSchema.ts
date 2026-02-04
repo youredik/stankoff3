@@ -21,13 +21,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class InitialSchema1738600000000 implements MigrationInterface {
   name = 'InitialSchema1738600000000';
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
+  public async up(_queryRunner: QueryRunner): Promise<void> {
     // Baseline migration - schema already exists
     // This migration is a marker for the initial state
     console.log('Initial schema baseline - no changes needed');
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // Cannot rollback initial schema
     console.log('Cannot rollback initial schema baseline');
   }

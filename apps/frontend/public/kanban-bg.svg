@@ -1,84 +1,478 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="4000" viewBox="0 0 4000 4000">
   <defs>
-    <pattern id="kanban-pattern" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
+    <pattern id="kanban-pattern" x="0" y="0" width="4000" height="4000" patternUnits="userSpaceOnUse">
       <!-- Background -->
-      <rect width="200" height="200" fill="transparent"/>
+      <rect width="4000" height="4000" fill="transparent"/>
 
-      <!-- Gear 1 (large) -->
-      <g transform="translate(40, 40)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.2">
-        <circle cx="0" cy="0" r="20"/>
-        <circle cx="0" cy="0" r="8"/>
-        <path d="M0,-25 L0,-18 M0,18 L0,25 M-25,0 L-18,0 M18,0 L25,0 M-17.7,-17.7 L-12.7,-12.7 M12.7,12.7 L17.7,17.7 M-17.7,17.7 L-12.7,12.7 M12.7,-12.7 L17.7,-17.7"/>
-        <!-- Gear teeth -->
-        <rect x="-4" y="-28" width="8" height="6" rx="1"/>
-        <rect x="-4" y="22" width="8" height="6" rx="1"/>
-        <rect x="-28" y="-4" width="6" height="8" rx="1"/>
-        <rect x="22" y="-4" width="6" height="8" rx="1"/>
+      <!-- Scale 10x wrapper -->
+      <g transform="scale(10)">
+
+        <!-- ===================== EXISTING ELEMENTS ===================== -->
+
+        <!-- Industrial Robot Arm (main) - side view, working position -->
+        <g transform="translate(15, 55)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.2">
+          <!-- Base platform -->
+          <rect x="0" y="40" width="24" height="8" rx="2"/>
+          <ellipse cx="12" cy="48" rx="14" ry="4"/>
+
+          <!-- Vertical column -->
+          <rect x="6" y="10" width="12" height="30" rx="2"/>
+
+          <!-- Shoulder joint -->
+          <circle cx="12" cy="10" r="7"/>
+
+          <!-- Upper arm (angled up-right) -->
+          <line x1="12" y1="10" x2="45" y2="-5" stroke-width="8" stroke-linecap="round"/>
+          <line x1="12" y1="10" x2="45" y2="-5" stroke-width="4" stroke-linecap="round" stroke="#fff" opacity="0.3"/>
+
+          <!-- Elbow joint -->
+          <circle cx="45" cy="-5" r="6"/>
+
+          <!-- Forearm (angled down to workpiece) -->
+          <line x1="45" y1="-5" x2="75" y2="25" stroke-width="6" stroke-linecap="round"/>
+          <line x1="45" y1="-5" x2="75" y2="25" stroke-width="3" stroke-linecap="round" stroke="#fff" opacity="0.3"/>
+
+          <!-- Wrist joint -->
+          <circle cx="75" cy="25" r="4"/>
+
+          <!-- Laser welding head (angled down) -->
+          <g transform="translate(75, 25) rotate(50)">
+            <rect x="-5" y="0" width="10" height="14" rx="1"/>
+            <path d="M-3,14 L0,20 L3,14"/>
+            <!-- Laser beam -->
+            <line x1="0" y1="20" x2="0" y2="28" stroke-dasharray="2,1" stroke-width="1"/>
+          </g>
+
+          <!-- Workpiece / metal plate being welded -->
+          <rect x="70" y="52" width="30" height="6" rx="1" opacity="0.7"/>
+        </g>
+
+        <!-- Welding sparks from main robot -->
+        <g transform="translate(100, 95)" stroke="#4a5568" stroke-width="1" opacity="0.18">
+          <line x1="0" y1="0" x2="-6" y2="-8"/>
+          <line x1="0" y1="0" x2="5" y2="-9"/>
+          <line x1="0" y1="0" x2="-9" y2="-4"/>
+          <line x1="0" y1="0" x2="8" y2="-3"/>
+          <line x1="0" y1="0" x2="-3" y2="-11"/>
+          <line x1="0" y1="0" x2="2" y2="-10"/>
+          <circle cx="-4" cy="-6" r="1" fill="#4a5568"/>
+          <circle cx="3" cy="-7" r="0.8" fill="#4a5568"/>
+        </g>
+
+        <!-- Metal plate with laser-cut text "Stankoff.RU" -->
+        <g transform="translate(5, 155)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.22">
+          <!-- Main plate -->
+          <rect x="0" y="0" width="120" height="35" rx="3"/>
+          <!-- Plate thickness / edge -->
+          <line x1="0" y1="35" x2="120" y2="35" stroke-width="2"/>
+          <!-- Laser-cut text (centered) -->
+          <text x="10" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold"
+                fill="none" stroke="#4a5568" stroke-width="1.2" letter-spacing="0.5">Stankoff.RU</text>
+        </g>
+
+        <!-- ===================== NEW MACHINES ===================== -->
+
+        <!-- CNC Lathe / Токарный станок с ЧПУ -->
+        <g transform="translate(140, 45)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.18">
+          <!-- Machine bed -->
+          <rect x="0" y="35" width="80" height="12" rx="2"/>
+          <!-- Headstock -->
+          <rect x="0" y="10" width="25" height="30" rx="2"/>
+          <!-- Spindle/chuck -->
+          <circle cx="25" cy="25" r="10"/>
+          <circle cx="25" cy="25" r="5"/>
+          <!-- Carriage -->
+          <rect x="35" y="15" width="20" height="22" rx="1"/>
+          <!-- Tool turret -->
+          <polygon points="55,20 65,15 65,35 55,30"/>
+          <circle cx="60" cy="25" r="3"/>
+          <!-- Tailstock -->
+          <rect x="68" y="18" width="12" height="18" rx="1"/>
+          <line x1="68" y1="27" x2="62" y2="27" stroke-width="2"/>
+          <!-- Workpiece (rotating shaft) -->
+          <line x1="30" y1="25" x2="65" y2="25" stroke-width="3" stroke-linecap="round"/>
+          <!-- Chips/cutting -->
+          <path d="M58,20 Q60,18 62,21 Q64,24 61,22" opacity="0.5"/>
+        </g>
+
+        <!-- CNC Milling Machine / Фрезерный станок -->
+        <g transform="translate(250, 35)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.16">
+          <!-- Base -->
+          <rect x="0" y="55" width="70" height="10" rx="2"/>
+          <!-- Table -->
+          <rect x="5" y="45" width="60" height="8" rx="1"/>
+          <!-- T-slots on table -->
+          <line x1="15" y1="49" x2="55" y2="49"/>
+          <line x1="15" y1="47" x2="55" y2="47"/>
+          <!-- Column -->
+          <rect x="55" y="5" width="15" height="50" rx="2"/>
+          <!-- Spindle head -->
+          <rect x="20" y="5" width="35" height="25" rx="2"/>
+          <!-- Spindle -->
+          <rect x="35" y="30" width="10" height="8" rx="1"/>
+          <polygon points="37,38 43,38 41,45 39,45"/>
+          <!-- Tool -->
+          <line x1="40" y1="45" x2="40" y2="50" stroke-width="2"/>
+          <!-- Workpiece on table -->
+          <rect x="30" y="40" width="20" height="5" rx="1" opacity="0.6"/>
+          <!-- Control panel -->
+          <rect x="58" y="10" width="10" height="15" rx="1"/>
+          <circle cx="63" cy="15" r="2"/>
+          <rect x="60" y="19" width="6" height="3" rx="1"/>
+        </g>
+
+        <!-- Press Brake / Листогибочный пресс -->
+        <g transform="translate(340, 60)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.14">
+          <!-- Frame sides -->
+          <rect x="0" y="0" width="8" height="70" rx="1"/>
+          <rect x="45" y="0" width="8" height="70" rx="1"/>
+          <!-- Top beam -->
+          <rect x="0" y="0" width="53" height="12" rx="1"/>
+          <!-- Moving ram -->
+          <rect x="5" y="20" width="43" height="10" rx="1"/>
+          <!-- V-die punch -->
+          <polygon points="20,30 33,30 27,42"/>
+          <!-- Bottom die (V-shape) -->
+          <rect x="8" y="50" width="37" height="8" rx="1"/>
+          <polygon points="20,50 33,50 27,45" fill="none"/>
+          <!-- Sheet metal being bent -->
+          <path d="M10,47 L24,47 L27,42 L30,47 L45,47" stroke-width="2"/>
+          <!-- Hydraulic cylinders -->
+          <rect x="12" y="12" width="5" height="8" rx="1"/>
+          <rect x="36" y="12" width="5" height="8" rx="1"/>
+        </g>
+
+        <!-- Plasma/Laser Cutting Table / Станок плазменной резки -->
+        <g transform="translate(10, 220)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.17">
+          <!-- Table frame -->
+          <rect x="0" y="20" width="100" height="50" rx="2"/>
+          <!-- Slat table (cutting surface) -->
+          <g opacity="0.5">
+            <line x1="5" y1="25" x2="5" y2="65"/>
+            <line x1="15" y1="25" x2="15" y2="65"/>
+            <line x1="25" y1="25" x2="25" y2="65"/>
+            <line x1="35" y1="25" x2="35" y2="65"/>
+            <line x1="45" y1="25" x2="45" y2="65"/>
+            <line x1="55" y1="25" x2="55" y2="65"/>
+            <line x1="65" y1="25" x2="65" y2="65"/>
+            <line x1="75" y1="25" x2="75" y2="65"/>
+            <line x1="85" y1="25" x2="85" y2="65"/>
+            <line x1="95" y1="25" x2="95" y2="65"/>
+          </g>
+          <!-- Gantry rails -->
+          <line x1="0" y1="20" x2="100" y2="20" stroke-width="3"/>
+          <line x1="0" y1="70" x2="100" y2="70" stroke-width="3"/>
+          <!-- Gantry (Y-axis) -->
+          <rect x="30" y="15" width="40" height="8" rx="1"/>
+          <!-- Cutting head carriage (X-axis) -->
+          <rect x="45" y="8" width="12" height="12" rx="1"/>
+          <!-- Plasma torch -->
+          <rect x="48" y="0" width="6" height="10" rx="1"/>
+          <line x1="51" y1="10" x2="51" y2="25" stroke-dasharray="2,2"/>
+          <!-- Sheet metal with cut parts -->
+          <rect x="10" y="30" width="80" height="35" rx="1" opacity="0.4"/>
+          <!-- Cut shapes (parts) -->
+          <circle cx="30" cy="47" r="8" stroke-dasharray="2,1"/>
+          <rect x="50" y="35" width="15" height="20" rx="1" stroke-dasharray="2,1"/>
+          <polygon points="78,38 85,55 71,55" stroke-dasharray="2,1"/>
+        </g>
+
+        <!-- Metal 3D Printer / DMLS -->
+        <g transform="translate(130, 230)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.15">
+          <!-- Enclosure -->
+          <rect x="0" y="0" width="55" height="60" rx="3"/>
+          <!-- Window -->
+          <rect x="5" y="5" width="45" height="35" rx="2" stroke-dasharray="3,2"/>
+          <!-- Build chamber inside -->
+          <rect x="12" y="25" width="30" height="12" rx="1" opacity="0.5"/>
+          <!-- Build plate -->
+          <rect x="15" y="30" width="24" height="3" rx="1"/>
+          <!-- Part being printed -->
+          <rect x="20" y="27" width="14" height="3" rx="0.5"/>
+          <rect x="22" y="24" width="10" height="3" rx="0.5"/>
+          <rect x="24" y="21" width="6" height="3" rx="0.5"/>
+          <!-- Laser/recoater arm -->
+          <line x1="10" y1="18" x2="45" y2="18"/>
+          <rect x="25" y="15" width="8" height="4" rx="1"/>
+          <line x1="29" y1="19" x2="29" y2="24" stroke-dasharray="1,1"/>
+          <!-- Powder supply -->
+          <rect x="8" y="43" width="15" height="12" rx="1"/>
+          <rect x="32" y="43" width="15" height="12" rx="1"/>
+          <!-- Control panel -->
+          <rect x="5" y="48" width="20" height="8" rx="1" opacity="0.6"/>
+        </g>
+
+        <!-- 5-Axis CNC / 5-осевой обрабатывающий центр -->
+        <g transform="translate(200, 220)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.16">
+          <!-- Machine base -->
+          <rect x="0" y="55" width="70" height="15" rx="2"/>
+          <!-- Trunnion table (A/C axis) -->
+          <ellipse cx="35" cy="50" rx="25" ry="8"/>
+          <ellipse cx="35" cy="50" rx="20" ry="5"/>
+          <!-- Rotary axis housing -->
+          <rect x="5" y="40" width="15" height="15" rx="2"/>
+          <rect x="50" y="40" width="15" height="15" rx="2"/>
+          <!-- Workpiece on table -->
+          <rect x="25" y="42" width="20" height="8" rx="1" opacity="0.6"/>
+          <!-- Spindle column -->
+          <rect x="60" y="0" width="10" height="55" rx="1"/>
+          <!-- Spindle head (tilting B-axis) -->
+          <g transform="translate(40, 20)">
+            <rect x="0" y="0" width="20" height="18" rx="2"/>
+            <!-- Spindle with tool -->
+            <rect x="6" y="18" width="8" height="10" rx="1"/>
+            <line x1="10" y1="28" x2="10" y2="38" stroke-width="2"/>
+            <polygon points="8,38 12,38 10,45"/>
+          </g>
+          <!-- Tool magazine -->
+          <rect x="0" y="0" width="35" height="12" rx="1"/>
+          <circle cx="8" cy="6" r="3"/>
+          <circle cx="18" cy="6" r="3"/>
+          <circle cx="28" cy="6" r="3"/>
+        </g>
+
+        <!-- Welding Positioner / Сварочный позиционер -->
+        <g transform="translate(290, 235)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.14">
+          <!-- Base -->
+          <rect x="0" y="50" width="50" height="10" rx="2"/>
+          <!-- Drive housing -->
+          <rect x="5" y="35" width="15" height="20" rx="2"/>
+          <!-- Tilting frame -->
+          <circle cx="12" cy="35" r="5"/>
+          <line x1="12" y1="35" x2="45" y2="20" stroke-width="3"/>
+          <!-- Rotary table -->
+          <ellipse cx="45" cy="20" rx="20" ry="8"/>
+          <ellipse cx="45" cy="20" rx="15" ry="5"/>
+          <!-- Workpiece (pipe assembly) -->
+          <rect x="35" y="10" width="20" height="10" rx="1" opacity="0.5"/>
+          <circle cx="35" cy="15" r="5" opacity="0.5"/>
+          <circle cx="55" cy="15" r="5" opacity="0.5"/>
+          <!-- Chuck jaws -->
+          <line x1="35" y1="14" x2="30" y2="14"/>
+          <line x1="35" y1="16" x2="30" y2="16"/>
+          <line x1="55" y1="14" x2="60" y2="14"/>
+          <line x1="55" y1="16" x2="60" y2="16"/>
+        </g>
+
+        <!-- Wire EDM / Электроэрозионный проволочный станок -->
+        <g transform="translate(350, 220)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.13">
+          <!-- Machine body -->
+          <rect x="0" y="10" width="45" height="55" rx="2"/>
+          <!-- Work tank (submerged cutting) -->
+          <rect x="5" y="25" width="35" height="30" rx="1"/>
+          <!-- Dielectric fluid level -->
+          <line x1="7" y1="35" x2="38" y2="35" stroke-dasharray="2,2" opacity="0.5"/>
+          <!-- Upper guide -->
+          <rect x="15" y="15" width="15" height="8" rx="1"/>
+          <!-- Lower guide -->
+          <rect x="15" y="50" width="15" height="5" rx="1"/>
+          <!-- Wire path -->
+          <line x1="22" y1="23" x2="22" y2="50" stroke-dasharray="1,2"/>
+          <!-- Workpiece -->
+          <rect x="10" y="38" width="25" height="8" rx="1" opacity="0.5"/>
+          <!-- Cut profile in workpiece -->
+          <path d="M20,38 Q22,42 20,46" stroke-dasharray="1,1"/>
+          <!-- Wire spools -->
+          <circle cx="8" cy="15" r="4"/>
+          <circle cx="37" cy="60" r="4"/>
+          <!-- Control panel -->
+          <rect x="0" y="0" width="20" height="8" rx="1"/>
+        </g>
+
+        <!-- Industrial Conveyor / Конвейер -->
+        <g transform="translate(10, 310)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.14">
+          <!-- Conveyor frame -->
+          <rect x="0" y="15" width="120" height="6" rx="1"/>
+          <!-- Rollers -->
+          <circle cx="8" cy="18" r="5"/>
+          <circle cx="112" cy="18" r="5"/>
+          <!-- Belt (top) -->
+          <line x1="8" y1="13" x2="112" y2="13" stroke-width="2"/>
+          <!-- Belt (bottom) -->
+          <line x1="8" y1="23" x2="112" y2="23"/>
+          <!-- Support legs -->
+          <line x1="20" y1="21" x2="20" y2="35"/>
+          <line x1="60" y1="21" x2="60" y2="35"/>
+          <line x1="100" y1="21" x2="100" y2="35"/>
+          <!-- Parts on conveyor -->
+          <rect x="25" y="8" width="12" height="5" rx="1" opacity="0.5"/>
+          <rect x="50" y="8" width="10" height="5" rx="1" opacity="0.5"/>
+          <rect x="75" y="7" width="14" height="6" rx="1" opacity="0.5"/>
+          <!-- Direction arrow -->
+          <line x1="95" y1="5" x2="110" y2="5"/>
+          <polygon points="110,5 106,3 106,7" fill="#4a5568"/>
+        </g>
+
+        <!-- CNC Grinding Machine / Шлифовальный станок -->
+        <g transform="translate(145, 320)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.15">
+          <!-- Base -->
+          <rect x="0" y="40" width="60" height="10" rx="2"/>
+          <!-- Work head -->
+          <rect x="0" y="20" width="18" height="25" rx="2"/>
+          <circle cx="18" cy="32" r="6"/>
+          <!-- Workpiece (shaft) -->
+          <line x1="24" y1="32" x2="50" y2="32" stroke-width="4" stroke-linecap="round"/>
+          <!-- Grinding wheel assembly -->
+          <rect x="30" y="5" width="20" height="20" rx="1"/>
+          <!-- Grinding wheel -->
+          <circle cx="40" cy="15" r="8"/>
+          <circle cx="40" cy="15" r="3"/>
+          <!-- Coolant spray -->
+          <path d="M35,23 Q38,28 34,32" stroke-dasharray="1,2" opacity="0.5"/>
+          <path d="M45,23 Q42,28 46,32" stroke-dasharray="1,2" opacity="0.5"/>
+          <!-- Tailstock -->
+          <rect x="50" y="25" width="10" height="15" rx="1"/>
+          <line x1="50" y1="32" x2="55" y2="32"/>
+        </g>
+
+        <!-- Robot Loading Cell / Роботизированная ячейка -->
+        <g transform="translate(220, 310)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.16">
+          <!-- Safety fence -->
+          <rect x="0" y="0" width="70" height="60" rx="2" stroke-dasharray="4,2"/>
+          <!-- Robot base -->
+          <ellipse cx="35" cy="45" rx="12" ry="5"/>
+          <rect x="28" y="25" width="14" height="20" rx="2"/>
+          <!-- Robot arm -->
+          <circle cx="35" cy="25" r="5"/>
+          <line x1="35" y1="25" x2="55" y2="15" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="55" cy="15" r="4"/>
+          <line x1="55" y1="15" x2="60" y2="35" stroke-width="4" stroke-linecap="round"/>
+          <!-- Gripper -->
+          <rect x="57" y="35" width="8" height="6" rx="1"/>
+          <line x1="58" y1="41" x2="58" y2="46"/>
+          <line x1="64" y1="41" x2="64" y2="46"/>
+          <!-- Part in gripper -->
+          <rect x="57" y="46" width="8" height="4" rx="1" opacity="0.5"/>
+          <!-- Input/output trays -->
+          <rect x="5" y="35" width="15" height="20" rx="1"/>
+          <rect x="5" y="38" width="15" height="3"/>
+          <rect x="5" y="44" width="15" height="3"/>
+          <rect x="5" y="50" width="15" height="3"/>
+        </g>
+
+        <!-- Horizontal Boring Mill / Горизонтально-расточной станок -->
+        <g transform="translate(310, 310)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.13">
+          <!-- Bed -->
+          <rect x="0" y="50" width="80" height="12" rx="2"/>
+          <!-- Column -->
+          <rect x="0" y="0" width="15" height="55" rx="2"/>
+          <!-- Spindle head -->
+          <rect x="15" y="15" width="25" height="20" rx="2"/>
+          <!-- Spindle -->
+          <rect x="40" y="22" width="15" height="6" rx="1"/>
+          <!-- Boring bar -->
+          <line x1="55" y1="25" x2="70" y2="25" stroke-width="3" stroke-linecap="round"/>
+          <!-- Rotary table -->
+          <rect x="50" y="35" width="25" height="15" rx="1"/>
+          <ellipse cx="62" cy="35" rx="10" ry="3"/>
+          <!-- Workpiece (large block) -->
+          <rect x="55" y="20" width="15" height="15" rx="1" opacity="0.5"/>
+          <!-- Hole being bored -->
+          <circle cx="62" cy="27" r="3" opacity="0.5"/>
+          <!-- Control pendant -->
+          <rect x="18" y="40" width="8" height="12" rx="1"/>
+          <circle cx="22" cy="44" r="2"/>
+        </g>
+
+        <!-- ===================== DECORATIVE ELEMENTS ===================== -->
+
+        <!-- Control panel (moved) -->
+        <g transform="translate(340, 150)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.15">
+          <rect x="0" y="0" width="45" height="55" rx="3"/>
+          <!-- Screen -->
+          <rect x="4" y="4" width="37" height="22" rx="1"/>
+          <!-- Grid on screen -->
+          <line x1="6" y1="10" x2="39" y2="10" opacity="0.3"/>
+          <line x1="6" y1="16" x2="39" y2="16" opacity="0.3"/>
+          <line x1="6" y1="22" x2="39" y2="22" opacity="0.3"/>
+          <!-- Buttons -->
+          <circle cx="12" cy="32" r="3"/>
+          <circle cx="22" cy="32" r="3"/>
+          <circle cx="32" cy="32" r="3"/>
+          <!-- Sliders -->
+          <rect x="6" y="40" width="15" height="4" rx="1"/>
+          <rect x="6" y="46" width="15" height="4" rx="1"/>
+          <!-- Emergency stop -->
+          <circle cx="32" cy="45" r="5" stroke-width="2" stroke="#4a5568"/>
+          <circle cx="32" cy="45" r="2" fill="#4a5568"/>
+        </g>
+
+        <!-- Laser optics/lens -->
+        <g transform="translate(130, 145)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.1">
+          <ellipse cx="0" cy="0" rx="18" ry="10"/>
+          <ellipse cx="0" cy="0" rx="12" ry="6"/>
+          <ellipse cx="0" cy="0" rx="5" ry="3"/>
+          <line x1="-18" y1="0" x2="18" y2="0" stroke-dasharray="2,2"/>
+          <line x1="0" y1="-10" x2="0" y2="10" stroke-dasharray="2,2"/>
+        </g>
+
+        <!-- Coordinate system -->
+        <g transform="translate(380, 380)" stroke="#4a5568" stroke-width="1" opacity="0.1">
+          <line x1="0" y1="0" x2="-18" y2="0"/>
+          <line x1="0" y1="0" x2="0" y2="-18"/>
+          <line x1="0" y1="0" x2="9" y2="9"/>
+          <polygon points="-18,0 -14,-2 -14,2" fill="#4a5568"/>
+          <polygon points="0,-18 -2,-14 2,-14" fill="#4a5568"/>
+          <text x="-22" y="3" font-size="6" fill="#4a5568">X</text>
+          <text x="2" y="-20" font-size="6" fill="#4a5568">Y</text>
+          <text x="12" y="12" font-size="6" fill="#4a5568">Z</text>
+        </g>
+
+        <!-- Laser warning symbol -->
+        <g transform="translate(175, 190)" fill="none" stroke="#4a5568" stroke-width="1" opacity="0.12">
+          <polygon points="0,-12 10,8 -10,8"/>
+          <line x1="0" y1="-5" x2="0" y2="2"/>
+          <circle cx="0" cy="5" r="1" fill="#4a5568"/>
+        </g>
+
+        <!-- Tool holder rack -->
+        <g transform="translate(270, 170)" fill="none" stroke="#4a5568" stroke-width="1" opacity="0.12">
+          <rect x="0" y="0" width="50" height="25" rx="2"/>
+          <circle cx="10" cy="12" r="5"/>
+          <circle cx="25" cy="12" r="5"/>
+          <circle cx="40" cy="12" r="5"/>
+          <!-- Tools -->
+          <line x1="10" y1="17" x2="10" y2="28" stroke-width="2"/>
+          <line x1="25" y1="17" x2="25" y2="30" stroke-width="2"/>
+          <line x1="40" y1="17" x2="40" y2="26" stroke-width="2"/>
+        </g>
+
+        <!-- Gear/sprocket decorative element -->
+        <g transform="translate(240, 130)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.1">
+          <circle cx="0" cy="0" r="15"/>
+          <circle cx="0" cy="0" r="10"/>
+          <circle cx="0" cy="0" r="4"/>
+          <!-- Teeth -->
+          <line x1="0" y1="-15" x2="0" y2="-20"/>
+          <line x1="13" y1="-7.5" x2="17.3" y2="-10"/>
+          <line x1="13" y1="7.5" x2="17.3" y2="10"/>
+          <line x1="0" y1="15" x2="0" y2="20"/>
+          <line x1="-13" y1="7.5" x2="-17.3" y2="10"/>
+          <line x1="-13" y1="-7.5" x2="-17.3" y2="-10"/>
+        </g>
+
+        <!-- Small sparks pattern -->
+        <g transform="translate(300, 100)" stroke="#4a5568" stroke-width="0.8" opacity="0.08">
+          <circle cx="0" cy="0" r="1.5"/>
+          <circle cx="8" cy="4" r="1"/>
+          <circle cx="-5" cy="6" r="1"/>
+          <circle cx="3" cy="-5" r="1"/>
+          <circle cx="12" cy="-2" r="0.8"/>
+          <circle cx="-8" cy="-3" r="1.2"/>
+        </g>
+
+        <!-- Measurement tool / Caliper -->
+        <g transform="translate(200, 385)" fill="none" stroke="#4a5568" stroke-width="1" opacity="0.1">
+          <rect x="0" y="0" width="60" height="8" rx="1"/>
+          <rect x="10" y="-5" width="3" height="18" rx="0.5"/>
+          <rect x="35" y="-5" width="3" height="18" rx="0.5"/>
+          <!-- Scale -->
+          <line x1="5" y1="3" x2="55" y2="3" stroke-width="0.5"/>
+          <!-- Dial -->
+          <circle cx="50" cy="-2" r="5"/>
+        </g>
+
       </g>
-
-      <!-- CNC tool/end mill -->
-      <g transform="translate(150, 30)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.15">
-        <rect x="-6" y="0" width="12" height="35" rx="2"/>
-        <line x1="-6" y1="8" x2="6" y2="8"/>
-        <line x1="-6" y1="16" x2="6" y2="16"/>
-        <path d="M-6,35 L-3,45 L3,45 L6,35"/>
-      </g>
-
-      <!-- Small gear -->
-      <g transform="translate(100, 100)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.12">
-        <circle cx="0" cy="0" r="12"/>
-        <circle cx="0" cy="0" r="4"/>
-        <rect x="-3" y="-17" width="6" height="4" rx="1"/>
-        <rect x="-3" y="13" width="6" height="4" rx="1"/>
-        <rect x="-17" y="-3" width="4" height="6" rx="1"/>
-        <rect x="13" y="-3" width="4" height="6" rx="1"/>
-      </g>
-
-      <!-- Drill bit -->
-      <g transform="translate(30, 150) rotate(-30)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.18">
-        <rect x="-4" y="-20" width="8" height="25" rx="1"/>
-        <path d="M-4,5 L0,15 L4,5"/>
-        <line x1="-4" y1="-15" x2="4" y2="-10"/>
-        <line x1="-4" y1="-10" x2="4" y2="-5"/>
-        <line x1="-4" y1="-5" x2="4" y2="0"/>
-      </g>
-
-      <!-- Lathe chuck representation -->
-      <g transform="translate(160, 140)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.15">
-        <circle cx="0" cy="0" r="22"/>
-        <circle cx="0" cy="0" r="15"/>
-        <circle cx="0" cy="0" r="6"/>
-        <!-- Chuck jaws -->
-        <rect x="-3" y="-24" width="6" height="8" rx="1"/>
-        <rect x="-3" y="16" width="6" height="8" rx="1"/>
-        <rect x="-24" y="-3" width="8" height="6" rx="1"/>
-        <rect x="16" y="-3" width="8" height="6" rx="1"/>
-      </g>
-
-      <!-- Measuring caliper simplified -->
-      <g transform="translate(90, 170)" fill="none" stroke="#4a5568" stroke-width="1.5" opacity="0.12">
-        <rect x="0" y="0" width="40" height="6" rx="1"/>
-        <rect x="0" y="6" width="8" height="15" rx="1"/>
-        <rect x="25" y="6" width="8" height="12" rx="1"/>
-      </g>
-
-      <!-- CNC coordinate lines -->
-      <g transform="translate(170, 85)" stroke="#4a5568" stroke-width="1" opacity="0.1">
-        <line x1="0" y1="0" x2="20" y2="0"/>
-        <line x1="0" y1="0" x2="0" y2="20"/>
-        <line x1="0" y1="0" x2="-10" y2="10"/>
-        <text x="22" y="4" font-size="6" fill="#4a5568">X</text>
-        <text x="2" y="24" font-size="6" fill="#4a5568">Y</text>
-        <text x="-16" y="14" font-size="6" fill="#4a5568">Z</text>
-      </g>
-
-      <!-- Wood grain lines (for woodworking) -->
-      <g transform="translate(70, 60)" stroke="#4a5568" stroke-width="0.8" opacity="0.08">
-        <path d="M0,0 Q10,5 20,0 T40,0" fill="none"/>
-        <path d="M0,8 Q10,13 20,8 T40,8" fill="none"/>
-        <path d="M0,16 Q10,21 20,16 T40,16" fill="none"/>
-      </g>
-
     </pattern>
   </defs>
   <rect width="100%" height="100%" fill="url(#kanban-pattern)"/>

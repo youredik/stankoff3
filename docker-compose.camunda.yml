@@ -1,91 +1,45 @@
 # =============================================
-# Camunda 8 Platform - Development Configuration
+# Zeebe Broker - Development Configuration
 # =============================================
 # Запуск: docker compose -f docker-compose.camunda.yml up -d
 #
-# Сервисы:
-#   - orchestration: Zeebe + Operate + Tasklist (объединённый контейнер)
-#   - elasticsearch: Хранилище для Operate/Tasklist
+# Это минимальная конфигурация для тестирования BPMN:
+#   - Только Zeebe broker (без Operate/Tasklist)
+#   - Не требует Elasticsearch
+#   - Легковесный и быстрый запуск
 #
 # Порты:
 #   - 26500: Zeebe gRPC (для подключения backend)
-#   - 8088: Operate + Tasklist UI (http://localhost:8088)
-#   - 9200: Elasticsearch (для отладки)
+#   - 9600: Zeebe REST/Actuator (healthcheck)
 #
-# Учётные данные:
-#   - Operate/Tasklist: demo / demo
-#
-# Использование с основным приложением:
-#   docker compose -f docker-compose.yml -f docker-compose.camunda.yml up -d
+# Для полной платформы с UI используйте camunda-8.8/docker-compose.yaml
 
 services:
-  # Zeebe + Operate + Tasklist (consolidated container)
-  orchestration:
-    image: camunda/camunda:8.8.9
-    container_name: stankoff-camunda
+  zeebe:
+    image: camunda/zeebe:8.7.21
+    container_name: stankoff-zeebe
     ports:
-      - "26500:26500"  # Zeebe gRPC
-      - "9600:9600"    # Zeebe REST
-      - "8088:8080"    # Operate + Tasklist UI
+      - "26500:26500"  # gRPC Gateway
+      - "9600:9600"    # Metrics/REST
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9600/actuator/health/status || exit 1"]
       interval: 10s
       retries: 30
-      start_period: 60s
-      timeout: 5s
-    volumes:
-      - zeebe_data:/usr/local/zeebe/data
-    environment:
-      # Simplified config via environment variables
-      - CAMUNDA_SYSTEM_CPU-THREAD-COUNT=2
-      - CAMUNDA_SYSTEM_IO-THREAD-COUNT=2
-      - CAMUNDA_SECURITY_AUTHENTICATION_METHOD=basic
-      - CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI=true
-      - CAMUNDA_SECURITY_AUTHORIZATIONS_ENABLED=false
-      - CAMUNDA_SECURITY_INITIALIZATION_USERS_0_USERNAME=demo
-      - CAMUNDA_SECURITY_INITIALIZATION_USERS_0_PASSWORD=demo
-      - CAMUNDA_SECURITY_INITIALIZATION_USERS_0_NAME=Demo User
-      - CAMUNDA_SECURITY_INITIALIZATION_USERS_0_EMAIL=demo@demo.com
-      - CAMUNDA_SECURITY_INITIALIZATION_DEFAULTROLES_ADMIN_USERS_0=demo
-      - CAMUNDA_DATABASE_INDEX_NUMBEROFREPLICAS=0
-      - CAMUNDA_DATA_SECONDARY-STORAGE_TYPE=elasticsearch
-      - CAMUNDA_DATA_SECONDARY-STORAGE_ELASTICSEARCH_CLUSTER-NAME=elasticsearch
-      - CAMUNDA_DATA_SECONDARY-STORAGE_ELASTICSEARCH_URL=http://elasticsearch:9200
-    networks:
-      - stankoff-network
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-
-  # Elasticsearch for Operate/Tasklist data
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.10
-    container_name: stankoff-elasticsearch
-    ports:
-      - "9200:9200"
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - cluster.routing.allocation.disk.threshold_enabled=false
-      - logger.org.elasticsearch.deprecation=OFF
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cat/health | grep -q green"]
-      interval: 10s
-      retries: 30
       start_period: 30s
       timeout: 5s
+    environment:
+      - ZEEBE_BROKER_GATEWAY_ENABLE=true
+      - ZEEBE_BROKER_NETWORK_HOST=0.0.0.0
+      - ZEEBE_LOG_LEVEL=info
+      - JAVA_OPTS=-Xms256m -Xmx256m
     volumes:
-      - elastic_data:/usr/share/elasticsearch/data
+      - zeebe_data:/usr/local/zeebe/data
     networks:
       - stankoff-network
 
 volumes:
   zeebe_data:
-    driver: local
-  elastic_data:
     driver: local
 
 networks:

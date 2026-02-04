@@ -26,7 +26,7 @@ export class AuditLogController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('sort') sort?: 'newest' | 'oldest',
-    @CurrentUser() user?: User,
+    @CurrentUser() _user?: User,
   ) {
     // Проверяем доступ к сущности через workspace
     // (entity содержит workspaceId, и мы проверяем доступ к workspace)

@@ -154,13 +154,14 @@ export function ProcessEditor({
       )}
 
       {/* BPMN Editor */}
-      <div className="flex-1 min-h-0">
-        <BpmnModeler
-          xml={initialXml}
-          onXmlChange={handleXmlChange}
-          onProcessIdChange={handleProcessIdChange}
-          className="h-full"
-        />
+      <div className="flex-1 min-h-0 relative">
+        <div className="absolute inset-0">
+          <BpmnModeler
+            xml={initialXml}
+            onXmlChange={handleXmlChange}
+            onProcessIdChange={handleProcessIdChange}
+          />
+        </div>
       </div>
     </div>
   );

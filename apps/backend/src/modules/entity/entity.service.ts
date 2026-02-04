@@ -13,7 +13,7 @@ import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AuditActionType } from '../audit-log/audit-log.entity';
 import { EmailService } from '../email/email.service';
-import { AutomationService, AutomationContext } from '../automation/automation.service';
+import { AutomationService } from '../automation/automation.service';
 import { TriggerType } from '../automation/automation-rule.entity';
 
 @Injectable()

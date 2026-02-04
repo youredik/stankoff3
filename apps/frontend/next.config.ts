@@ -1,6 +1,10 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Используем Turbopack (по умолчанию в Next.js 16)
+  // Пустой конфиг чтобы убрать предупреждение о webpack
+  turbopack: {},
+
   // Настройки изображений
   images: {
     remotePatterns: [

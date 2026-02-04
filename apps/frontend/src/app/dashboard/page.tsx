@@ -67,9 +67,21 @@ function DashboardContent() {
           onWorkspaceChange={handleWorkspaceChange}
         />
 
-        <main className="flex-1">
+        <main
+          className="flex-1 relative"
+          style={currentView === 'kanban' ? {
+            backgroundImage: 'url(/kanban-bg.svg)',
+            backgroundSize: '200px 200px',
+            backgroundRepeat: 'repeat',
+          } : undefined}
+        >
+          {/* Overlay for kanban background */}
+          {currentView === 'kanban' && (
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-50/60 via-gray-100/50 to-gray-50/60 dark:from-gray-900/70 dark:via-gray-800/60 dark:to-gray-900/70 pointer-events-none" />
+          )}
+
           {currentView === 'kanban' && selectedWorkspace && (
-            <div className="p-6">
+            <div className="relative p-6">
               <KanbanBoard workspaceId={selectedWorkspace} />
             </div>
           )}

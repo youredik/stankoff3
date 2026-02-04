@@ -25,6 +25,8 @@ function LoginPageContent() {
   useEffect(() => {
     // Проверяем ошибку SSO
     const ssoError = searchParams.get('error');
+    const logoutSuccess = searchParams.get('logout');
+
     if (ssoError === 'sso_failed') {
       useAuthStore.setState({ error: 'Ошибка SSO авторизации. Попробуйте снова.' });
       return;
@@ -36,8 +38,8 @@ function LoginPageContent() {
       return;
     }
 
-    // Если не авторизован, не загружается и нет ошибки - автоматический редирект на SSO
-    if (!isAuthenticated && !isLoading && !ssoError) {
+    // Если не авторизован, не загружается и нет ошибки и не после logout - автоматический редирект на SSO
+    if (!isAuthenticated && !isLoading && !ssoError && !logoutSuccess) {
       setIsRedirecting(true);
       window.location.href = authApi.getKeycloakLoginUrl();
     }

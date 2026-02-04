@@ -163,103 +163,90 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
   return (
     <div>
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            {currentWorkspace && (
-              <span className="text-3xl">{currentWorkspace.icon}</span>
-            )}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {currentWorkspace?.name || 'Загрузка...'}
-              </h2>
-              <p className="text-gray-500 dark:text-gray-400 mt-1">
-                {filteredEntities.length === entities.length
-                  ? `${entities.length} заявок`
-                  : `${filteredEntities.length} из ${entities.length} заявок`}
-              </p>
+      <div>
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {currentWorkspace?.name || 'Загрузка...'}
+                </h2>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">
+                  {filteredEntities.length === entities.length
+                    ? `${entities.length} заявок`
+                    : `${filteredEntities.length} из ${entities.length} заявок`}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowFilters(true)}
+                aria-label="Открыть фильтры"
+                aria-expanded={showFilters}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors cursor-pointer backdrop-blur-sm ${
+                  activeFilterCount > 0
+                    ? 'border-primary-300 dark:border-primary-700 bg-primary-50/80 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                    : 'border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80 text-gray-700 dark:text-gray-300'
+                }`}
+              >
+                <Filter className="w-5 h-5" />
+                <span>Фильтры</span>
+                {activeFilterCount > 0 && (
+                  <span className="bg-primary-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  aria-label="Сбросить все фильтры"
+                  className="flex items-center gap-1 px-3 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80 rounded-lg transition-colors cursor-pointer backdrop-blur-sm"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Сбросить</span>
+                </button>
+              )}
+              {/* Настройки - только для админов */}
+              {isAdmin && (
+                <button
+                  onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
+                  aria-label="Настройки рабочего места"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80 text-gray-700 dark:text-gray-300 transition-colors cursor-pointer backdrop-blur-sm"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span>Настройки</span>
+                </button>
+              )}
+              {/* Создание заявки - только для editor+ */}
+              {canEditEntities && (
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  aria-label="Создать новую заявку"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Новая заявка</span>
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowFilters(true)}
-              aria-label="Открыть фильтры"
-              aria-expanded={showFilters}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors cursor-pointer ${
-                activeFilterCount > 0
-                  ? 'border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
-            >
-              <Filter className="w-5 h-5" />
-              <span>Фильтры</span>
-              {activeFilterCount > 0 && (
-                <span className="bg-primary-600 text-white text-xs px-1.5 py-0.5 rounded-full">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            {activeFilterCount > 0 && (
-              <button
-                onClick={clearFilters}
-                aria-label="Сбросить все фильтры"
-                className="flex items-center gap-1 px-3 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-                <span>Сбросить</span>
-              </button>
-            )}
-            {/* Настройки - только для админов */}
-            {isAdmin && (
-              <button
-                onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
-                aria-label="Настройки рабочего места"
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
-              >
-                <Settings className="w-5 h-5" />
-                <span>Настройки</span>
-              </button>
-            )}
-            {/* Создание заявки - только для editor+ */}
-            {canEditEntities && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                aria-label="Создать новую заявку"
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Новая заявка</span>
-              </button>
-            )}
+        </div>
+
+        {/* Индикатор режима просмотра */}
+        {!canEditEntities && currentRole && (
+          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+            <Eye className="w-4 h-4" />
+            <span className="text-sm">Режим просмотра — вы можете просматривать заявки, но не можете их редактировать</span>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Индикатор режима просмотра */}
-      {!canEditEntities && currentRole && (
-        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">
-          <Eye className="w-4 h-4" />
-          <span className="text-sm">Режим просмотра — вы можете просматривать заявки, но не можете их редактировать</span>
-        </div>
-      )}
-
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div
-          className="relative rounded-xl overflow-hidden min-h-[calc(100vh-220px)]"
-          style={{
-            backgroundImage: 'url(/kanban-bg.svg)',
-            backgroundSize: '200px 200px',
-            backgroundRepeat: 'repeat',
-          }}
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         >
-          {/* Overlay for light/dark mode */}
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-50/60 via-gray-100/50 to-gray-50/60 dark:from-gray-900/70 dark:via-gray-800/60 dark:to-gray-900/70 pointer-events-none" />
-
-          <div className="relative flex overflow-x-auto py-4">
+          <div className="flex overflow-x-auto pb-4">
             {columns.map((column) => (
               <KanbanColumn
                 key={column.id}
@@ -271,12 +258,12 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
               />
             ))}
           </div>
-        </div>
 
-        <DragOverlay>
-          {activeCard ? <KanbanCard entity={activeCard} isDragging /> : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeCard ? <KanbanCard entity={activeCard} isDragging /> : null}
+          </DragOverlay>
+        </DndContext>
+      </div>
 
       <EntityDetailPanel />
 

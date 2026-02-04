@@ -93,7 +93,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('message')
-  handleMessage(client: Socket, payload: any): string {
+  handleMessage(_client: Socket, _payload: unknown): string {
     return 'Message received';
   }
 }

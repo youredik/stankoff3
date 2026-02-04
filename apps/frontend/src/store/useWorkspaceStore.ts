@@ -129,6 +129,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     const workspaceData = {
       name: data.name || 'Новое рабочее место',
       icon: data.icon || '📋',
+      sectionId: data.sectionId ?? null,
+      showInMenu: data.showInMenu ?? true,
       sections: data.sections || [
         {
           id: generateId(),

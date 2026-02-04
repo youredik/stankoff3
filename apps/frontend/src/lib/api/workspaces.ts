@@ -47,6 +47,17 @@ export const workspacesApi = {
   setArchived: (workspaceId: string, isArchived: boolean) =>
     apiClient.patch<Workspace>(`/workspaces/${workspaceId}/archive`, { isArchived }).then((r) => r.data),
 
+  // Раздел и показ в меню
+  setSection: (workspaceId: string, sectionId: string | null) =>
+    apiClient.patch<Workspace>(`/workspaces/${workspaceId}/section`, { sectionId }).then((r) => r.data),
+
+  setShowInMenu: (workspaceId: string, showInMenu: boolean) =>
+    apiClient.patch<Workspace>(`/workspaces/${workspaceId}/show-in-menu`, { showInMenu }).then((r) => r.data),
+
+  // Изменить порядок workspaces
+  reorder: (workspaceIds: string[]) =>
+    apiClient.post('/workspaces/reorder', { workspaceIds }),
+
   exportJson: (workspaceId: string) =>
     `/api/workspaces/${workspaceId}/export/json`,
 

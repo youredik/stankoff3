@@ -8,18 +8,25 @@
     "apps/backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev": "concurrently -n front,back -c cyan,yellow --restart-tries 3 --restart-after 2000 \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "cd apps/frontend && npm run dev",
     "dev:backend": "cd apps/backend && npm run start:dev",
     "build": "npm run build:frontend && npm run build:backend",
     "build:frontend": "cd apps/frontend && npm run build",
     "build:backend": "cd apps/backend && npm run build",
+    "test": "npm run test:backend",
+    "test:backend": "cd apps/backend && npm test",
+    "test:coverage": "cd apps/backend && npm test -- --coverage",
+    "test:e2e": "cd apps/frontend && npm run test:e2e",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
   },
   "engines": {
     "node": ">=20.0.0",

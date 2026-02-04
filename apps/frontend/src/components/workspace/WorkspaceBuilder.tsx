@@ -24,7 +24,9 @@ import { FieldEditor } from './FieldEditor';
 import { WorkspaceMembers } from './WorkspaceMembers';
 import { AutomationRules } from './AutomationRules';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useSectionStore } from '@/store/useSectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { workspacesApi } from '@/lib/api/workspaces';
 import type { Field, FieldType, Workspace } from '@/types';
 
 type TabType = 'structure' | 'members' | 'automation';
@@ -51,6 +53,8 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
     moveField,
     saveWorkspace,
   } = useWorkspaceStore();
+
+  const { sections, fetchSections } = useSectionStore();
 
   const [editingField, setEditingField] = useState<{
     field: Field;
@@ -80,7 +84,8 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
     setIsInitialized(false);
     fetchWorkspace(workspaceId).finally(() => setIsInitialized(true));
     fetchWorkspaces();
-  }, [workspaceId, fetchWorkspace, fetchWorkspaces]);
+    fetchSections();
+  }, [workspaceId, fetchWorkspace, fetchWorkspaces, fetchSections]);
 
   useEffect(() => {
     setHasChanges(true);
@@ -240,6 +245,30 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
       setHasChanges(true);
     }
     setShowIconPicker(false);
+  };
+
+  // Изменение раздела
+  const handleSectionChange = async (sectionId: string | null) => {
+    if (currentWorkspace) {
+      try {
+        await workspacesApi.setSection(currentWorkspace.id, sectionId);
+        setCurrentWorkspace({ ...currentWorkspace, sectionId });
+      } catch (err) {
+        console.error('Failed to update section:', err);
+      }
+    }
+  };
+
+  // Изменение showInMenu
+  const handleShowInMenuChange = async (showInMenu: boolean) => {
+    if (currentWorkspace) {
+      try {
+        await workspacesApi.setShowInMenu(currentWorkspace.id, showInMenu);
+        setCurrentWorkspace({ ...currentWorkspace, showInMenu });
+      } catch (err) {
+        console.error('Failed to update showInMenu:', err);
+      }
+    }
   };
 
   if (!isInitialized || (loading && !currentWorkspace)) {
@@ -403,6 +432,41 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
               </button>
             )}
           </div>
+
+          {/* Settings Bar - Section & Menu Visibility */}
+          {isGlobalAdmin && activeTab === 'structure' && (
+            <div className="px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-6">
+              {/* Выбор раздела */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 dark:text-gray-400">Раздел:</label>
+                <select
+                  value={currentWorkspace.sectionId || ''}
+                  onChange={(e) => handleSectionChange(e.target.value || null)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Без раздела</option>
+                  {sections.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.icon} {section.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Показывать в меню */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={currentWorkspace.showInMenu !== false}
+                  onChange={(e) => handleShowInMenuChange(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Показывать в боковом меню
+                </span>
+              </label>
+            </div>
+          )}
 
           {/* Content */}
           {activeTab === 'structure' ? (

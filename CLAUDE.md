@@ -69,28 +69,84 @@ stankoff-portal/
    - Изменения в интерфейсах типов
    - Новые stores или методы в существующих
 
+### Тестирование (ОБЯЗАТЕЛЬНО)
+
+**КРИТИЧЕСКИ ВАЖНО:** Весь новый функционал должен быть покрыт тестами на 100%!
+
+**Pre-commit hooks:**
+- Настроен husky для автоматической проверки перед коммитом
+- Коммит будет отклонён если тесты не проходят
+- Проверяется: TypeScript компиляция (backend + frontend) и unit-тесты backend
+
+**Команды тестирования:**
+```bash
+# Unit тесты backend
+npm run test                  # Запуск unit-тестов
+npm run test:coverage         # Тесты с отчётом о покрытии
+
+# E2E тесты frontend (Playwright)
+npm run test:e2e              # Все тесты
+npm run test:e2e:headed       # Тесты с видимым браузером
+npm run test:e2e:ui           # Интерактивный UI
+```
+
+**Требования к тестам:**
+1. **Каждый новый сервис** должен иметь `*.spec.ts` файл рядом
+2. **Каждый контроллер** должен иметь unit-тесты для всех endpoints
+3. **Мокировать** внешние зависимости (БД, API, S3)
+4. **Тестировать** как happy path, так и error cases
+5. **Использовать** строгие типы в тестах (минимизировать `any`)
+
+**Пример структуры теста:**
+```typescript
+describe('ServiceName', () => {
+  let service: ServiceName;
+  let dependency: jest.Mocked<Dependency>;
+
+  beforeEach(async () => {
+    // Создание моков и модуля
+  });
+
+  describe('methodName', () => {
+    it('должен вернуть результат при успехе', async () => {
+      // Arrange, Act, Assert
+    });
+
+    it('должен обработать ошибку', async () => {
+      // Тест error case
+    });
+  });
+});
+```
+
 ### Проверка работоспособности (ОБЯЗАТЕЛЬНО)
 
 После любых изменений в коде **всегда** проверяй:
 
-1. **E2E тесты (Playwright):**
+1. **Unit тесты backend:**
+   ```bash
+   npm run test
+   ```
+
+2. **E2E тесты (Playwright):**
    ```bash
    cd apps/frontend && npm run test:e2e
    ```
 
-2. **TypeScript компиляция:**
+3. **TypeScript компиляция:**
    ```bash
    cd apps/frontend && npm run build
    cd apps/backend && npm run build
    ```
 
-3. **Что проверять:**
+4. **Что проверять:**
+   - Unit тесты проходят
    - E2E тесты проходят
    - Нет ошибок TypeScript
    - Нет runtime ошибок в консоли браузера
    - Нет ошибок 500 от API
 
-4. **При ошибках:**
+5. **При ошибках:**
    - Исправь ошибку
    - Проверь снова
    - Только потом переходи к документированию
@@ -334,7 +390,19 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `DELETE /api/entities/cleanup/test-data` — очистка тестовых данных (E2E)
 - `GET/POST /api/comments/entity/:id` — комментарии
 - `GET/POST/PUT /api/workspaces` — рабочие места
+- `PATCH /api/workspaces/:id/section` — изменить раздел workspace
+- `PATCH /api/workspaces/:id/show-in-menu` — показывать/скрывать в меню
+- `POST /api/workspaces/reorder` — изменить порядок workspaces
 - `POST /api/files/upload` — загрузка файлов
+
+**Разделы (группировка workspaces):**
+- `GET /api/sections` — список доступных разделов
+- `POST /api/sections` — создать раздел (только админ)
+- `PUT /api/sections/:id` — обновить раздел
+- `DELETE /api/sections/:id` — удалить раздел (только пустой)
+- `POST /api/sections/reorder` — изменить порядок разделов
+- `GET /api/sections/my-roles` — роли пользователя во всех разделах
+- `GET/POST/PUT/DELETE /api/sections/:id/members` — управление участниками раздела
 
 **Поиск:**
 - `GET /api/search?q=текст` — глобальный поиск по заявкам и комментариям

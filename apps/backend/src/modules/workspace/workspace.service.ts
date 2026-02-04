@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,13 +22,16 @@ export class WorkspaceService {
   async findAll(userId: string, userRole: UserRole): Promise<Workspace[]> {
     // Глобальный admin видит все
     if (userRole === UserRole.ADMIN) {
-      return this.workspaceRepository.find();
+      return this.workspaceRepository.find({
+        relations: ['section'],
+        order: { orderInSection: 'ASC', name: 'ASC' },
+      });
     }
 
     // Остальные видят только свои
     const memberships = await this.memberRepository.find({
       where: { userId },
-      relations: ['workspace'],
+      relations: ['workspace', 'workspace.section'],
     });
 
     return memberships.map((m) => m.workspace);
@@ -40,7 +43,10 @@ export class WorkspaceService {
   }
 
   async findOne(id: string): Promise<Workspace | null> {
-    return this.workspaceRepository.findOne({ where: { id } });
+    return this.workspaceRepository.findOne({
+      where: { id },
+      relations: ['section'],
+    });
   }
 
   // Проверка доступа пользователя к workspace
@@ -215,6 +221,9 @@ export class WorkspaceService {
       sections: newSections,
       lastEntityNumber: 0, // Сбрасываем счётчик
       isArchived: false,
+      sectionId: original.sectionId, // Копируем раздел
+      showInMenu: original.showInMenu,
+      orderInSection: original.orderInSection,
     });
 
     const saved = await this.workspaceRepository.save(duplicated);
@@ -234,6 +243,36 @@ export class WorkspaceService {
 
     workspace.isArchived = isArchived;
     return this.workspaceRepository.save(workspace);
+  }
+
+  // Установить раздел для workspace
+  async setSection(workspaceId: string, sectionId: string | null): Promise<Workspace> {
+    const workspace = await this.findOne(workspaceId);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    workspace.sectionId = sectionId;
+    const saved = await this.workspaceRepository.save(workspace);
+    return this.findOne(saved.id) as Promise<Workspace>;
+  }
+
+  // Установить showInMenu
+  async setShowInMenu(workspaceId: string, showInMenu: boolean): Promise<Workspace> {
+    const workspace = await this.findOne(workspaceId);
+    if (!workspace) {
+      throw new NotFoundException('Workspace не найден');
+    }
+
+    workspace.showInMenu = showInMenu;
+    return this.workspaceRepository.save(workspace);
+  }
+
+  // Изменить порядок workspaces внутри раздела
+  async reorderInSection(workspaceIds: string[]): Promise<void> {
+    for (let i = 0; i < workspaceIds.length; i++) {
+      await this.workspaceRepository.update(workspaceIds[i], { orderInSection: i });
+    }
   }
 
   // Экспорт заявок workspace в JSON
@@ -307,7 +346,7 @@ export class WorkspaceService {
   async importFromJson(
     workspaceId: string,
     entities: any[],
-    userId: string,
+    _userId: string,
   ): Promise<{ imported: number; errors: string[] }> {
     const workspace = await this.findOne(workspaceId);
     if (!workspace) {
@@ -350,7 +389,7 @@ export class WorkspaceService {
   async importFromCsv(
     workspaceId: string,
     csvContent: string,
-    userId: string,
+    _userId: string,
   ): Promise<{ imported: number; errors: string[] }> {
     const workspace = await this.findOne(workspaceId);
     if (!workspace) {

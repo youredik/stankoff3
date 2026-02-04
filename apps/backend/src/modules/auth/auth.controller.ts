@@ -50,7 +50,7 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: COOKIE_MAX_AGE,
-      path: '/api/auth',
+      path: '/api',
     });
 
     return { accessToken: tokens.accessToken };
@@ -63,13 +63,15 @@ export class AuthController {
   ) {
     // Получаем id_token для logout hint (позволяет пропустить страницу подтверждения)
     const idToken = req.cookies?.[ID_TOKEN_COOKIE];
+    console.log('Logout: cookies available:', Object.keys(req.cookies || {}));
+    console.log('Logout: id_token present:', !!idToken);
 
     // Очищаем refresh token cookie
     res.clearCookie(REFRESH_TOKEN_COOKIE, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/api/auth',
+      path: '/api',
     });
 
     // Очищаем id_token cookie
@@ -77,20 +79,21 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/api/auth',
+      path: '/api',
     });
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
 
     // Возвращаем URL для logout из Keycloak
-    const keycloakLogoutUrl = this.authService.getKeycloakLogoutUrl(frontendUrl + '/login', idToken);
+    // Добавляем ?logout=success чтобы страница /login не делала автоматический редирект на SSO
+    const keycloakLogoutUrl = this.authService.getKeycloakLogoutUrl(frontendUrl + '/login?logout=success', idToken);
     return { message: 'Выход выполнен успешно', keycloakLogoutUrl };
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@CurrentUser() user: User) {
-    const { password, ...userWithoutPassword } = user;
+    const { password: _password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
@@ -143,17 +146,18 @@ export class AuthController {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax', // lax для cross-origin redirect
         maxAge: COOKIE_MAX_AGE,
-        path: '/api/auth',
+        path: '/api',
       });
 
       // Сохраняем id_token для logout (позволяет пропустить страницу подтверждения)
+      console.log('Keycloak callback: idToken present:', !!idToken);
       if (idToken) {
         res.cookie(ID_TOKEN_COOKIE, idToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
           maxAge: COOKIE_MAX_AGE,
-          path: '/api/auth',
+          path: '/api',
         });
       }
 

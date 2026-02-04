@@ -6,7 +6,6 @@ import { WorkspaceEntity } from '../entity/entity.entity';
 
 describe('EmailService', () => {
   let service: EmailService;
-  let configService: jest.Mocked<ConfigService>;
 
   const mockUser: User = {
     id: 'user-1',
@@ -54,7 +53,6 @@ describe('EmailService', () => {
     }).compile();
 
     service = module.get<EmailService>(EmailService);
-    configService = module.get(ConfigService);
   });
 
   describe('send', () => {

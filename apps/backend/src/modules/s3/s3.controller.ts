@@ -6,13 +6,12 @@ import {
   Get,
   Param,
   Query,
-  Req,
   Res,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { S3Service } from './s3.service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -134,7 +133,7 @@ export class S3Controller {
       });
 
       (stream as any).pipe(res);
-    } catch (error: any) {
+    } catch {
       throw new NotFoundException(`Файл не найден: ${key}`);
     }
   }

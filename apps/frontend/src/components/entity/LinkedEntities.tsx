@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link2, Plus, X, ExternalLink, Loader2 } from 'lucide-react';
 import { entitiesApi } from '@/lib/api/entities';
 import { workspacesApi } from '@/lib/api/workspaces';
@@ -35,6 +35,9 @@ export function LinkedEntities({
   const [allEntities, setAllEntities] = useState<Entity[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Стабильный ключ для сравнения массива (вместо reference equality)
+  const linkedIdsKey = useMemo(() => linkedEntityIds.join(','), [linkedEntityIds]);
 
   // Fetch linked entity details
   useEffect(() => {
@@ -107,34 +110,46 @@ export function LinkedEntities({
     };
 
     fetchLinkedEntities();
-  }, [linkedEntityIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedIdsKey]); // Используем стабильный ключ вместо массива
 
-  // Fetch entities for add modal
+  // Fetch entities for add modal (только при открытии модалки)
   useEffect(() => {
     if (!showAddModal) return;
+
+    let cancelled = false;
 
     const fetchAll = async () => {
       try {
         const workspacesData = await workspacesApi.getAll();
+        if (cancelled) return;
+
         setWorkspaces(workspacesData);
 
-        if (workspacesData.length > 0 && !selectedWorkspaceId) {
-          setSelectedWorkspaceId(workspacesData[0].id);
+        if (workspacesData.length > 0) {
+          setSelectedWorkspaceId((prev) => prev || workspacesData[0].id);
         }
 
         const allEntitiesData: Entity[] = [];
         for (const ws of workspacesData) {
+          if (cancelled) return;
           const wsEntities = await entitiesApi.getByWorkspace(ws.id);
           allEntitiesData.push(...wsEntities);
         }
-        setAllEntities(allEntitiesData);
+        if (!cancelled) {
+          setAllEntities(allEntitiesData);
+        }
       } catch {
         // silent
       }
     };
 
     fetchAll();
-  }, [showAddModal, selectedWorkspaceId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showAddModal]); // Убрали selectedWorkspaceId — он менялся внутри эффекта
 
   const handleRemoveLink = (customId: string) => {
     const updated = linkedEntityIds.filter((id) => id !== customId);

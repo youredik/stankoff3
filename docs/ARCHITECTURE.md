@@ -85,9 +85,12 @@ Stankoff Portal - это корпоративная система управл�
 - `FieldEditor.tsx` - Редактор свойств полей
 - `SectionCard.tsx` - Секция с полями
 
+**Section (Разделы)**
+- `SectionMembersModal.tsx` - Модальное окно управления участниками раздела (добавление, удаление, изменение ролей viewer/admin)
+
 **Layout**
 - `Header.tsx` - Шапка с поиском, переключателем вида (Канбан/Аналитика) и уведомлениями
-- `Sidebar.tsx` - Боковое меню с рабочими местами, бейджами ролей и выпадающим меню (дублировать, архивировать, экспорт, импорт)
+- `Sidebar.tsx` - Боковое меню с разделами (секциями), группировкой workspaces по разделам, управлением секциями (создание, редактирование, удаление, участники) и выпадающим меню для workspace (дублировать, архивировать, экспорт, импорт)
 - `NotificationPanel.tsx` - Выпадающая панель уведомлений с иконками типов и настройкой push-уведомлений
 - `GlobalSearch.tsx` - Глобальный поиск по всем заявкам (Cmd+K)
 
@@ -247,6 +250,28 @@ interface SidebarStore {
 
 > Управляет состоянием мобильного sidebar. На desktop sidebar всегда видим, на мобильных открывается по клику на burger menu.
 
+**useSectionStore**
+```typescript
+interface SectionStore {
+  sections: MenuSection[];          // Все доступные разделы
+  myRoles: Record<string, MenuSectionRole>; // Роли пользователя во всех разделах
+  collapsedSections: Set<string>;   // Свёрнутые разделы (в localStorage)
+  loading: boolean;
+  error: string | null;
+
+  fetchSections(): Promise<void>;
+  fetchMyRoles(): Promise<void>;
+  createSection(data: CreateSectionData): Promise<MenuSection>;
+  updateSection(id: string, data: UpdateSectionData): Promise<void>;
+  deleteSection(id: string): Promise<void>;
+  reorderSections(sectionIds: string[]): Promise<void>;
+  toggleCollapsed(sectionId: string): void;
+  isAdmin(sectionId: string): boolean;  // Проверка роли admin в разделе
+}
+```
+
+> Управляет разделами (секциями) для группировки workspaces. Состояние свёрнутых разделов сохраняется в localStorage.
+
 #### Hooks
 
 **useWebSocket**
@@ -321,7 +346,11 @@ interface Workspace {
   prefix: string;           // Префикс для номеров заявок: TP, REK и т.д.
   lastEntityNumber: number; // Счётчик для автогенерации номеров
   isArchived: boolean;      // Архивирован ли workspace
-  sections: Section[];      // Секции с полями
+  sectionId: string | null; // ID раздела (группировка)
+  section: Section | null;  // Связанный раздел
+  showInMenu: boolean;      // Отображать в боковом меню (по умолчанию true)
+  orderInSection: number;   // Порядок внутри раздела
+  sections: WorkspaceSection[];  // Секции с полями (структура workspace)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -581,6 +610,53 @@ interface RuleAction {
 
 > **Выполнение правил:** При срабатывании триггера (создание, изменение статуса и т.д.) AutomationService находит все включённые правила для workspace, проверяет условия и выполняет действия. Правила выполняются в порядке приоритета.
 
+**SectionModule**
+Разделы для группировки рабочих мест с контролем доступа.
+
+```
+section/
+├── section.module.ts
+├── section.controller.ts       # CRUD разделов и управление участниками
+├── section.service.ts          # Логика работы с разделами
+├── section.entity.ts           # Section entity
+├── section-member.entity.ts    # SectionMember entity
+└── dto/
+    ├── create-section.dto.ts
+    ├── update-section.dto.ts
+    ├── add-section-member.dto.ts
+    └── update-section-member.dto.ts
+```
+
+```typescript
+enum SectionRole {
+  VIEWER = 'viewer',  // Видит раздел и его workspaces
+  ADMIN = 'admin',    // Управляет разделом и его участниками
+}
+
+interface Section {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;           // Эмоджи иконка (по умолчанию 📁)
+  order: number;          // Порядок сортировки
+  workspaces: Workspace[];
+  members: SectionMember[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface SectionMember {
+  id: string;
+  sectionId: string;
+  userId: string;
+  user: User;
+  role: SectionRole;
+  createdAt: Date;
+}
+```
+
+> **Контроль доступа:** Глобальный admin видит все разделы. Остальные пользователи видят разделы, где они либо участники раздела, либо участники хотя бы одного workspace в разделе. Запрещено удалять непустые разделы (с workspaces).
+
 **BpmnModule**
 Интеграция с Camunda 8 Platform для управления бизнес-процессами (BPMN 2.0).
 
@@ -696,6 +772,20 @@ interface ProcessInstance {
 | GET | /api/workspaces/:id/export/csv | Экспорт entities в CSV |
 | POST | /api/workspaces/:id/import/json | Импорт entities из JSON |
 | POST | /api/workspaces/:id/import/csv | Импорт entities из CSV |
+| PATCH | /api/workspaces/:id/section | Изменить раздел workspace |
+| PATCH | /api/workspaces/:id/show-in-menu | Показать/скрыть в меню |
+| POST | /api/workspaces/reorder | Изменить порядок workspaces |
+| GET | /api/sections | Список доступных разделов |
+| GET | /api/sections/:id | Детали раздела |
+| GET | /api/sections/my-roles | Роли пользователя во всех разделах |
+| POST | /api/sections | Создать раздел (только admin) |
+| PUT | /api/sections/:id | Обновить раздел |
+| DELETE | /api/sections/:id | Удалить раздел (только пустой) |
+| POST | /api/sections/reorder | Изменить порядок разделов |
+| GET | /api/sections/:id/members | Участники раздела |
+| POST | /api/sections/:id/members | Добавить участника |
+| PUT | /api/sections/:id/members/:userId | Изменить роль участника |
+| DELETE | /api/sections/:id/members/:userId | Удалить участника |
 | GET | /api/search | Глобальный FTS поиск (query: q, workspaceId, types, limit) |
 | GET | /api/search/entities | FTS поиск по заявкам |
 | GET | /api/search/comments | FTS поиск по комментариям |
@@ -815,17 +905,34 @@ NotificationPanel показывает в списке
 
 ```
 ┌───────────────────┐
-│     workspaces    │
+│     sections      │  ◄── Разделы (группы workspaces)
 ├───────────────────┤
 │ id (uuid, PK)     │
 │ name              │
-│ icon              │
-│ prefix            │  ◄── Префикс номеров (TP, REK)
-│ lastEntityNumber  │  ◄── Счётчик для автогенерации
-│ sections (jsonb)  │◄──────────────────────────┐
-│ createdAt         │                           │
-│ updatedAt         │                           │
-└───────────────────┘                           │
+│ description       │
+│ icon              │  ◄── Эмоджи (по умолчанию 📁)
+│ order             │  ◄── Порядок сортировки
+│ createdAt         │
+│ updatedAt         │
+└───────────────────┘
+         ▲
+         │ sectionId
+         │
+┌───────────────────┐       ┌───────────────────┐
+│ section_members   │       │     workspaces    │
+├───────────────────┤       ├───────────────────┤
+│ id (uuid, PK)     │       │ id (uuid, PK)     │
+│ sectionId (FK)    │──►    │ name              │
+│ userId (FK)       │──►    │ icon              │
+│ role (enum)       │       │ prefix            │  ◄── Префикс номеров (TP, REK)
+│ createdAt         │       │ lastEntityNumber  │  ◄── Счётчик для автогенерации
+└───────────────────┘       │ sectionId (FK)    │──► sections.id (nullable)
+UNIQUE(sectionId, userId)   │ showInMenu        │  ◄── Отображать в меню (default: true)
+                            │ orderInSection    │  ◄── Порядок внутри раздела
+                            │ sections (jsonb)  │◄──────────────────────────┐
+                            │ createdAt         │                           │
+                            │ updatedAt         │                           │
+                            └───────────────────┘                           │
          ▲                                      │
          │ workspaceId                          │
          │                                      │
@@ -986,6 +1093,7 @@ await analyticsService.refreshMaterializedViews();
 | 1770126700000 | AddFullTextSearch | tsvector, триггеры, FTS индексы |
 | 1770126800000 | AddCachedFields | commentCount, lastActivityAt и т.д. |
 | 1770126900000 | AddMaterializedViews | mv_workspace_stats и др. |
+| 1770300000000 | AddSections | Разделы, section_members, поля workspaces |
 
 **Команды:**
 ```bash
