@@ -156,32 +156,33 @@ services:
         condition: any
         delay: 5s
 
-  # Camunda 8 Platform (Zeebe + Operate + Tasklist + embedded Elasticsearch)
+  # Zeebe Broker (BPMN workflow engine, no Elasticsearch required)
   camunda:
-    image: camunda/camunda:8.8.9
+    image: camunda/zeebe:8.7.21
     environment:
-      - CAMUNDA_OPERATE_CSRFPREVENTIONENABLED=false
-      - CAMUNDA_TASKLIST_CSRFPREVENTIONENABLED=false
-      # Use embedded storage (RocksDB + Elasticsearch)
+      - ZEEBE_BROKER_GATEWAY_ENABLE=true
+      - ZEEBE_BROKER_NETWORK_HOST=0.0.0.0
       - ZEEBE_BROKER_CLUSTER_PARTITIONSCOUNT=1
       - ZEEBE_BROKER_CLUSTER_REPLICATIONFACTOR=1
+      - ZEEBE_LOG_LEVEL=info
+      - JAVA_OPTS=-Xms256m -Xmx512m
     volumes:
-      - camunda-data:/usr/local/camunda/data
+      - camunda-data:/usr/local/zeebe/data
     networks:
       - stankoff-preprod-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9600/actuator/health/status || exit 1"]
       interval: 30s
       timeout: 10s
-      start_period: 180s
+      start_period: 60s
       retries: 10
     deploy:
       replicas: 1
       resources:
         limits:
-          memory: 3G
+          memory: 1G
         reservations:
-          memory: 2G
+          memory: 512M
       restart_policy:
         condition: any
         delay: 10s
