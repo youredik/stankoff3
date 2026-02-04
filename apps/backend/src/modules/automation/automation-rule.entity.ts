@@ -28,6 +28,7 @@ export enum ActionType {
   SET_FIELD = 'set_field',           // Установить значение поля
   SEND_NOTIFICATION = 'send_notification', // Отправить уведомление
   SEND_EMAIL = 'send_email',         // Отправить email
+  EVALUATE_DMN = 'evaluate_dmn',     // Выполнить DMN таблицу решений
 }
 
 // Операторы сравнения для условий
@@ -68,6 +69,11 @@ export interface RuleAction {
     recipientId?: string;
     message?: string;
     subject?: string; // Для email
+    // Для EVALUATE_DMN
+    decisionTableId?: string;           // ID таблицы решений
+    inputMapping?: Record<string, string>; // Маппинг полей entity -> input DMN (field -> columnName)
+    outputMapping?: Record<string, string>; // Маппинг output DMN -> поля entity (columnName -> field)
+    applyOutputToEntity?: boolean;      // Применить результат к entity (default: true)
   };
 }
 

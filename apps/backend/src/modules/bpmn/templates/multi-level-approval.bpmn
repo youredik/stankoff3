@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_MultiLevelApproval" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="multi-level-approval" name="Многоуровневое согласование" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Заявка создана">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_SetPending" name="Установить статус">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;level1_review&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Level1" name="Согласование уровень 1 (Руководитель)">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= level1ApproverId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Level1" name="Решение уровень 1">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_Level1_Approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Level1_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_SetLevel2" name="Статус: Уровень 2">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;level2_review&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Level1_Approve</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Level2" name="Согласование уровень 2 (Директор)">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= level2ApproverId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Level2" name="Решение уровень 2">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_Level2_Approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Level2_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_SetLevel3" name="Статус: Уровень 3">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;level3_review&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Level2_Approve</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Level3" name="Согласование уровень 3 (CEO)">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= level3ApproverId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Level3" name="Решение уровень 3">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_Level3_Approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Level3_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_Approve" name="Финальное одобрение">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;approved&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Level3_Approve</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyApproved</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Reject" name="Отклонить">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;rejected&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Level1_Reject</bpmn:incoming>
+      <bpmn:incoming>Flow_Level2_Reject</bpmn:incoming>
+      <bpmn:incoming>Flow_Level3_Reject</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyRejected</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Notify" name="Уведомить заявителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= &quot;Ваша заявка прошла многоуровневое согласование&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotifyApproved</bpmn:incoming>
+      <bpmn:incoming>Flow_ToNotifyRejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="Завершено">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_SetPending" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_SetPending" targetRef="Task_Level1" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Level1" targetRef="Gateway_Level1" />
+    <bpmn:sequenceFlow id="Flow_Level1_Approve" name="Одобрено" sourceRef="Gateway_Level1" targetRef="Task_SetLevel2">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "approve"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Level1_Reject" name="Отклонено" sourceRef="Gateway_Level1" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "reject"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_SetLevel2" targetRef="Task_Level2" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_Level2" targetRef="Gateway_Level2" />
+    <bpmn:sequenceFlow id="Flow_Level2_Approve" name="Одобрено" sourceRef="Gateway_Level2" targetRef="Task_SetLevel3">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "approve"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Level2_Reject" name="Отклонено" sourceRef="Gateway_Level2" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "reject"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_SetLevel3" targetRef="Task_Level3" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_Level3" targetRef="Gateway_Level3" />
+    <bpmn:sequenceFlow id="Flow_Level3_Approve" name="Одобрено" sourceRef="Gateway_Level3" targetRef="Task_Approve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "approve"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Level3_Reject" name="Отклонено" sourceRef="Gateway_Level3" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "reject"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToNotifyApproved" sourceRef="Task_Approve" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_ToNotifyRejected" sourceRef="Task_Reject" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_Notify" targetRef="EndEvent_1" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="multi-level-approval">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="202" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetPending_di" bpmnElement="Task_SetPending">
+        <dc:Bounds x="240" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Level1_di" bpmnElement="Task_Level1">
+        <dc:Bounds x="390" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Level1_di" bpmnElement="Gateway_Level1" isMarkerVisible="true">
+        <dc:Bounds x="545" y="195" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetLevel2_di" bpmnElement="Task_SetLevel2">
+        <dc:Bounds x="650" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Level2_di" bpmnElement="Task_Level2">
+        <dc:Bounds x="800" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Level2_di" bpmnElement="Gateway_Level2" isMarkerVisible="true">
+        <dc:Bounds x="955" y="195" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetLevel3_di" bpmnElement="Task_SetLevel3">
+        <dc:Bounds x="1060" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Level3_di" bpmnElement="Task_Level3">
+        <dc:Bounds x="1210" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Level3_di" bpmnElement="Gateway_Level3" isMarkerVisible="true">
+        <dc:Bounds x="1365" y="195" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Approve_di" bpmnElement="Task_Approve">
+        <dc:Bounds x="1470" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reject_di" bpmnElement="Task_Reject">
+        <dc:Bounds x="930" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Notify_di" bpmnElement="Task_Notify">
+        <dc:Bounds x="1620" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="1772" y="202" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

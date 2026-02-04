@@ -95,19 +95,51 @@ describe('BpmnTemplatesService', () => {
   });
 
   describe('getCategories', () => {
-    it('должен вернуть список категорий', () => {
+    it('должен вернуть список категорий с метаданными', () => {
       const categories = service.getCategories();
 
       expect(Array.isArray(categories)).toBe(true);
-      expect(categories).toContain('approval');
-      expect(categories).toContain('support');
+
+      // Проверяем структуру
+      const approvalCategory = categories.find(c => c.category === 'approval');
+      expect(approvalCategory).toBeDefined();
+      expect(approvalCategory?.label).toBe('Согласование');
+      expect(approvalCategory?.count).toBeGreaterThan(0);
+
+      const supportCategory = categories.find(c => c.category === 'support');
+      expect(supportCategory).toBeDefined();
+      expect(supportCategory?.label).toBe('Техподдержка');
     });
 
     it('должен вернуть уникальные категории', () => {
       const categories = service.getCategories();
-      const uniqueCategories = [...new Set(categories)];
+      const uniqueCategories = [...new Set(categories.map(c => c.category))];
 
       expect(categories.length).toBe(uniqueCategories.length);
+    });
+  });
+
+  describe('searchTemplates', () => {
+    it('должен найти шаблоны по названию', () => {
+      const results = service.searchTemplates('согласование');
+
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.some(t => t.name.toLowerCase().includes('согласование'))).toBe(true);
+    });
+
+    it('должен найти шаблоны по тегам', () => {
+      const results = service.searchTemplates('SLA');
+
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBeGreaterThan(0);
+    });
+
+    it('должен вернуть пустой массив если ничего не найдено', () => {
+      const results = service.searchTemplates('несуществующий запрос xyz123');
+
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBe(0);
     });
   });
 });

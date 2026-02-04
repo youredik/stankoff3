@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_IncidentManagement" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="incident-management" name="Управление инцидентами" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Инцидент зарегистрирован">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_SetNew" name="Статус: Новый">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;new&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Categorize" name="Категоризация и приоритет">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= serviceDesk" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-categorize-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Priority" name="Приоритет">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_Critical</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Normal</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_EscalateManager" name="Эскалация на менеджера">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= incidentManagerId" target="userId" />
+          <zeebe:input source="= &quot;Критический инцидент требует внимания!&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Critical</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_SetInProgress" name="Статус: В работе">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;in_progress&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:incoming>Flow_Normal</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Investigate" name="Расследование">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= technicianId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-investigate-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_NeedEscalation" name="Нужна эскалация?">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_Escalate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Resolve</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_L2Support" name="Эскалация L2">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= l2SupportId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-l2-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Escalate</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Resolve" name="Решение инцидента">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= technicianId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-resolve-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Resolve</bpmn:incoming>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_SetResolved" name="Статус: Решён">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;resolved&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyUser" name="Уведомить пользователя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= &quot;Ваш инцидент решён. Пожалуйста, подтвердите.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Confirmation" name="Подтверждение пользователем">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= creatorId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-confirm-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Confirmed" name="Подтверждено?">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_Close</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Reopen</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_Close" name="Закрыть инцидент">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;closed&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Close</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="Инцидент закрыт">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_SetNew" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_SetNew" targetRef="Task_Categorize" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Categorize" targetRef="Gateway_Priority" />
+    <bpmn:sequenceFlow id="Flow_Critical" name="Критический" sourceRef="Gateway_Priority" targetRef="Task_EscalateManager">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= priority = "critical"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Normal" name="Обычный" sourceRef="Gateway_Priority" targetRef="Task_SetInProgress">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= priority != "critical"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_EscalateManager" targetRef="Task_SetInProgress" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_SetInProgress" targetRef="Task_Investigate" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_Investigate" targetRef="Gateway_NeedEscalation" />
+    <bpmn:sequenceFlow id="Flow_Escalate" name="Да" sourceRef="Gateway_NeedEscalation" targetRef="Task_L2Support">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= needEscalation = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Resolve" name="Нет" sourceRef="Gateway_NeedEscalation" targetRef="Task_Resolve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= needEscalation = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_L2Support" targetRef="Task_Resolve" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_Resolve" targetRef="Task_SetResolved" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_SetResolved" targetRef="Task_NotifyUser" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Task_NotifyUser" targetRef="Task_Confirmation" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Task_Confirmation" targetRef="Gateway_Confirmed" />
+    <bpmn:sequenceFlow id="Flow_Close" name="Да" sourceRef="Gateway_Confirmed" targetRef="Task_Close">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= confirmed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Reopen" name="Нет" sourceRef="Gateway_Confirmed" targetRef="Task_SetInProgress">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= confirmed = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_Close" targetRef="EndEvent_1" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="incident-management">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetNew_di" bpmnElement="Task_SetNew">
+        <dc:Bounds x="240" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Categorize_di" bpmnElement="Task_Categorize">
+        <dc:Bounds x="390" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Priority_di" bpmnElement="Gateway_Priority" isMarkerVisible="true">
+        <dc:Bounds x="545" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EscalateManager_di" bpmnElement="Task_EscalateManager">
+        <dc:Bounds x="650" y="50" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetInProgress_di" bpmnElement="Task_SetInProgress">
+        <dc:Bounds x="800" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Investigate_di" bpmnElement="Task_Investigate">
+        <dc:Bounds x="950" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_NeedEscalation_di" bpmnElement="Gateway_NeedEscalation" isMarkerVisible="true">
+        <dc:Bounds x="1105" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_L2Support_di" bpmnElement="Task_L2Support">
+        <dc:Bounds x="1210" y="50" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Resolve_di" bpmnElement="Task_Resolve">
+        <dc:Bounds x="1360" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetResolved_di" bpmnElement="Task_SetResolved">
+        <dc:Bounds x="1510" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyUser_di" bpmnElement="Task_NotifyUser">
+        <dc:Bounds x="1660" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Confirmation_di" bpmnElement="Task_Confirmation">
+        <dc:Bounds x="1810" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Confirmed_di" bpmnElement="Gateway_Confirmed" isMarkerVisible="true">
+        <dc:Bounds x="1965" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Close_di" bpmnElement="Task_Close">
+        <dc:Bounds x="2070" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="2222" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

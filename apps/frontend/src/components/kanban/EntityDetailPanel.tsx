@@ -15,7 +15,9 @@ import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment, Field, Section, Attachment } from '@/types';
 import { filesApi } from '@/lib/api/files';
 import { bpmnApi } from '@/lib/api/bpmn';
+import { getAssigneeRecommendations, type AssigneeRecommendation } from '@/lib/api/recommendations';
 import { StartProcessModal, ProcessInstanceList } from '@/components/bpmn';
+import { SlaStatusBadge } from '@/components/sla/SlaStatusBadge';
 import type { ProcessInstance } from '@/types';
 
 // Default statuses for backwards compatibility
@@ -457,6 +459,8 @@ export function EntityDetailPanel() {
   const [showStartProcess, setShowStartProcess] = useState(false);
   const [processInstances, setProcessInstances] = useState<ProcessInstance[]>([]);
   const [loadingProcesses, setLoadingProcesses] = useState(false);
+  const [assigneeRecommendations, setAssigneeRecommendations] = useState<AssigneeRecommendation[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   // Get status options from workspace
   const statuses = useMemo(() => {
@@ -531,6 +535,34 @@ export function EntityDetailPanel() {
 
     loadProcesses();
   }, [selectedEntity?.id]);
+
+  // Load assignee recommendations when entity has no assignee
+  useEffect(() => {
+    if (!selectedEntity?.id || !currentWorkspace?.id || selectedEntity.assigneeId) {
+      setAssigneeRecommendations([]);
+      return;
+    }
+
+    const loadRecommendations = async () => {
+      setLoadingRecommendations(true);
+      try {
+        const recommendations = await getAssigneeRecommendations(
+          currentWorkspace.id,
+          selectedEntity.title,
+          selectedEntity.data?.description as string | undefined,
+          3
+        );
+        setAssigneeRecommendations(recommendations);
+      } catch (err) {
+        console.debug('Failed to load recommendations:', err);
+        setAssigneeRecommendations([]);
+      } finally {
+        setLoadingRecommendations(false);
+      }
+    };
+
+    loadRecommendations();
+  }, [selectedEntity?.id, selectedEntity?.assigneeId, selectedEntity?.title, currentWorkspace?.id]);
 
   const handleProcessStarted = async () => {
     if (!selectedEntity?.id) return;
@@ -822,6 +854,50 @@ export function EntityDetailPanel() {
                         : 'Не назначен'}
                     </p>
                   )}
+
+                  {/* ML Recommendations */}
+                  {canAssign && !selectedEntity.assigneeId && (
+                    <div className="mt-3">
+                      {loadingRecommendations ? (
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <div className="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full" />
+                          <span>Анализ рекомендаций...</span>
+                        </div>
+                      ) : assigneeRecommendations.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <span className="inline-block w-3 h-3 bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full" />
+                            Рекомендации AI
+                          </p>
+                          {assigneeRecommendations.map((rec) => (
+                            <button
+                              key={rec.userId}
+                              onClick={() => updateAssignee(selectedEntity.id, rec.userId)}
+                              className="w-full text-left p-2 rounded bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 border border-teal-200 dark:border-teal-800 hover:border-teal-400 dark:hover:border-teal-600 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {rec.displayName}
+                                </span>
+                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300">
+                                  {rec.score}%
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                                {rec.reason}
+                              </p>
+                              <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                                <span>Нагрузка: {rec.currentWorkload}</span>
+                                {rec.avgResponseTimeMinutes !== null && (
+                                  <span>Ответ: ~{rec.avgResponseTimeMinutes}мин</span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
 
                 {/* Файлы */}
@@ -916,6 +992,18 @@ export function EntityDetailPanel() {
                       })}
                     </span>
                   </div>
+                </div>
+
+                {/* SLA */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-500 uppercase mb-2">
+                    SLA
+                  </p>
+                  <SlaStatusBadge
+                    targetType="entity"
+                    targetId={selectedEntity.id}
+                    showDetails={true}
+                  />
                 </div>
 
                 {/* Processes */}

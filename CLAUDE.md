@@ -419,6 +419,53 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/bpmn/instances` — запустить процесс
 - `GET /api/bpmn/statistics/definition/:id` — статистика по процессу
 
+**BPMN Триггеры:**
+- `GET /api/bpmn/triggers?workspaceId=...` — список триггеров
+- `POST /api/bpmn/triggers` — создать триггер
+- `PUT /api/bpmn/triggers/:id` — обновить триггер
+- `PATCH /api/bpmn/triggers/:id/toggle` — включить/выключить
+- `DELETE /api/bpmn/triggers/:id` — удалить триггер
+- `POST /api/bpmn/webhooks/:workspaceId/:triggerId` — webhook endpoint
+
+**BPMN User Tasks (Inbox):**
+- `GET /api/bpmn/tasks/inbox` — задачи пользователя
+- `GET /api/bpmn/tasks` — фильтрация задач
+- `GET /api/bpmn/tasks/:id` — детали задачи с формой
+- `POST /api/bpmn/tasks/:id/claim` — взять задачу
+- `POST /api/bpmn/tasks/:id/unclaim` — отпустить задачу
+- `POST /api/bpmn/tasks/:id/complete` — завершить с данными формы
+- `POST /api/bpmn/tasks/:id/delegate` — делегировать
+
+**BPMN Entity Links:**
+- `GET /api/bpmn/entity-links/entity/:id` — связи сущности
+- `GET /api/bpmn/entity-links/entity/:id/linked` — связанные сущности
+- `POST /api/bpmn/entity-links` — создать связь
+- `POST /api/bpmn/entity-links/spawn` — создать сущность и связать
+- `DELETE /api/bpmn/entity-links/:id` — удалить связь
+
+**SLA (Service Level Agreement):**
+- `GET /api/sla/definitions?workspaceId=...` — список определений SLA
+- `GET /api/sla/definitions/:id` — детали определения
+- `POST /api/sla/definitions` — создать определение SLA
+- `PUT /api/sla/definitions/:id` — обновить определение
+- `DELETE /api/sla/definitions/:id` — удалить определение
+- `GET /api/sla/status/:targetType/:targetId` — статус SLA для цели
+- `GET /api/sla/dashboard?workspaceId=...` — статистика SLA
+- `POST /api/sla/instances/:id/pause` — приостановить SLA
+- `POST /api/sla/instances/:id/resume` — возобновить SLA
+
+**DMN (Decision Tables):**
+- `GET /api/dmn/tables?workspaceId=...` — список таблиц решений
+- `GET /api/dmn/tables/:id` — детали таблицы
+- `POST /api/dmn/tables` — создать таблицу
+- `PUT /api/dmn/tables/:id` — обновить таблицу
+- `DELETE /api/dmn/tables/:id` — удалить таблицу
+- `POST /api/dmn/tables/:id/clone` — клонировать таблицу
+- `POST /api/dmn/evaluate` — вычислить с логированием
+- `POST /api/dmn/tables/:id/evaluate-quick` — быстрое вычисление
+- `GET /api/dmn/tables/:id/evaluations` — история вычислений
+- `GET /api/dmn/tables/:id/statistics` — статистика правил
+
 ## WebSocket события
 
 - `entity:created`, `entity:updated` — сущности

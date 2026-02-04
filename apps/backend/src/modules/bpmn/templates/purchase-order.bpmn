@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_PurchaseOrder" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="purchase-order" name="Заказ на закупку" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Заявка на закупку">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_SetNew" name="Статус: Новая">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;new&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Review" name="Проверка заявки">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= procurementId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:po-review-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_CheckBudget" name="Проверка бюджета">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="check-budget" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= totalAmount" target="amount" />
+          <zeebe:input source="= departmentId" target="departmentId" />
+          <zeebe:output source="= budgetAvailable" target="budgetAvailable" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Budget" name="Бюджет есть?">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_BudgetOk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NoBudget</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_ManagerApproval" name="Согласование руководителем">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= managerId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:po-approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_BudgetOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Approved" name="Одобрено?">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_SetApproved" name="Статус: Одобрен">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;approved&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Approved</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_SelectSupplier" name="Выбор поставщика">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= procurementId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:po-supplier-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_CreatePO" name="Создание заказа">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= procurementId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:po-create-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_SetOrdered" name="Статус: Заказано">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;ordered&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_ReceiveGoods" name="Приёмка товара">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= warehouseId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:po-receive-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_Complete" name="Статус: Выполнен">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;completed&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotify</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Reject" name="Отклонить">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;rejected&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Rejected</bpmn:incoming>
+      <bpmn:incoming>Flow_NoBudget</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyRejected</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Notify" name="Уведомить заявителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= &quot;Статус вашей заявки на закупку изменён&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotify</bpmn:incoming>
+      <bpmn:incoming>Flow_ToNotifyRejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="Заказ завершён">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_SetNew" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_SetNew" targetRef="Task_Review" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Review" targetRef="Task_CheckBudget" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_CheckBudget" targetRef="Gateway_Budget" />
+    <bpmn:sequenceFlow id="Flow_BudgetOk" name="Да" sourceRef="Gateway_Budget" targetRef="Task_ManagerApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= budgetAvailable = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NoBudget" name="Нет" sourceRef="Gateway_Budget" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= budgetAvailable = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_ManagerApproval" targetRef="Gateway_Approved" />
+    <bpmn:sequenceFlow id="Flow_Approved" name="Да" sourceRef="Gateway_Approved" targetRef="Task_SetApproved">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "approve"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Rejected" name="Нет" sourceRef="Gateway_Approved" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "reject"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_SetApproved" targetRef="Task_SelectSupplier" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_SelectSupplier" targetRef="Task_CreatePO" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_CreatePO" targetRef="Task_SetOrdered" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_SetOrdered" targetRef="Task_ReceiveGoods" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Task_ReceiveGoods" targetRef="Task_Complete" />
+    <bpmn:sequenceFlow id="Flow_ToNotify" sourceRef="Task_Complete" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_ToNotifyRejected" sourceRef="Task_Reject" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_Notify" targetRef="EndEvent_1" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="purchase-order">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetNew_di" bpmnElement="Task_SetNew">
+        <dc:Bounds x="240" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Review_di" bpmnElement="Task_Review">
+        <dc:Bounds x="390" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckBudget_di" bpmnElement="Task_CheckBudget">
+        <dc:Bounds x="540" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Budget_di" bpmnElement="Gateway_Budget" isMarkerVisible="true">
+        <dc:Bounds x="695" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManagerApproval_di" bpmnElement="Task_ManagerApproval">
+        <dc:Bounds x="800" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Approved_di" bpmnElement="Gateway_Approved" isMarkerVisible="true">
+        <dc:Bounds x="955" y="85" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetApproved_di" bpmnElement="Task_SetApproved">
+        <dc:Bounds x="1060" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SelectSupplier_di" bpmnElement="Task_SelectSupplier">
+        <dc:Bounds x="1210" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreatePO_di" bpmnElement="Task_CreatePO">
+        <dc:Bounds x="1360" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetOrdered_di" bpmnElement="Task_SetOrdered">
+        <dc:Bounds x="1510" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReceiveGoods_di" bpmnElement="Task_ReceiveGoods">
+        <dc:Bounds x="1660" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Complete_di" bpmnElement="Task_Complete">
+        <dc:Bounds x="1810" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reject_di" bpmnElement="Task_Reject">
+        <dc:Bounds x="930" y="200" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Notify_di" bpmnElement="Task_Notify">
+        <dc:Bounds x="1960" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="2112" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

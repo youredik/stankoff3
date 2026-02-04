@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_ExpenseApproval" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="expense-approval" name="Согласование расходов" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Заявка на расход">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_SetPending" name="Статус: Проверка">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;budget_check&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CheckBudget" name="Проверить бюджет">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="check-budget" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= amount" target="amount" />
+          <zeebe:input source="= departmentId" target="departmentId" />
+          <zeebe:output source="= budgetAvailable" target="budgetAvailable" />
+          <zeebe:output source="= requiresHigherApproval" target="requiresHigherApproval" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_BudgetCheck" name="Бюджет доступен?">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_BudgetOk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NoBudget</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:exclusiveGateway id="Gateway_AmountCheck" name="Сумма > лимита?">
+      <bpmn:incoming>Flow_BudgetOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_HighAmount</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NormalAmount</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_ManagerApproval" name="Согласование руководителем">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= managerId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:expense-approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NormalAmount</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_DirectorApproval" name="Согласование директором">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= directorId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:expense-approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_HighAmount</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Decision" name="Решение">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_Approve" name="Одобрить расход">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;approved&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Approve</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_ReserveBudget" name="Зарезервировать бюджет">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="reserve-budget" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= amount" target="amount" />
+          <zeebe:input source="= departmentId" target="departmentId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Reject" name="Отклонить">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;rejected&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Reject</bpmn:incoming>
+      <bpmn:incoming>Flow_NoBudget</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Notify" name="Уведомить заявителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= &quot;Ваша заявка на расход рассмотрена&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="Завершено">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_SetPending" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_SetPending" targetRef="Task_CheckBudget" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_CheckBudget" targetRef="Gateway_BudgetCheck" />
+    <bpmn:sequenceFlow id="Flow_BudgetOk" name="Да" sourceRef="Gateway_BudgetCheck" targetRef="Gateway_AmountCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= budgetAvailable = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NoBudget" name="Нет" sourceRef="Gateway_BudgetCheck" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= budgetAvailable = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_HighAmount" name="Да" sourceRef="Gateway_AmountCheck" targetRef="Task_DirectorApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= requiresHigherApproval = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NormalAmount" name="Нет" sourceRef="Gateway_AmountCheck" targetRef="Task_ManagerApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= requiresHigherApproval = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_ManagerApproval" targetRef="Gateway_Decision" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_DirectorApproval" targetRef="Gateway_Decision" />
+    <bpmn:sequenceFlow id="Flow_Approve" name="Одобрено" sourceRef="Gateway_Decision" targetRef="Task_Approve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "approve"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Reject" name="Отклонено" sourceRef="Gateway_Decision" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "reject"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_Approve" targetRef="Task_ReserveBudget" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_ReserveBudget" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_Reject" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_Notify" targetRef="EndEvent_1" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="expense-approval">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetPending_di" bpmnElement="Task_SetPending">
+        <dc:Bounds x="240" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckBudget_di" bpmnElement="Task_CheckBudget">
+        <dc:Bounds x="390" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_BudgetCheck_di" bpmnElement="Gateway_BudgetCheck" isMarkerVisible="true">
+        <dc:Bounds x="545" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_AmountCheck_di" bpmnElement="Gateway_AmountCheck" isMarkerVisible="true">
+        <dc:Bounds x="645" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManagerApproval_di" bpmnElement="Task_ManagerApproval">
+        <dc:Bounds x="750" y="200" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DirectorApproval_di" bpmnElement="Task_DirectorApproval">
+        <dc:Bounds x="750" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Decision_di" bpmnElement="Gateway_Decision" isMarkerVisible="true">
+        <dc:Bounds x="905" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Approve_di" bpmnElement="Task_Approve">
+        <dc:Bounds x="1010" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReserveBudget_di" bpmnElement="Task_ReserveBudget">
+        <dc:Bounds x="1160" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reject_di" bpmnElement="Task_Reject">
+        <dc:Bounds x="1010" y="200" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Notify_di" bpmnElement="Task_Notify">
+        <dc:Bounds x="1310" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="1462" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

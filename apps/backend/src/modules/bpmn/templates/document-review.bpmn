@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_DocumentReview" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="document-review" name="Рецензирование документа" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Документ на рецензию">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_SetPending" name="Статус: На рецензии">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;under_review&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyReviewers" name="Уведомить рецензентов">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= reviewerIds" target="userIds" />
+          <zeebe:input source="= &quot;Вам назначено рецензирование документа&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:parallelGateway id="Gateway_Start" name="Параллельное рецензирование">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_R1</bpmn:outgoing>
+      <bpmn:outgoing>Flow_R2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_R3</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:userTask id="Task_Reviewer1" name="Рецензия 1">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= reviewer1Id" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:review-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_R1</bpmn:incoming>
+      <bpmn:outgoing>Flow_R1_Done</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Reviewer2" name="Рецензия 2">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= reviewer2Id" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:review-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_R2</bpmn:incoming>
+      <bpmn:outgoing>Flow_R2_Done</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Reviewer3" name="Рецензия 3">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= reviewer3Id" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:review-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_R3</bpmn:incoming>
+      <bpmn:outgoing>Flow_R3_Done</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:parallelGateway id="Gateway_Join" name="Все рецензии готовы">
+      <bpmn:incoming>Flow_R1_Done</bpmn:incoming>
+      <bpmn:incoming>Flow_R2_Done</bpmn:incoming>
+      <bpmn:incoming>Flow_R3_Done</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:serviceTask id="Task_AggregateReviews" name="Агрегация результатов">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="aggregate-reviews" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= review1" target="review1" />
+          <zeebe:input source="= review2" target="review2" />
+          <zeebe:input source="= review3" target="review3" />
+          <zeebe:output source="= aggregatedDecision" target="decision" />
+          <zeebe:output source="= needsRevision" target="needsRevision" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Decision" name="Требуются правки?">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_NeedsRevision</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Approved</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_SetRevision" name="Статус: На доработку">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;revision_required&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NeedsRevision</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Revise" name="Внести правки">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= authorId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:revision-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_BackToReview</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_Approve" name="Статус: Одобрен">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;approved&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Approved</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyAuthor" name="Уведомить автора">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= authorId" target="userId" />
+          <zeebe:input source="= &quot;Рецензирование вашего документа завершено&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="Рецензирование завершено">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_SetPending" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_SetPending" targetRef="Task_NotifyReviewers" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_NotifyReviewers" targetRef="Gateway_Start" />
+    <bpmn:sequenceFlow id="Flow_R1" sourceRef="Gateway_Start" targetRef="Task_Reviewer1" />
+    <bpmn:sequenceFlow id="Flow_R2" sourceRef="Gateway_Start" targetRef="Task_Reviewer2" />
+    <bpmn:sequenceFlow id="Flow_R3" sourceRef="Gateway_Start" targetRef="Task_Reviewer3" />
+    <bpmn:sequenceFlow id="Flow_R1_Done" sourceRef="Task_Reviewer1" targetRef="Gateway_Join" />
+    <bpmn:sequenceFlow id="Flow_R2_Done" sourceRef="Task_Reviewer2" targetRef="Gateway_Join" />
+    <bpmn:sequenceFlow id="Flow_R3_Done" sourceRef="Task_Reviewer3" targetRef="Gateway_Join" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_Join" targetRef="Task_AggregateReviews" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_AggregateReviews" targetRef="Gateway_Decision" />
+    <bpmn:sequenceFlow id="Flow_NeedsRevision" name="Да" sourceRef="Gateway_Decision" targetRef="Task_SetRevision">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= needsRevision = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Approved" name="Нет" sourceRef="Gateway_Decision" targetRef="Task_Approve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= needsRevision = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_SetRevision" targetRef="Task_Revise" />
+    <bpmn:sequenceFlow id="Flow_BackToReview" sourceRef="Task_Revise" targetRef="Task_SetPending" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_Approve" targetRef="Task_NotifyAuthor" />
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_NotifyAuthor" targetRef="EndEvent_1" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="document-review">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="202" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetPending_di" bpmnElement="Task_SetPending">
+        <dc:Bounds x="240" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyReviewers_di" bpmnElement="Task_NotifyReviewers">
+        <dc:Bounds x="390" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Start_di" bpmnElement="Gateway_Start">
+        <dc:Bounds x="545" y="195" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reviewer1_di" bpmnElement="Task_Reviewer1">
+        <dc:Bounds x="650" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reviewer2_di" bpmnElement="Task_Reviewer2">
+        <dc:Bounds x="650" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reviewer3_di" bpmnElement="Task_Reviewer3">
+        <dc:Bounds x="650" y="280" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Join_di" bpmnElement="Gateway_Join">
+        <dc:Bounds x="805" y="195" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AggregateReviews_di" bpmnElement="Task_AggregateReviews">
+        <dc:Bounds x="910" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Decision_di" bpmnElement="Gateway_Decision" isMarkerVisible="true">
+        <dc:Bounds x="1065" y="195" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetRevision_di" bpmnElement="Task_SetRevision">
+        <dc:Bounds x="1170" y="280" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Revise_di" bpmnElement="Task_Revise">
+        <dc:Bounds x="1320" y="280" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Approve_di" bpmnElement="Task_Approve">
+        <dc:Bounds x="1170" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyAuthor_di" bpmnElement="Task_NotifyAuthor">
+        <dc:Bounds x="1320" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="1472" y="122" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

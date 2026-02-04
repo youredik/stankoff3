@@ -7,6 +7,7 @@ import { ru } from 'date-fns/locale';
 import { Link2, Calendar } from 'lucide-react';
 import type { Entity } from '@/types';
 import { useEntityStore } from '@/store/useEntityStore';
+import { SlaTimer } from '@/components/sla/SlaTimer';
 
 interface KanbanCardProps {
   entity: Entity;
@@ -113,9 +114,12 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
             <span className="text-xs text-gray-500">Не назначен</span>
           )}
         </div>
-        <div className="flex items-center gap-1 text-xs text-gray-500">
-          <Calendar className="w-3 h-3" />
-          <span>{format(entity.createdAt, 'dd.MM', { locale: ru })}</span>
+        <div className="flex items-center gap-3">
+          <SlaTimer targetId={entity.id} compact />
+          <div className="flex items-center gap-1 text-xs text-gray-500">
+            <Calendar className="w-3 h-3" />
+            <span>{format(entity.createdAt, 'dd.MM', { locale: ru })}</span>
+          </div>
         </div>
       </div>
 

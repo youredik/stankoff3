@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { typeOrmConfig } from './config/typeorm.config';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
@@ -17,6 +18,9 @@ import { AutomationModule } from './modules/automation/automation.module';
 import { SearchModule } from './modules/search/search.module';
 import { BpmnModule } from './modules/bpmn/bpmn.module';
 import { SectionModule } from './modules/section/section.module';
+import { SlaModule } from './modules/sla/sla.module';
+import { DmnModule } from './modules/dmn/dmn.module';
+import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { SeedService } from './seed.service';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
@@ -34,6 +38,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
       envFilePath: '../../.env',
     }),
 
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(typeOrmConfig),
     TypeOrmModule.forFeature([User, WorkspaceEntity, Workspace, WorkspaceMember, Section, SectionMember]),
 
@@ -51,6 +56,9 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     SearchModule,
     BpmnModule,
     SectionModule,
+    SlaModule,
+    DmnModule,
+    ConnectorsModule,
   ],
   providers: [
     SeedService,

@@ -13,6 +13,7 @@ import { WorkspaceEntity } from '../entity/entity.entity';
 import { User } from '../user/user.entity';
 import { EventsGateway } from '../websocket/events.gateway';
 import { EmailService } from '../email/email.service';
+import { DmnService } from '../dmn/dmn.service';
 
 describe('AutomationService', () => {
   let service: AutomationService;
@@ -86,6 +87,10 @@ describe('AutomationService', () => {
       send: jest.fn().mockResolvedValue(undefined),
     };
 
+    const mockDmnService = {
+      evaluateQuick: jest.fn().mockResolvedValue({}),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AutomationService,
@@ -94,6 +99,7 @@ describe('AutomationService', () => {
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: EventsGateway, useValue: mockEventsGateway },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: DmnService, useValue: mockDmnService },
       ],
     }).compile();
 
@@ -536,6 +542,269 @@ describe('AutomationService', () => {
       });
 
       expect(entityRepo.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('EVALUATE_DMN действие', () => {
+    let dmnService: jest.Mocked<DmnService>;
+
+    beforeEach(() => {
+      dmnService = {
+        evaluateQuick: jest.fn().mockResolvedValue({}),
+      } as any;
+      // Re-assign after module compilation
+      (service as any).dmnService = dmnService;
+      ruleRepo.update.mockResolvedValue({ affected: 1 } as any);
+      entityRepo.update.mockResolvedValue({ affected: 1 } as any);
+    });
+
+    it('должен вызвать DMN evaluation с входными данными entity', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: { decisionTableId: 'dmn-1' },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      dmnService.evaluateQuick.mockResolvedValue({ resultStatus: 'approved' });
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(dmnService.evaluateQuick).toHaveBeenCalledWith(
+        'dmn-1',
+        expect.objectContaining({
+          status: 'new',
+          priority: 'medium',
+          title: 'Test Entity',
+        }),
+      );
+    });
+
+    it('должен использовать inputMapping для маппинга полей', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: {
+            decisionTableId: 'dmn-1',
+            inputMapping: {
+              priority: 'requestPriority',
+              status: 'currentStatus',
+            },
+          },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      dmnService.evaluateQuick.mockResolvedValue({});
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(dmnService.evaluateQuick).toHaveBeenCalledWith(
+        'dmn-1',
+        {
+          requestPriority: 'medium',
+          currentStatus: 'new',
+        },
+      );
+    });
+
+    it('должен применить результат DMN к entity (status)', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: { decisionTableId: 'dmn-1' },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      dmnService.evaluateQuick.mockResolvedValue({ status: 'in_progress' });
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(entityRepo.update).toHaveBeenCalledWith(
+        'entity-1',
+        expect.objectContaining({ status: 'in_progress' }),
+      );
+    });
+
+    it('должен применить результат DMN к entity (priority)', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: { decisionTableId: 'dmn-1' },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      dmnService.evaluateQuick.mockResolvedValue({ priority: 'high' });
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(entityRepo.update).toHaveBeenCalledWith(
+        'entity-1',
+        expect.objectContaining({ priority: 'high' }),
+      );
+    });
+
+    it('должен записывать кастомные поля в data', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: { decisionTableId: 'dmn-1' },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      dmnService.evaluateQuick.mockResolvedValue({ riskLevel: 'high', score: 85 });
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(entityRepo.update).toHaveBeenCalledWith(
+        'entity-1',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            riskLevel: 'high',
+            score: 85,
+          }),
+        }),
+      );
+    });
+
+    it('должен использовать outputMapping для маппинга результата', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: {
+            decisionTableId: 'dmn-1',
+            outputMapping: {
+              resultPriority: 'priority',
+              resultStatus: 'status',
+            },
+          },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      dmnService.evaluateQuick.mockResolvedValue({
+        resultPriority: 'high',
+        resultStatus: 'approved',
+      });
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(entityRepo.update).toHaveBeenCalledWith(
+        'entity-1',
+        expect.objectContaining({
+          priority: 'high',
+          status: 'approved',
+        }),
+      );
+    });
+
+    it('не должен применять результат если applyOutputToEntity = false', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: {
+            decisionTableId: 'dmn-1',
+            applyOutputToEntity: false,
+          },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      dmnService.evaluateQuick.mockResolvedValue({ status: 'approved' });
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      // update должен быть вызван только для статистики правила, не для entity
+      expect(entityRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('должен эмитить событие после обновления entity', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: { decisionTableId: 'dmn-1' },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      dmnService.evaluateQuick.mockResolvedValue({ priority: 'high' });
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(eventsGateway.emitEntityUpdated).toHaveBeenCalledWith(mockEntity);
+    });
+
+    it('должен обрабатывать ошибки DMN evaluation gracefully', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: { decisionTableId: 'dmn-1' },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      dmnService.evaluateQuick.mockRejectedValue(new Error('DMN evaluation failed'));
+
+      // Не должен выбрасывать исключение
+      await expect(service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE }))
+        .resolves.not.toThrow();
+
+      // Статистика правила все равно должна обновиться
+      expect(ruleRepo.update).toHaveBeenCalled();
+    });
+
+    it('не должен выполнять DMN если decisionTableId не задан', async () => {
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: {},
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+
+      await service.executeRules({ entity: mockEntity, trigger: TriggerType.ON_CREATE });
+
+      expect(dmnService.evaluateQuick).not.toHaveBeenCalled();
+    });
+
+    it('должен передавать data поля entity как входные данные', async () => {
+      const entityWithData = {
+        ...mockEntity,
+        data: { customField: 'customValue', amount: 1000 },
+      } as any;
+
+      const rule = {
+        ...mockRule,
+        actions: [{
+          type: ActionType.EVALUATE_DMN,
+          config: { decisionTableId: 'dmn-1' },
+        }],
+      };
+      ruleRepo.find.mockResolvedValue([rule as any]);
+      entityRepo.findOne.mockResolvedValue(entityWithData);
+      dmnService.evaluateQuick.mockResolvedValue({});
+
+      await service.executeRules({ entity: entityWithData, trigger: TriggerType.ON_CREATE });
+
+      expect(dmnService.evaluateQuick).toHaveBeenCalledWith(
+        'dmn-1',
+        expect.objectContaining({
+          customField: 'customValue',
+          amount: 1000,
+        }),
+      );
     });
   });
 });

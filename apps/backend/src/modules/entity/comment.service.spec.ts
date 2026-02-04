@@ -8,6 +8,7 @@ import { WorkspaceEntity } from './entity.entity';
 import { EventsGateway } from '../websocket/events.gateway';
 import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { SlaService } from '../sla/sla.service';
 
 describe('CommentService', () => {
   let service: CommentService;
@@ -61,6 +62,10 @@ describe('CommentService', () => {
       log: jest.fn(),
     };
 
+    const mockSlaService = {
+      recordResponse: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentService,
@@ -69,6 +74,7 @@ describe('CommentService', () => {
         { provide: EventsGateway, useValue: mockEventsGateway },
         { provide: S3Service, useValue: mockS3Service },
         { provide: AuditLogService, useValue: mockAuditLogService },
+        { provide: SlaService, useValue: mockSlaService },
       ],
     }).compile();
 

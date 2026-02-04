@@ -8,3 +8,4 @@ export { ProcessStatisticsCard } from './ProcessStatisticsCard';
 export { ProcessDetailView } from './ProcessDetailView';
 export { StartProcessModal } from './StartProcessModal';
 export { TemplateSelector } from './TemplateSelector';
+export { ProcessMiningDashboard } from './ProcessMiningDashboard';

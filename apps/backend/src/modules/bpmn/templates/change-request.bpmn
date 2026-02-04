@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_ChangeRequest" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="change-request" name="Запрос на изменение" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="RFC создан">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_SetNew" name="Статус: Новый">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;new&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Assessment" name="Оценка изменения">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= changeManagerId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:change-assessment-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_SetAssessed" name="Статус: Оценен">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;assessed&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_RiskLevel" name="Уровень риска">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_HighRisk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_LowRisk</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_CABApproval" name="Одобрение CAB">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= cabChairId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:cab-approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_HighRisk</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ManagerApproval" name="Одобрение менеджера">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= serviceManagerId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:manager-approval-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_LowRisk</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Approval" name="Одобрено?">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_SetApproved" name="Статус: Одобрен">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;approved&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Approved</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_Implementation" name="Внедрение изменения">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= implementerId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:implementation-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Review" name="Post-Implementation Review">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= changeManagerId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:pir-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_Close" name="Закрыть RFC">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;closed&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotify</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Reject" name="Отклонить RFC">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;rejected&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Rejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyRejected</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_Notify" name="Уведомить заявителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= &quot;Статус вашего RFC изменён&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotify</bpmn:incoming>
+      <bpmn:incoming>Flow_ToNotifyRejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="RFC завершён">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_SetNew" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_SetNew" targetRef="Task_Assessment" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Assessment" targetRef="Task_SetAssessed" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_SetAssessed" targetRef="Gateway_RiskLevel" />
+    <bpmn:sequenceFlow id="Flow_HighRisk" name="Высокий" sourceRef="Gateway_RiskLevel" targetRef="Task_CABApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= riskLevel = "high"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LowRisk" name="Низкий/Средний" sourceRef="Gateway_RiskLevel" targetRef="Task_ManagerApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= riskLevel != "high"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_CABApproval" targetRef="Gateway_Approval" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_ManagerApproval" targetRef="Gateway_Approval" />
+    <bpmn:sequenceFlow id="Flow_Approved" name="Да" sourceRef="Gateway_Approval" targetRef="Task_SetApproved">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "approve"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Rejected" name="Нет" sourceRef="Gateway_Approval" targetRef="Task_Reject">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "reject"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_SetApproved" targetRef="Task_Implementation" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_Implementation" targetRef="Task_Review" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_Review" targetRef="Task_Close" />
+    <bpmn:sequenceFlow id="Flow_ToNotify" sourceRef="Task_Close" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_ToNotifyRejected" sourceRef="Task_Reject" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_Notify" targetRef="EndEvent_1" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="change-request">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetNew_di" bpmnElement="Task_SetNew">
+        <dc:Bounds x="240" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Assessment_di" bpmnElement="Task_Assessment">
+        <dc:Bounds x="390" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetAssessed_di" bpmnElement="Task_SetAssessed">
+        <dc:Bounds x="540" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_RiskLevel_di" bpmnElement="Gateway_RiskLevel" isMarkerVisible="true">
+        <dc:Bounds x="695" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CABApproval_di" bpmnElement="Task_CABApproval">
+        <dc:Bounds x="800" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManagerApproval_di" bpmnElement="Task_ManagerApproval">
+        <dc:Bounds x="800" y="200" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Approval_di" bpmnElement="Gateway_Approval" isMarkerVisible="true">
+        <dc:Bounds x="955" y="145" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetApproved_di" bpmnElement="Task_SetApproved">
+        <dc:Bounds x="1060" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Implementation_di" bpmnElement="Task_Implementation">
+        <dc:Bounds x="1210" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Review_di" bpmnElement="Task_Review">
+        <dc:Bounds x="1360" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Close_di" bpmnElement="Task_Close">
+        <dc:Bounds x="1510" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reject_di" bpmnElement="Task_Reject">
+        <dc:Bounds x="1060" y="200" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Notify_di" bpmnElement="Task_Notify">
+        <dc:Bounds x="1660" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="1812" y="152" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

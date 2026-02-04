@@ -216,4 +216,101 @@ export class EmailService {
       text: `Статус заявки ${entity.customId} изменён: ${oldStatus} → ${newStatus}. Изменил: ${changedBy.firstName} ${changedBy.lastName}. Ссылка: ${entityUrl}`,
     });
   }
+
+  // Предупреждение о приближении SLA дедлайна
+  async sendSlaWarningNotification(
+    recipient: User,
+    entity: WorkspaceEntity,
+    slaName: string,
+    type: 'response' | 'resolution',
+    remainingMinutes: number,
+    usedPercent: number,
+    frontendUrl: string,
+  ): Promise<boolean> {
+    const entityUrl = `${frontendUrl}/dashboard?entity=${entity.id}`;
+    const typeLabel = type === 'response' ? 'первого ответа' : 'решения';
+
+    return this.send({
+      to: recipient.email,
+      subject: `⚠️ SLA: заявка ${entity.customId} приближается к дедлайну`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #f59e0b; color: white; padding: 24px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">⚠️ Предупреждение SLA</h1>
+          </div>
+          <div style="padding: 32px; background: #fffbeb;">
+            <h2 style="margin: 0 0 16px; color: #92400e;">Приближается дедлайн ${typeLabel}</h2>
+            <p style="margin: 0 0 24px; color: #78350f;">
+              Заявка <strong>${entity.customId}</strong> требует внимания.
+              SLA <strong>${slaName}</strong> израсходовано на ${Math.round(usedPercent)}%.
+            </p>
+            <div style="background: white; border-radius: 8px; padding: 20px; border: 2px solid #fbbf24;">
+              <p style="margin: 0 0 12px; color: #111827; font-weight: 500;">${entity.title}</p>
+              <p style="margin: 0; color: #b45309; font-size: 14px;">
+                Осталось: <strong>${remainingMinutes} мин</strong>
+              </p>
+              <div style="margin-top: 12px; background: #f3f4f6; border-radius: 4px; height: 8px; overflow: hidden;">
+                <div style="background: ${usedPercent >= 90 ? '#ef4444' : '#f59e0b'}; height: 100%; width: ${Math.min(usedPercent, 100)}%;"></div>
+              </div>
+            </div>
+            <div style="margin-top: 24px; text-align: center;">
+              <a href="${entityUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+                Открыть заявку
+              </a>
+            </div>
+          </div>
+          <div style="padding: 16px; text-align: center; color: #9ca3af; font-size: 12px;">
+            Это автоматическое SLA уведомление от Stankoff Portal
+          </div>
+        </div>
+      `,
+      text: `SLA предупреждение для заявки ${entity.customId}: ${slaName} израсходовано на ${Math.round(usedPercent)}%, осталось ${remainingMinutes} мин до дедлайна ${typeLabel}. Ссылка: ${entityUrl}`,
+    });
+  }
+
+  // Уведомление о нарушении SLA
+  async sendSlaBreachNotification(
+    recipient: User,
+    entity: WorkspaceEntity,
+    slaName: string,
+    type: 'response' | 'resolution',
+    frontendUrl: string,
+  ): Promise<boolean> {
+    const entityUrl = `${frontendUrl}/dashboard?entity=${entity.id}`;
+    const typeLabel = type === 'response' ? 'время первого ответа' : 'время решения';
+
+    return this.send({
+      to: recipient.email,
+      subject: `🚨 SLA НАРУШЕН: заявка ${entity.customId}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #dc2626; color: white; padding: 24px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">🚨 SLA НАРУШЕН</h1>
+          </div>
+          <div style="padding: 32px; background: #fef2f2;">
+            <h2 style="margin: 0 0 16px; color: #991b1b;">Превышено ${typeLabel}</h2>
+            <p style="margin: 0 0 24px; color: #7f1d1d;">
+              Заявка <strong>${entity.customId}</strong> нарушила SLA <strong>${slaName}</strong>.
+              Требуется немедленное внимание!
+            </p>
+            <div style="background: white; border-radius: 8px; padding: 20px; border: 2px solid #ef4444;">
+              <p style="margin: 0 0 12px; color: #111827; font-weight: 500;">${entity.title}</p>
+              <p style="margin: 0; color: #b91c1c; font-weight: bold;">
+                Статус: ${entity.status}
+              </p>
+            </div>
+            <div style="margin-top: 24px; text-align: center;">
+              <a href="${entityUrl}" style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+                Срочно открыть заявку
+              </a>
+            </div>
+          </div>
+          <div style="padding: 16px; text-align: center; color: #9ca3af; font-size: 12px;">
+            Это автоматическое SLA уведомление от Stankoff Portal
+          </div>
+        </div>
+      `,
+      text: `СРОЧНО: SLA нарушен для заявки ${entity.customId}! ${slaName} - превышено ${typeLabel}. Ссылка: ${entityUrl}`,
+    });
+  }
 }

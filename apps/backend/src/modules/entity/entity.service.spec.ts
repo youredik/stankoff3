@@ -13,6 +13,7 @@ import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { EmailService } from '../email/email.service';
 import { AutomationService } from '../automation/automation.service';
+import { SlaService } from '../sla/sla.service';
 
 describe('EntityService', () => {
   let service: EntityService;
@@ -131,6 +132,11 @@ describe('EntityService', () => {
       get: jest.fn().mockReturnValue('http://localhost:3000'),
     };
 
+    const mockSlaService = {
+      createInstance: jest.fn().mockResolvedValue(null),
+      recordResolution: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EntityService,
@@ -145,6 +151,7 @@ describe('EntityService', () => {
         { provide: EmailService, useValue: mockEmailService },
         { provide: AutomationService, useValue: mockAutomationService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: SlaService, useValue: mockSlaService },
       ],
     }).compile();
 

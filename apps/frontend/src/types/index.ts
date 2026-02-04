@@ -291,3 +291,410 @@ export interface BpmnTemplate {
   category: string;
   bpmnXml: string;
 }
+
+// ==================== User Tasks ====================
+
+export type UserTaskStatus = 'created' | 'claimed' | 'completed' | 'cancelled' | 'delegated';
+
+export interface UserTask {
+  id: string;
+  processInstanceId: string;
+  workspaceId: string;
+  entityId?: string;
+  entity?: Entity;
+  jobKey: string;
+  elementId: string;
+  elementName?: string;
+  taskType: string;
+  formKey?: string;
+  formSchema?: FormSchema;
+  formData: Record<string, unknown>;
+  formDefinition?: FormDefinition;
+  assigneeId?: string;
+  assignee?: User;
+  assigneeEmail?: string;
+  candidateGroups: string[];
+  candidateUsers: string[];
+  dueDate?: string;
+  followUpDate?: string;
+  priority: number;
+  status: UserTaskStatus;
+  claimedAt?: string;
+  claimedById?: string;
+  claimedBy?: User;
+  completedAt?: string;
+  completedById?: string;
+  completedBy?: User;
+  completionResult?: Record<string, unknown>;
+  history: UserTaskHistoryEntry[];
+  processVariables: Record<string, unknown>;
+  comments?: UserTaskComment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserTaskHistoryEntry {
+  action: string;
+  userId?: string;
+  timestamp: string;
+  details?: Record<string, unknown>;
+}
+
+export interface UserTaskComment {
+  id: string;
+  taskId: string;
+  userId: string;
+  user?: User;
+  content: string;
+  createdAt: string;
+}
+
+export interface UserTaskFilter {
+  workspaceId?: string;
+  status?: UserTaskStatus | UserTaskStatus[];
+  assigneeId?: string;
+  candidateGroup?: string;
+  dueBeforeDate?: string;
+  taskType?: string;
+  entityId?: string;
+  limit?: number;
+}
+
+// ==================== Forms ====================
+
+export interface FormSchema {
+  $id: string;
+  type: 'object';
+  title: string;
+  description?: string;
+  required?: string[];
+  properties: Record<string, FormFieldSchema>;
+  ui?: FormUISchema;
+}
+
+export interface FormFieldSchema {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  title: string;
+  description?: string;
+  default?: unknown;
+  // String specifics
+  format?: 'date' | 'date-time' | 'email' | 'uri' | 'textarea' | 'richtext';
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  // Number specifics
+  minimum?: number;
+  maximum?: number;
+  // Enum (select/radio)
+  enum?: unknown[];
+  enumNames?: string[];
+  // Array specifics
+  items?: FormFieldSchema;
+  minItems?: number;
+  maxItems?: number;
+  // Custom extensions
+  'x-component'?: string;
+  'x-options'?: Record<string, unknown>;
+}
+
+export interface FormUISchema {
+  'ui:order'?: string[];
+  [fieldName: string]: {
+    'ui:widget'?: string;
+    'ui:placeholder'?: string;
+    'ui:help'?: string;
+    'ui:disabled'?: boolean;
+    'ui:hidden'?: boolean;
+    'ui:options'?: Record<string, unknown>;
+  } | string[] | undefined;
+}
+
+export interface FormDefinition {
+  id: string;
+  workspaceId?: string;
+  key: string;
+  name: string;
+  description?: string;
+  schema: FormSchema;
+  uiSchema?: FormUISchema;
+  version: number;
+  isActive: boolean;
+  createdById?: string;
+  createdBy?: User;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==================== Process Triggers ====================
+
+export type TriggerType =
+  | 'entity_created'
+  | 'status_changed'
+  | 'assignee_changed'
+  | 'comment_added'
+  | 'cron'
+  | 'webhook'
+  | 'message';
+
+export interface TriggerConditions {
+  entityTypes?: string[];
+  fromStatus?: string;
+  toStatus?: string;
+  onlyWhenAssigned?: boolean;
+  expression?: string;
+  timezone?: string;
+  secret?: string;
+  allowedIps?: string[];
+  priority?: string;
+  category?: string;
+  customExpression?: string;
+}
+
+export interface VariableMappings {
+  [variableName: string]: string;
+}
+
+export interface ProcessTrigger {
+  id: string;
+  processDefinitionId: string;
+  processDefinition?: ProcessDefinition;
+  workspaceId: string;
+  triggerType: TriggerType;
+  conditions: TriggerConditions;
+  variableMappings: VariableMappings;
+  isActive: boolean;
+  lastTriggeredAt?: string;
+  triggerCount: number;
+  name?: string;
+  description?: string;
+  createdById?: string;
+  createdBy?: User;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TriggerExecutionStatus = 'pending' | 'success' | 'failed' | 'skipped';
+
+export interface TriggerExecution {
+  id: string;
+  triggerId: string;
+  trigger?: ProcessTrigger;
+  processInstanceId?: string;
+  triggerContext: Record<string, unknown>;
+  status: TriggerExecutionStatus;
+  errorMessage?: string;
+  executedAt: string;
+}
+
+// ==================== Entity Links ====================
+
+export type EntityLinkType =
+  | 'spawned'
+  | 'blocks'
+  | 'blocked_by'
+  | 'related'
+  | 'duplicate'
+  | 'parent'
+  | 'child';
+
+export interface EntityLink {
+  id: string;
+  sourceEntityId: string;
+  sourceEntity?: Entity;
+  targetEntityId: string;
+  targetEntity?: Entity;
+  linkType: EntityLinkType;
+  processInstanceId?: string;
+  metadata?: Record<string, unknown>;
+  createdById?: string;
+  createdBy?: User;
+  createdAt: string;
+}
+
+// ==================== SLA (Service Level Agreement) ====================
+
+export type SlaTargetType = 'entity' | 'task' | 'process';
+export type SlaStatus = 'pending' | 'met' | 'breached';
+
+export interface BusinessHours {
+  start: string; // "09:00"
+  end: string; // "18:00"
+  timezone: string; // "Europe/Moscow"
+  workdays: number[]; // [1,2,3,4,5] (Mon-Fri)
+}
+
+export interface SlaConditions {
+  priority?: string;
+  category?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+export interface EscalationRule {
+  threshold: number; // Percentage (80, 100, 150)
+  action: 'notify' | 'escalate';
+  targets: string[]; // ['assignee', 'manager', userId]
+}
+
+export interface SlaDefinition {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  appliesTo: SlaTargetType;
+  conditions: SlaConditions;
+  responseTime?: number; // minutes
+  resolutionTime?: number; // minutes
+  warningThreshold: number; // percentage
+  businessHoursOnly: boolean;
+  businessHours: BusinessHours;
+  escalationRules: EscalationRule[];
+  isActive: boolean;
+  priority: number;
+  createdById?: string;
+  createdBy?: User;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SlaInstance {
+  id: string;
+  slaDefinitionId: string;
+  slaDefinition?: SlaDefinition;
+  workspaceId: string;
+  targetType: SlaTargetType;
+  targetId: string;
+  responseDueAt?: string;
+  resolutionDueAt?: string;
+  responseStatus: SlaStatus;
+  resolutionStatus: SlaStatus;
+  firstResponseAt?: string;
+  resolvedAt?: string;
+  isPaused: boolean;
+  pausedAt?: string;
+  totalPausedMinutes: number;
+  currentEscalationLevel: number;
+  lastEscalationAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SlaStatusInfo {
+  instanceId: string;
+  definitionName: string;
+  responseStatus: SlaStatus;
+  resolutionStatus: SlaStatus;
+  responseDueAt?: string;
+  resolutionDueAt?: string;
+  responseRemainingMinutes?: number;
+  resolutionRemainingMinutes?: number;
+  responseUsedPercent?: number;
+  resolutionUsedPercent?: number;
+  isPaused: boolean;
+  currentEscalationLevel: number;
+}
+
+export interface SlaDashboard {
+  total: number;
+  pending: number;
+  met: number;
+  breached: number;
+  atRisk: number;
+}
+
+// ==================== DMN (Decision Tables) ====================
+
+export type HitPolicy = 'UNIQUE' | 'FIRST' | 'ANY' | 'COLLECT' | 'RULE_ORDER';
+export type ColumnType = 'string' | 'number' | 'boolean' | 'date';
+export type RuleOperator =
+  | 'eq'
+  | 'neq'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'in'
+  | 'not_in'
+  | 'contains'
+  | 'between'
+  | 'any';
+
+export interface InputColumn {
+  id: string;
+  name: string;
+  label: string;
+  type: ColumnType;
+  expression?: string;
+}
+
+export interface OutputColumn {
+  id: string;
+  name: string;
+  label: string;
+  type: ColumnType;
+  defaultValue?: unknown;
+}
+
+export interface RuleCondition {
+  operator: RuleOperator;
+  value: unknown;
+  value2?: unknown; // For 'between'
+}
+
+export interface DecisionRule {
+  id: string;
+  description?: string;
+  inputs: Record<string, RuleCondition>;
+  outputs: Record<string, unknown>;
+  priority?: number;
+}
+
+export interface DecisionTable {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  hitPolicy: HitPolicy;
+  inputColumns: InputColumn[];
+  outputColumns: OutputColumn[];
+  rules: DecisionRule[];
+  isActive: boolean;
+  version: number;
+  createdById?: string;
+  createdBy?: User;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvaluationResult {
+  ruleId: string;
+  outputs: Record<string, unknown>;
+  matched: boolean;
+}
+
+export interface DecisionEvaluation {
+  id: string;
+  decisionTableId: string;
+  decisionTable?: DecisionTable;
+  targetType?: string;
+  targetId?: string;
+  inputData: Record<string, unknown>;
+  outputData: Record<string, unknown>;
+  matchedRules: EvaluationResult[];
+  evaluationTimeMs: number;
+  triggeredBy?: string;
+  createdAt: string;
+}
+
+export interface EvaluationOutput {
+  results: EvaluationResult[];
+  finalOutput: Record<string, unknown>;
+  matchedCount: number;
+  evaluationTimeMs: number;
+}
+
+export interface DecisionTableStatistics {
+  totalEvaluations: number;
+  avgEvaluationTime: number;
+  ruleHitCounts: Record<string, number>;
+}

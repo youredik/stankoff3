@@ -16,20 +16,22 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus, Save, ArrowLeft, Loader2, Pencil, Users, Settings2, Zap } from 'lucide-react';
+import { Plus, Save, ArrowLeft, Loader2, Pencil, Users, Settings2, Zap, Clock, Table2 } from 'lucide-react';
 import { SectionCard } from './SectionCard';
 import { FieldCard } from './FieldCard';
 import { FieldPalette, FIELD_TYPES } from './FieldPalette';
 import { FieldEditor } from './FieldEditor';
 import { WorkspaceMembers } from './WorkspaceMembers';
 import { AutomationRules } from './AutomationRules';
+import { SlaSettings } from '@/components/sla/SlaSettings';
+import { DmnSettings } from '@/components/dmn/DmnSettings';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import type { Field, FieldType, Workspace } from '@/types';
 
-type TabType = 'structure' | 'members' | 'automation';
+type TabType = 'structure' | 'members' | 'automation' | 'sla' | 'dmn';
 
 // Популярные эмодзи для рабочих мест
 const WORKSPACE_ICONS = ['📋', '📁', '🔧', '💼', '📊', '🎯', '📝', '⚙️', '🛠️', '📦', '🚀', '💡', '🔬', '📐', '🎨', '📈'];
@@ -431,6 +433,32 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 <span>Автоматизация</span>
               </button>
             )}
+            {isGlobalAdmin && (
+              <button
+                onClick={() => setActiveTab('sla')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'sla'
+                    ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>SLA</span>
+              </button>
+            )}
+            {isGlobalAdmin && (
+              <button
+                onClick={() => setActiveTab('dmn')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'dmn'
+                    ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <Table2 className="w-4 h-4" />
+                <span>Таблицы решений</span>
+              </button>
+            )}
           </div>
 
           {/* Settings Bar - Section & Menu Visibility */}
@@ -495,11 +523,19 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
             <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
               <WorkspaceMembers workspaceId={workspaceId} />
             </div>
-          ) : (
+          ) : activeTab === 'automation' ? (
             <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
               <AutomationRules workspaceId={workspaceId} />
             </div>
-          )}
+          ) : activeTab === 'sla' ? (
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
+              <SlaSettings workspaceId={workspaceId} />
+            </div>
+          ) : activeTab === 'dmn' ? (
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
+              <DmnSettings workspaceId={workspaceId} />
+            </div>
+          ) : null}
         </div>
 
         {/* Field Palette - only show on structure tab */}

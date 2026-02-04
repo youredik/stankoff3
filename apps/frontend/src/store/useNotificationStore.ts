@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { browserNotifications } from '@/hooks/useBrowserNotifications';
 
-export type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace';
+export type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace' | 'sla_warning' | 'sla_breach';
 
 export interface AppNotification {
   id: string;
@@ -12,6 +12,7 @@ export interface AppNotification {
   type?: NotificationType;
   entityId?: string;
   workspaceId?: string;
+  urgent?: boolean; // Для SLA breach уведомлений
 }
 
 // Заголовки для браузерных уведомлений по типу
@@ -22,6 +23,8 @@ const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   assignment: 'Назначение исполнителя',
   mention: 'Упоминание',
   workspace: 'Рабочее место',
+  sla_warning: 'Предупреждение SLA',
+  sla_breach: 'Нарушение SLA',
 };
 
 interface NotificationStore {
@@ -33,6 +36,7 @@ interface NotificationStore {
     type?: NotificationType;
     entityId?: string;
     workspaceId?: string;
+    urgent?: boolean;
   }) => void;
   markAllRead: () => void;
   markRead: (id: string) => void;
@@ -57,6 +61,7 @@ export const useNotificationStore = create<NotificationStore>()(
           type: data.type,
           entityId: data.entityId,
           workspaceId: data.workspaceId,
+          urgent: data.urgent,
         };
 
         // Показываем браузерное уведомление если включено

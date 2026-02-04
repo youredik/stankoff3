@@ -4,6 +4,7 @@ import { useEntityStore } from '@/store/useEntityStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useSlaStore, SlaUpdate } from '@/store/useSlaStore';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -170,6 +171,52 @@ export function useWebSocket() {
           workspaceId: entity?.workspaceId,
         });
       }
+    });
+
+    // SLA события
+    socket.on('sla:warning', (data: {
+      instanceId: string;
+      targetId: string;
+      targetType: string;
+      definitionName: string;
+      type: 'response' | 'resolution';
+      usedPercent: number;
+      remainingMinutes: number;
+      workspaceId: string;
+    }) => {
+      const typeLabel = data.type === 'response' ? 'ответа' : 'решения';
+      useNotificationStore.getState().addNotification({
+        text: `⚠️ Предупреждение SLA «${data.definitionName}»: осталось ${data.remainingMinutes} мин до дедлайна ${typeLabel}`,
+        type: 'sla_warning',
+        entityId: data.targetId,
+        workspaceId: data.workspaceId,
+      });
+    });
+
+    socket.on('sla:breached', (data: {
+      instanceId: string;
+      targetId: string;
+      targetType: string;
+      definitionName: string;
+      type: 'response' | 'resolution';
+      workspaceId: string;
+    }) => {
+      const typeLabel = data.type === 'response' ? 'время ответа' : 'время решения';
+      useNotificationStore.getState().addNotification({
+        text: `🚨 Нарушение SLA «${data.definitionName}»: превышено ${typeLabel}`,
+        type: 'sla_breach',
+        entityId: data.targetId,
+        workspaceId: data.workspaceId,
+        urgent: true,
+      });
+    });
+
+    // SLA batch updates (real-time timer countdown)
+    socket.on('sla:batch-update', (data: {
+      workspaceId: string;
+      updates: SlaUpdate[];
+    }) => {
+      useSlaStore.getState().setUpdates(data.workspaceId, data.updates);
     });
 
     return () => {

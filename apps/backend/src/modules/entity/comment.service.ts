@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef, Optional, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Comment } from './comment.entity';
@@ -8,6 +8,9 @@ import { EventsGateway } from '../websocket/events.gateway';
 import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AuditActionType } from '../audit-log/audit-log.entity';
+import { TriggersService } from '../bpmn/triggers/triggers.service';
+import { TriggerType as BpmnTriggerType } from '../bpmn/entities/process-trigger.entity';
+import { SlaService } from '../sla/sla.service';
 
 // Response attachment type with signed URLs
 export interface AttachmentWithUrls {
@@ -27,6 +30,8 @@ export interface CommentWithUrls extends Omit<Comment, 'attachments'> {
 
 @Injectable()
 export class CommentService {
+  private readonly logger = new Logger(CommentService.name);
+
   constructor(
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
@@ -36,6 +41,10 @@ export class CommentService {
     private s3Service: S3Service,
     @Inject(forwardRef(() => AuditLogService))
     private auditLogService: AuditLogService,
+    @Optional()
+    @Inject(forwardRef(() => TriggersService))
+    private triggersService: TriggersService,
+    private slaService: SlaService,
   ) {}
 
   async findOne(id: string): Promise<Comment | null> {
@@ -142,6 +151,38 @@ export class CommentService {
         },
         entityId,
       );
+
+      // BPMN триггеры: comment_added
+      if (this.triggersService) {
+        try {
+          await this.triggersService.evaluateTriggers(
+            BpmnTriggerType.COMMENT_ADDED,
+            {
+              entityId,
+              workspaceId: entity.workspaceId,
+              commentId: saved.id,
+              authorId: dto.authorId,
+              hasAttachments: (dto.attachments || []).length > 0,
+              attachmentCount: (dto.attachments || []).length,
+              contentLength: dto.content?.length || 0,
+              entityTitle: entity.title,
+              entityStatus: entity.status,
+              entityPriority: entity.priority,
+            },
+            entity.workspaceId,
+          );
+        } catch (err) {
+          this.logger.error(`BPMN trigger error on comment create: ${err.message}`);
+        }
+      }
+
+      // SLA: отмечаем первый ответ при добавлении комментария
+      try {
+        await this.slaService.recordResponse('entity', entityId);
+        this.logger.debug(`SLA response recorded for entity ${entityId}`);
+      } catch (err) {
+        this.logger.error(`SLA response recording error: ${err.message}`);
+      }
     }
 
     return result;

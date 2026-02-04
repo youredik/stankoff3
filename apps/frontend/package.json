@@ -16,6 +16,7 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@bpmn-io/form-js": "^1.18.0",
     "@bpmn-io/properties-panel": "^3.36.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^9.0.0",
@@ -33,6 +34,8 @@
     "camunda-bpmn-moddle": "^7.0.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dmn-js": "^17.5.0",
+    "dmn-js-properties-panel": "^3.9.0",
     "lucide-react": "^0.468.0",
     "next": "^16.1.2",
     "react": "^19.0.0",

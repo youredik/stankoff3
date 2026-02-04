@@ -8,6 +8,7 @@ import { User } from '../user/user.entity';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { EmailModule } from '../email/email.module';
+import { DmnModule } from '../dmn/dmn.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { EmailModule } from '../email/email.module';
     forwardRef(() => WorkspaceModule),
     forwardRef(() => WebsocketModule),
     EmailModule,
+    DmnModule,
   ],
   controllers: [AutomationController],
   providers: [AutomationService],

@@ -35,7 +35,19 @@ const ProcessDetailView = dynamic(
   },
 );
 
-type Tab = 'definitions' | 'instances';
+const ProcessMiningDashboard = dynamic(
+  () => import('@/components/bpmn/ProcessMiningDashboard').then((mod) => mod.ProcessMiningDashboard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+        <span className="text-gray-500">Загрузка аналитики...</span>
+      </div>
+    ),
+  },
+);
+
+type Tab = 'definitions' | 'instances' | 'analytics';
 type ViewMode = 'list' | 'edit' | 'detail';
 
 export default function ProcessesPage() {
@@ -274,6 +286,17 @@ export default function ProcessesPage() {
                 <span className="text-sm font-medium">Экземпляры</span>
                 <span className="text-xs text-gray-400">({instances.length})</span>
               </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`flex items-center gap-2 py-3 border-b-2 transition-colors ${
+                  activeTab === 'analytics'
+                    ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="text-sm font-medium">Аналитика</span>
+              </button>
             </div>
           </>
         )}
@@ -334,6 +357,10 @@ export default function ProcessesPage() {
                     emptyMessage="Нет запущенных процессов в этом workspace"
                   />
                 </div>
+              )}
+
+              {activeTab === 'analytics' && (
+                <ProcessMiningDashboard workspaceId={workspaceId} />
               )}
             </div>
           )}

@@ -15,6 +15,7 @@ import { WorkspaceEntity } from '../entity/entity.entity';
 import { User } from '../user/user.entity';
 import { EventsGateway } from '../websocket/events.gateway';
 import { EmailService } from '../email/email.service';
+import { DmnService } from '../dmn/dmn.service';
 
 export interface AutomationContext {
   entity: WorkspaceEntity;
@@ -38,6 +39,7 @@ export class AutomationService {
     @Inject(forwardRef(() => EventsGateway))
     private eventsGateway: EventsGateway,
     private emailService: EmailService,
+    private dmnService: DmnService,
   ) {}
 
   // ==================== CRUD операции ====================
@@ -342,6 +344,104 @@ export class AutomationService {
           this.logger.log(`Sent email to ${recipients.length} users`);
         }
         break;
+
+      case ActionType.EVALUATE_DMN:
+        if (config.decisionTableId) {
+          await this.executeDmnEvaluation(config, context);
+        }
+        break;
+    }
+  }
+
+  /**
+   * Выполняет DMN таблицу решений и применяет результат к entity
+   */
+  private async executeDmnEvaluation(
+    config: RuleAction['config'],
+    context: AutomationContext,
+  ): Promise<void> {
+    const { entity } = context;
+
+    // Собираем входные данные из entity
+    const inputData: Record<string, unknown> = {};
+    const inputMapping = config.inputMapping || {};
+
+    // Если маппинг не задан, используем все поля entity
+    if (Object.keys(inputMapping).length === 0) {
+      // Системные поля
+      inputData['status'] = entity.status;
+      inputData['priority'] = entity.priority;
+      inputData['assigneeId'] = entity.assigneeId;
+      inputData['title'] = entity.title;
+      // Кастомные поля
+      if (entity.data) {
+        for (const [key, value] of Object.entries(entity.data)) {
+          inputData[key] = value;
+        }
+      }
+    } else {
+      // Используем заданный маппинг
+      for (const [entityField, dmnColumnName] of Object.entries(inputMapping)) {
+        const value = this.getFieldValue(entity, entityField);
+        inputData[dmnColumnName] = value;
+      }
+    }
+
+    try {
+      // Выполняем DMN таблицу
+      const output = await this.dmnService.evaluateQuick(
+        config.decisionTableId!,
+        inputData,
+      );
+
+      this.logger.log(`DMN evaluation output for entity ${entity.id}: ${JSON.stringify(output)}`);
+
+      // Применяем результат к entity если требуется
+      if (config.applyOutputToEntity !== false && output) {
+        const outputMapping = config.outputMapping || {};
+        const updates: Partial<WorkspaceEntity> = {};
+        let dataUpdates: Record<string, unknown> = { ...entity.data };
+
+        for (const [dmnColumnName, value] of Object.entries(output)) {
+          // Определяем целевое поле
+          const targetField = outputMapping[dmnColumnName] || dmnColumnName;
+
+          // Применяем к системным полям или data
+          if (targetField === 'status' && typeof value === 'string') {
+            updates.status = value;
+          } else if (targetField === 'priority' && typeof value === 'string') {
+            updates.priority = value as 'low' | 'medium' | 'high';
+          } else if (targetField === 'assigneeId') {
+            updates.assigneeId = value as string | null;
+          } else {
+            // Кастомное поле - записываем в data
+            dataUpdates[targetField] = value;
+          }
+        }
+
+        // Обновляем data только если есть изменения
+        if (Object.keys(dataUpdates).length > Object.keys(entity.data || {}).length ||
+            JSON.stringify(dataUpdates) !== JSON.stringify(entity.data)) {
+          updates.data = dataUpdates;
+        }
+
+        // Применяем обновления
+        if (Object.keys(updates).length > 0) {
+          await this.entityRepository.update(entity.id, updates);
+          this.logger.log(`Applied DMN output to entity ${entity.id}: ${JSON.stringify(updates)}`);
+
+          // Эмитим событие об обновлении
+          const updated = await this.entityRepository.findOne({
+            where: { id: entity.id },
+            relations: ['assignee'],
+          });
+          if (updated) {
+            this.eventsGateway.emitEntityUpdated(updated);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`DMN evaluation failed for table ${config.decisionTableId}: ${error.message}`);
     }
   }
 

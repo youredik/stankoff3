@@ -92,6 +92,59 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  // Отправка события в workspace (broadcast с workspaceId в payload)
+  emitToWorkspace(workspaceId: string, event: string, data: any) {
+    // Отправляем всем клиентам с workspaceId в payload
+    // Клиент фильтрует по workspaceId
+    this.server.emit(event, { ...data, workspaceId });
+  }
+
+  // SLA Real-time updates
+  emitSlaUpdate(workspaceId: string, data: {
+    targetId: string;
+    targetType: string;
+    instanceId: string;
+    responseStatus: string;
+    resolutionStatus: string;
+    responseDueAt: Date | null;
+    resolutionDueAt: Date | null;
+    responseRemainingMinutes: number | null;
+    resolutionRemainingMinutes: number | null;
+    responseUsedPercent: number | null;
+    resolutionUsedPercent: number | null;
+    isPaused: boolean;
+    definitionName: string;
+  }) {
+    this.server.emit('sla:update', { ...data, workspaceId });
+  }
+
+  // Batch SLA updates for multiple entities
+  emitSlaBatchUpdate(workspaceId: string, updates: Array<{
+    targetId: string;
+    targetType: string;
+    instanceId: string;
+    responseRemainingMinutes: number | null;
+    resolutionRemainingMinutes: number | null;
+    responseUsedPercent: number | null;
+    resolutionUsedPercent: number | null;
+    isPaused: boolean;
+  }>) {
+    this.server.emit('sla:batch-update', { workspaceId, updates });
+  }
+
+  @SubscribeMessage('sla:subscribe')
+  handleSlaSubscribe(client: AuthenticatedSocket, payload: { entityIds: string[] }): void {
+    // Client wants to subscribe to SLA updates for specific entities
+    client.join(payload.entityIds.map(id => `sla:${id}`));
+    console.log(`Client ${client.id} subscribed to SLA updates for ${payload.entityIds.length} entities`);
+  }
+
+  @SubscribeMessage('sla:unsubscribe')
+  handleSlaUnsubscribe(client: AuthenticatedSocket, payload: { entityIds: string[] }): void {
+    payload.entityIds.forEach(id => client.leave(`sla:${id}`));
+    console.log(`Client ${client.id} unsubscribed from SLA updates`);
+  }
+
   @SubscribeMessage('message')
   handleMessage(_client: Socket, _payload: unknown): string {
     return 'Message received';

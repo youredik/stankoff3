@@ -9,6 +9,8 @@ import {
   FileText,
   Briefcase,
   X,
+  AlertTriangle,
+  AlertOctagon,
 } from 'lucide-react';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -21,6 +23,8 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
   assignment: UserCheck,
   mention: Bell,
   workspace: Briefcase,
+  sla_warning: AlertTriangle,
+  sla_breach: AlertOctagon,
 };
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
@@ -30,6 +34,8 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   assignment: 'text-purple-500 bg-purple-100 dark:bg-purple-900/40',
   mention: 'text-pink-500 bg-pink-100 dark:bg-pink-900/40',
   workspace: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-900/40',
+  sla_warning: 'text-amber-500 bg-amber-100 dark:bg-amber-900/40',
+  sla_breach: 'text-red-500 bg-red-100 dark:bg-red-900/40',
 };
 
 export function ToastContainer() {
@@ -52,11 +58,14 @@ export function ToastContainer() {
       shownIdsRef.current.add(notification.id);
       setToasts((prev) => [...prev, notification]);
 
+      // Для срочных уведомлений (SLA breach) показываем дольше
+      const duration = notification.urgent ? 10000 : 3000;
+
       // Установить таймер для автоматического закрытия
       const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== notification.id));
         timersRef.current.delete(notification.id);
-      }, 3000);
+      }, duration);
 
       timersRef.current.set(notification.id, timer);
     }
@@ -99,7 +108,11 @@ export function ToastContainer() {
         return (
           <div
             key={toast.id}
-            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg px-4 py-3 max-w-sm pointer-events-auto flex items-start gap-3 animate-slide-in"
+            className={`bg-white dark:bg-gray-900 border rounded-lg shadow-lg px-4 py-3 max-w-sm pointer-events-auto flex items-start gap-3 animate-slide-in ${
+              toast.urgent
+                ? 'border-red-500 border-2 ring-2 ring-red-500/20'
+                : 'border-gray-200 dark:border-gray-700'
+            }`}
             style={{
               animation: 'slideIn 0.3s ease-out',
             }}

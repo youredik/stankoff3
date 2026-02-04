@@ -12,6 +12,8 @@ import {
   FileText,
   Briefcase,
   Settings,
+  AlertTriangle,
+  AlertOctagon,
 } from 'lucide-react';
 import { useNotificationStore, NotificationType } from '@/store/useNotificationStore';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -28,6 +30,8 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
   assignment: UserCheck,
   mention: Bell,
   workspace: Briefcase,
+  sla_warning: AlertTriangle,
+  sla_breach: AlertOctagon,
 };
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
@@ -37,6 +41,8 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   assignment: 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40',
   mention: 'text-pink-600 dark:text-pink-400 bg-pink-100 dark:bg-pink-900/40',
   workspace: 'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40',
+  sla_warning: 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40',
+  sla_breach: 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40',
 };
 
 export function NotificationPanel({ onClose }: NotificationPanelProps) {
@@ -163,7 +169,11 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
               key={notif.id}
               onClick={() => handleNotificationClick(notif.id, notif.entityId)}
               className={`p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer flex items-start gap-3 transition-colors ${
-                !notif.read ? 'bg-primary-100 dark:bg-primary-900/20' : ''
+                notif.urgent && !notif.read
+                  ? 'bg-red-50 dark:bg-red-900/30 border-l-4 border-l-red-500'
+                  : !notif.read
+                    ? 'bg-primary-100 dark:bg-primary-900/20'
+                    : ''
               }`}
             >
               <div className={`p-2 rounded ${colorClass}`}>

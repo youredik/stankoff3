@@ -66,7 +66,7 @@ Stankoff Portal - это корпоративная система управл�
 - `KanbanBoard.tsx` - Основной контейнер с DndContext, фильтрами и индикатором режима просмотра
 - `KanbanColumn.tsx` - Droppable колонка статуса (динамические из workspace)
 - `KanbanCard.tsx` - Draggable карточка сущности (отключается для viewer)
-- `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями, вложениями, кастомными полями и tooltips на заблокированных элементах
+- `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями, вложениями, кастомными полями, ML-рекомендациями исполнителей и tooltips на заблокированных элементах
 - `CreateEntityModal.tsx` - Создание новой сущности с поддержкой кастомных полей из структуры workspace
 - `FilterPanel.tsx` - Панель фильтрации по всем полям
 
@@ -118,6 +118,38 @@ Stankoff Portal - это корпоративная система управл�
 - `ProcessDetailView.tsx` - Детальный просмотр развёрнутого процесса (BpmnHeatMap + статистика)
 - `StartProcessModal.tsx` - Модальное окно запуска процесса на сущности
 - `TemplateSelector.tsx` - Модальное окно выбора шаблона при создании нового процесса (пустой или из предзаготовленных шаблонов)
+- `ProcessMiningDashboard.tsx` - Дашборд аналитики Process Mining (статистика workspace, топ процессов по объёму/длительности, временной анализ, распределение по статусам, детальный анализ выбранного процесса)
+
+**BPMN Tasks (Пользовательские задачи)**
+- `tasks/TaskInbox.tsx` - Inbox пользовательских задач с фильтрами (мои/доступные/все) и поиском
+- `tasks/TaskCard.tsx` - Карточка задачи в списке (статус, приоритет, срок, исполнитель)
+- `tasks/TaskDetail.tsx` - Детальный просмотр задачи с формой, комментариями и историей
+- `tasks/TaskActions.tsx` - Кнопки действий (взять/отказаться/завершить/делегировать)
+
+**BPMN Forms (Динамические формы)**
+- `forms/DynamicForm.tsx` - Компонент формы на основе JSON Schema с валидацией и поддержкой различных типов полей (text, number, boolean, select, date, textarea)
+- `forms/FormViewer.tsx` - Компонент отображения форм User Tasks на основе @bpmn-io/form-js (dynamic import, SSR=false)
+- `forms/FormEditor.tsx` - Визуальный drag-and-drop редактор форм (@bpmn-io/form-js-editor) с undo/redo, import/export, preview
+
+**BPMN Triggers (Триггеры процессов)**
+- `triggers/TriggersList.tsx` - Список триггеров workspace с управлением (включить/выключить/удалить)
+- `triggers/TriggerForm.tsx` - Форма создания/редактирования триггера с настройкой условий
+
+**BPMN Entity Links (Связи сущностей)**
+- `entity-links/EntityLinksList.tsx` - Список связей сущности с группировкой по типу связи
+- `entity-links/AddLinkModal.tsx` - Модальное окно добавления связи с поиском сущностей
+
+**SLA (Service Level Agreement)**
+- `sla/SlaStatusBadge.tsx` - Компактный бейдж со статусом SLA (время до дедлайна, цветовая индикация pending/met/breached)
+- `sla/SlaDashboard.tsx` - Дашборд SLA для workspace (статистика: всего/выполнено/нарушено/в процессе/под угрозой)
+- `sla/SlaDefinitionForm.tsx` - Форма создания/редактирования определения SLA (время ответа/решения, рабочие часы, условия, эскалация)
+- `sla/SlaSettings.tsx` - Страница настроек SLA в workspace (список определений + дашборд)
+- `sla/SlaTimer.tsx` - Real-time таймер обратного отсчёта SLA с клиентской интерполяцией между серверными обновлениями, цветовая индикация по срочности (красный <15мин, жёлтый <60мин)
+
+**DMN (Decision Tables)**
+- `dmn/DecisionTableEditor.tsx` - Редактор таблиц решений (входные/выходные колонки, правила с условиями, hit policies)
+- `dmn/DecisionTableViewer.tsx` - Просмотр таблицы решений с возможностью тестирования и просмотра статистики
+- `dmn/DmnSettings.tsx` - Страница настроек DMN в workspace (список таблиц с CRUD)
 
 > **Dynamic Imports:** Все компоненты с bpmn-js используют `dynamic(() => import(...), { ssr: false })`, так как библиотека требует браузерных API (DOM, Canvas).
 
@@ -184,7 +216,7 @@ interface WorkspaceStore {
 
 **useNotificationStore**
 ```typescript
-type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention';
+type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace' | 'sla_warning' | 'sla_breach';
 
 interface AppNotification {
   id: string;
@@ -194,6 +226,7 @@ interface AppNotification {
   type?: NotificationType;
   entityId?: string;
   workspaceId?: string;
+  urgent?: boolean;  // Для SLA breach уведомлений
 }
 
 interface NotificationStore {
@@ -272,6 +305,32 @@ interface SectionStore {
 
 > Управляет разделами (секциями) для группировки workspaces. Состояние свёрнутых разделов сохраняется в localStorage.
 
+**useSlaStore**
+```typescript
+interface SlaUpdate {
+  targetId: string;
+  targetType: string;
+  instanceId: string;
+  responseRemainingMinutes: number | null;
+  resolutionRemainingMinutes: number | null;
+  responseUsedPercent: number | null;
+  resolutionUsedPercent: number | null;
+  isPaused: boolean;
+}
+
+interface SlaStore {
+  slaUpdates: Map<string, SlaUpdate>;  // Map для быстрого O(1) доступа
+  lastUpdateTime: number;
+
+  setSlaUpdate(targetId: string, update: SlaUpdate): void;
+  setSlaUpdates(updates: SlaUpdate[]): void;  // Batch update от WebSocket
+  getSlaUpdate(targetId: string): SlaUpdate | undefined;
+  clearSlaUpdates(): void;
+}
+```
+
+> Хранит real-time обновления SLA от WebSocket. Backend отправляет batch-обновления каждые 10 секунд, клиент интерполирует значения между обновлениями (1 секунда интервал) для плавного обратного отсчёта.
+
 #### Hooks
 
 **useWebSocket**
@@ -281,6 +340,9 @@ interface SectionStore {
 - `status:changed` - Изменение статуса
 - `comment:created` - Новый комментарий
 - `user:assigned` - Назначение ответственного
+- `sla:warning` - SLA приближается к дедлайну (toast уведомление)
+- `sla:breached` - SLA нарушен (urgent toast уведомление, показывается дольше)
+- `sla:batch-update` - Batch обновления SLA таймеров (каждые 10 сек, сохраняется в useSlaStore)
 
 > **URL подключения:** В браузере используется `window.location.origin` (динамически определяется текущий хост). Nginx проксирует `/socket.io/` на backend. Это позволяет работать на любом окружении (localhost, preprod, production) без изменения конфигурации.
 
@@ -446,6 +508,12 @@ emitEntityUpdated(entity)    // При обновлении
 emitStatusChanged({id, status, entity})  // При смене статуса
 emitCommentCreated(comment)  // При добавлении комментария
 emitAssigneeChanged({entityId, entity, assigneeId, previousAssigneeId})  // При назначении
+emitToWorkspace(workspaceId, event, data)  // Broadcast в workspace
+emitToUser(userId, event, data)  // Личное уведомление пользователю
+
+// SLA события (через emitToWorkspace):
+// 'sla:warning' - приближается дедлайн
+// 'sla:breached' - SLA нарушен
 ```
 
 **S3Module**
@@ -533,6 +601,8 @@ interface EmailService {
   sendAssignmentNotification(assignee, entity, assignedBy, frontendUrl): Promise<boolean>;
   sendCommentNotification(recipient, entity, commentAuthor, commentPreview, frontendUrl): Promise<boolean>;
   sendStatusChangeNotification(recipient, entity, changedBy, oldStatus, newStatus, frontendUrl): Promise<boolean>;
+  sendSlaWarningNotification(recipient, entity, slaName, type, remainingMinutes, usedPercent, frontendUrl): Promise<boolean>;
+  sendSlaBreachNotification(recipient, entity, slaName, type, frontendUrl): Promise<boolean>;
 }
 ```
 
@@ -563,6 +633,7 @@ enum ActionType {
   SET_FIELD = 'set_field',           // Установить значение поля
   SEND_NOTIFICATION = 'send_notification', // Отправить уведомление
   SEND_EMAIL = 'send_email',         // Отправить email
+  EVALUATE_DMN = 'evaluate_dmn',     // Вычислить таблицу решений DMN
 }
 
 enum ConditionOperator {
@@ -604,7 +675,28 @@ interface RuleCondition {
 
 interface RuleAction {
   type: ActionType;
-  config: Record<string, any>;  // Настройки действия
+  config: {
+    // SET_STATUS
+    status?: string;
+    // SET_ASSIGNEE
+    assigneeId?: string | null;
+    assigneeMode?: 'specific' | 'creator' | 'round_robin';
+    // SET_PRIORITY
+    priority?: 'low' | 'medium' | 'high';
+    // SET_FIELD
+    fieldId?: string;
+    fieldValue?: any;
+    // SEND_NOTIFICATION / SEND_EMAIL
+    recipientMode?: 'assignee' | 'creator' | 'specific' | 'all_workspace_members';
+    recipientId?: string;
+    message?: string;
+    subject?: string;
+    // EVALUATE_DMN
+    decisionTableId?: string;           // ID таблицы решений
+    inputMapping?: Record<string, string>; // Маппинг полей entity → DMN input
+    outputMapping?: Record<string, string>; // Маппинг DMN output → полей entity
+    applyOutputToEntity?: boolean;      // Применить результат к entity
+  };
 }
 ```
 
@@ -713,6 +805,194 @@ interface ProcessInstance {
 - Process Instance: создание и отслеживание экземпляров
 - Message Correlation: отправка сообщений в процессы
 
+**SlaModule**
+Модуль управления SLA (Service Level Agreement) для отслеживания сроков выполнения заявок.
+
+```
+sla/
+├── sla.module.ts
+├── sla.controller.ts       # API для определений и статусов SLA
+├── sla.service.ts          # Логика работы с SLA
+├── sla-calculator.service.ts # Расчёт дедлайнов с учётом рабочего времени
+├── entities/
+│   ├── sla-definition.entity.ts  # Определение SLA
+│   ├── sla-instance.entity.ts    # Экземпляр SLA для сущности
+│   └── sla-event.entity.ts       # События SLA (создание, пауза, нарушение)
+└── dto/
+    └── create-sla-definition.dto.ts
+```
+
+```typescript
+interface SlaDefinition {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  appliesTo: 'entity' | 'task' | 'process';  // Тип цели
+  conditions: SlaConditions;      // Условия применения (priority, category)
+  responseTime?: number;          // Время на первый ответ (минуты)
+  resolutionTime?: number;        // Время на решение (минуты)
+  warningThreshold: number;       // Порог предупреждения (%)
+  businessHoursOnly: boolean;     // Считать только рабочие часы
+  businessHours: BusinessHours;   // Рабочие часы
+  escalationRules: EscalationRule[]; // Правила эскалации
+  isActive: boolean;
+  priority: number;               // Приоритет (для выбора при нескольких подходящих)
+}
+
+interface BusinessHours {
+  start: string;     // "09:00"
+  end: string;       // "18:00"
+  timezone: string;  // "Europe/Moscow"
+  workdays: number[]; // [1,2,3,4,5] (Пн-Пт)
+}
+
+interface SlaInstance {
+  id: string;
+  slaDefinitionId: string;
+  targetType: 'entity' | 'task' | 'process';
+  targetId: string;
+  responseDueAt?: Date;      // Дедлайн первого ответа
+  resolutionDueAt?: Date;    // Дедлайн решения
+  responseStatus: 'pending' | 'met' | 'breached';
+  resolutionStatus: 'pending' | 'met' | 'breached';
+  firstResponseAt?: Date;
+  resolvedAt?: Date;
+  isPaused: boolean;
+  totalPausedMinutes: number;
+  currentEscalationLevel: number;
+}
+```
+
+**Ключевые функции:**
+- Автоматическое создание SLA экземпляра при создании сущности (EntityService интегрирован с SlaService)
+- Автоматическая фиксация первого ответа при добавлении комментария (CommentService)
+- Автоматическая фиксация закрытия при переходе в финальный статус (closed, done, resolved, cancelled, completed)
+- Расчёт дедлайнов с учётом рабочего времени (пропуск выходных)
+- Пауза SLA (например, ожидание ответа клиента)
+- Автоматическая проверка нарушений (cron каждую минуту)
+- WebSocket уведомления при приближении к дедлайну (`sla:warning`) и нарушении (`sla:breached`)
+- Эскалация при приближении к дедлайну
+- Дашборд со статистикой (выполнено/нарушено/в риске)
+
+**WebSocket события SLA:**
+| Событие | Описание |
+|---------|----------|
+| `sla:warning` | SLA приближается к дедлайну (достигнут warningThreshold) |
+| `sla:breached` | SLA нарушен (дедлайн истёк) |
+
+**Payload WebSocket событий:**
+```typescript
+interface SlaNotificationPayload {
+  workspaceId: string;
+  instanceId: string;
+  targetType: 'entity' | 'task' | 'process';
+  targetId: string;
+  type: 'response' | 'resolution';
+  definitionName: string;
+  dueAt: Date;
+  usedPercent?: number;   // только для warning
+  threshold?: number;      // только для warning
+}
+```
+
+**API эндпоинты SLA:**
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | /api/sla/definitions?workspaceId=:id | Список определений SLA |
+| GET | /api/sla/definitions/:id | Детали определения |
+| POST | /api/sla/definitions | Создать определение SLA |
+| PUT | /api/sla/definitions/:id | Обновить определение |
+| DELETE | /api/sla/definitions/:id | Удалить определение |
+| GET | /api/sla/status/:targetType/:targetId | Статус SLA для цели |
+| GET | /api/sla/dashboard?workspaceId=:id | Статистика SLA |
+| POST | /api/sla/instances/:id/pause | Приостановить SLA |
+| POST | /api/sla/instances/:id/resume | Возобновить SLA |
+
+**DmnModule**
+Модуль таблиц решений (Decision Model and Notation) для бизнес-правил.
+
+```
+dmn/
+├── dmn.module.ts
+├── dmn.controller.ts         # API для таблиц решений
+├── dmn.service.ts            # CRUD и вызов evaluator
+├── dmn-evaluator.service.ts  # Движок вычисления правил
+├── entities/
+│   ├── decision-table.entity.ts   # Таблица решений
+│   └── decision-evaluation.entity.ts # Лог вычислений
+└── dto/
+    └── create-decision-table.dto.ts
+```
+
+```typescript
+type HitPolicy = 'UNIQUE' | 'FIRST' | 'ANY' | 'COLLECT' | 'RULE_ORDER';
+
+interface DecisionTable {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string;
+  hitPolicy: HitPolicy;          // Политика выбора правила
+  inputColumns: InputColumn[];   // Входные колонки
+  outputColumns: OutputColumn[]; // Выходные колонки
+  rules: DecisionRule[];         // Правила
+  isActive: boolean;
+  version: number;
+}
+
+interface InputColumn {
+  id: string;
+  name: string;           // Имя для поиска в inputData
+  label: string;          // Отображаемое имя
+  type: 'string' | 'number' | 'boolean' | 'date';
+}
+
+interface DecisionRule {
+  id: string;
+  description?: string;
+  inputs: Record<string, RuleCondition>;  // Условия по колонкам
+  outputs: Record<string, unknown>;       // Выходные значения
+}
+
+interface RuleCondition {
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'not_in' | 'contains' | 'between' | 'any';
+  value: unknown;
+  value2?: unknown;  // Для 'between'
+}
+```
+
+**Hit Policies:**
+- `UNIQUE` - только одно правило должно совпасть (предупреждение при нескольких)
+- `FIRST` - первое совпавшее правило (по порядку)
+- `ANY` - любое совпавшее (все должны давать одинаковый результат)
+- `COLLECT` - собрать все совпавшие выходы в массив
+- `RULE_ORDER` - все совпавшие в порядке правил
+
+**Операторы условий:**
+- `eq`, `neq` - равно/не равно (case-insensitive для строк)
+- `gt`, `gte`, `lt`, `lte` - сравнение чисел
+- `in`, `not_in` - вхождение в массив
+- `contains` - подстрока (case-insensitive)
+- `between` - диапазон (value <= x <= value2)
+- `any` - любое значение (пропуск условия)
+
+**API эндпоинты DMN:**
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | /api/dmn/tables?workspaceId=:id | Список таблиц решений |
+| GET | /api/dmn/tables/:id | Детали таблицы |
+| POST | /api/dmn/tables | Создать таблицу |
+| PUT | /api/dmn/tables/:id | Обновить таблицу |
+| DELETE | /api/dmn/tables/:id | Удалить таблицу |
+| POST | /api/dmn/tables/:id/clone | Клонировать таблицу |
+| POST | /api/dmn/evaluate | Вычислить с логированием |
+| POST | /api/dmn/evaluate/quick | Быстрое вычисление (без лога) |
+| POST | /api/dmn/evaluate/by-name | Вычислить по имени таблицы |
+| GET | /api/dmn/tables/:id/evaluations | История вычислений |
+| GET | /api/dmn/tables/:id/statistics | Статистика (попадания правил) |
+| GET | /api/dmn/evaluations/target/:type/:id | Вычисления для цели |
+
 **Функции Workspace**
 
 Дополнительные операции с рабочими местами:
@@ -813,6 +1093,64 @@ interface ProcessInstance {
 | POST | /api/bpmn/instances/:id/message | Отправить сообщение в процесс |
 | GET | /api/bpmn/statistics/definition/:id | Статистика по определению процесса |
 | GET | /api/bpmn/statistics/workspace/:workspaceId | Общая статистика процессов workspace |
+| GET | /api/bpmn/triggers?workspaceId=:id | Список триггеров процессов |
+| GET | /api/bpmn/triggers/:id | Детали триггера |
+| POST | /api/bpmn/triggers | Создать триггер |
+| PUT | /api/bpmn/triggers/:id | Обновить триггер |
+| PATCH | /api/bpmn/triggers/:id/toggle | Включить/выключить триггер |
+| DELETE | /api/bpmn/triggers/:id | Удалить триггер |
+| GET | /api/bpmn/triggers/:id/executions | История выполнения триггера |
+| POST | /api/bpmn/webhooks/:workspaceId/:triggerId | Webhook endpoint для триггеров |
+| GET | /api/bpmn/tasks/inbox | Задачи пользователя (inbox) |
+| GET | /api/bpmn/tasks | Поиск/фильтрация задач |
+| GET | /api/bpmn/tasks/statistics?workspaceId=:id | Статистика по задачам |
+| GET | /api/bpmn/tasks/:id | Детали задачи с формой |
+| GET | /api/bpmn/tasks/:id/comments | Комментарии задачи |
+| POST | /api/bpmn/tasks/:id/claim | Взять задачу |
+| POST | /api/bpmn/tasks/:id/unclaim | Отпустить задачу |
+| POST | /api/bpmn/tasks/:id/complete | Завершить задачу с данными формы |
+| POST | /api/bpmn/tasks/:id/delegate | Делегировать задачу |
+| POST | /api/bpmn/tasks/:id/comments | Добавить комментарий к задаче |
+| GET | /api/bpmn/entity-links/entity/:entityId | Связи сущности |
+| GET | /api/bpmn/entity-links/entity/:entityId/linked | Связанные сущности с деталями |
+| GET | /api/bpmn/entity-links/entity/:entityId/type/:type | Связи по типу |
+| GET | /api/bpmn/entity-links/statistics?workspaceId=:id | Статистика связей |
+| POST | /api/bpmn/entity-links | Создать связь |
+| POST | /api/bpmn/entity-links/spawn | Создать сущность и связать |
+| DELETE | /api/bpmn/entity-links/:id | Удалить связь |
+| GET | /api/bpmn/templates | Список шаблонов процессов (без XML) |
+| GET | /api/bpmn/templates/:id | Шаблон с BPMN XML |
+| GET | /api/bpmn/templates/category/:category | Шаблоны по категории |
+| GET | /api/bpmn/templates/categories | Список категорий с количеством |
+| GET | /api/bpmn/templates/search?q=:query | Поиск шаблонов по названию/тегам |
+| GET | /api/bpmn/mining/process/:definitionId | Process Mining статистика процесса |
+| GET | /api/bpmn/mining/process/:definitionId/time | Анализ времени (дни недели, часы) |
+| GET | /api/bpmn/mining/workspace/:workspaceId | Статистика всех процессов workspace |
+| GET | /api/entities/recommendations/assignees/:entityId | ML-рекомендации исполнителей |
+| POST | /api/entities/recommendations/priority | Рекомендация приоритета |
+| POST | /api/entities/recommendations/response-time | Оценка времени ответа |
+| GET | /api/entities/recommendations/similar/:entityId | Похожие заявки |
+| GET | /api/sla/definitions?workspaceId=:id | Список определений SLA |
+| GET | /api/sla/definitions/:id | Детали определения SLA |
+| POST | /api/sla/definitions | Создать определение SLA |
+| PUT | /api/sla/definitions/:id | Обновить определение SLA |
+| DELETE | /api/sla/definitions/:id | Удалить определение SLA |
+| GET | /api/sla/status/:targetType/:targetId | Статус SLA для цели |
+| GET | /api/sla/dashboard?workspaceId=:id | Статистика SLA |
+| POST | /api/sla/instances/:id/pause | Приостановить SLA |
+| POST | /api/sla/instances/:id/resume | Возобновить SLA |
+| GET | /api/dmn/tables?workspaceId=:id | Список таблиц решений |
+| GET | /api/dmn/tables/:id | Детали таблицы решений |
+| POST | /api/dmn/tables | Создать таблицу решений |
+| PUT | /api/dmn/tables/:id | Обновить таблицу |
+| DELETE | /api/dmn/tables/:id | Удалить таблицу |
+| POST | /api/dmn/tables/:id/clone | Клонировать таблицу |
+| POST | /api/dmn/evaluate | Вычислить с логированием |
+| POST | /api/dmn/evaluate/quick | Быстрое вычисление |
+| POST | /api/dmn/evaluate/by-name | Вычислить по имени |
+| GET | /api/dmn/tables/:id/evaluations | История вычислений |
+| GET | /api/dmn/tables/:id/statistics | Статистика правил |
+| GET | /api/dmn/evaluations/target/:type/:id | Вычисления для цели |
 
 ## Потоки данных
 
@@ -1094,6 +1432,8 @@ await analyticsService.refreshMaterializedViews();
 | 1770126800000 | AddCachedFields | commentCount, lastActivityAt и т.д. |
 | 1770126900000 | AddMaterializedViews | mv_workspace_stats и др. |
 | 1770300000000 | AddSections | Разделы, section_members, поля workspaces |
+| 1770500000000 | AddSlaAndDmnTables | SLA и DMN таблицы (sla_definitions, sla_instances, sla_events, decision_tables, decision_evaluations) |
+| 1770600000000 | FixSlaAndDmnTables | Исправление структуры DMN таблиц (переименование колонок, добавление target_type/target_id) |
 
 **Команды:**
 ```bash
@@ -1533,6 +1873,209 @@ GitHub Actions workflow (`.github/workflows/ci.yml`):
 - Sentry для отслеживания ошибок frontend/backend
 - Prometheus метрики
 - Grafana dashboards
+
+## Process Mining (Аналитика процессов)
+
+### Описание
+
+Process Mining модуль предоставляет статистическую аналитику выполнения бизнес-процессов. Работает на базе исторических данных из ProcessInstance без внешних ML-зависимостей.
+
+### Структура сервиса
+
+```
+bpmn/process-mining/
+├── process-mining.service.ts       # Основная логика аналитики
+├── process-mining.controller.ts    # REST API endpoints
+└── process-mining.service.spec.ts  # Unit тесты
+```
+
+### Метрики и статистика
+
+**ProcessStats (статистика процесса)**
+```typescript
+interface ProcessStats {
+  definitionId: string;
+  definitionName: string;
+  totalInstances: number;       // Всего экземпляров
+  completedInstances: number;   // Завершённых
+  activeInstances: number;      // Активных
+  terminatedInstances: number;  // Отменённых
+  completionRate: number;       // % завершения (0-100)
+  avgDurationMinutes: number | null;  // Среднее время выполнения
+}
+```
+
+**TimeAnalysis (анализ по времени)**
+```typescript
+interface TimeAnalysis {
+  dayOfWeekStats: { day: number; count: number; avgDuration: number }[];  // 7 дней
+  hourlyStats: { hour: number; count: number; avgDuration: number }[];    // 24 часа
+  trendLine: { date: string; count: number }[];  // Тренд по дням
+}
+```
+
+**WorkspaceStats (статистика workspace)**
+```typescript
+interface WorkspaceStats {
+  totalDefinitions: number;       // Всего определений процессов
+  totalInstances: number;         // Всего экземпляров
+  statusDistribution: Record<ProcessInstanceStatus, number>;  // Распределение по статусам
+  avgCompletionRate: number;      // Средний % завершения
+  topProcesses: { id: string; name: string; count: number }[];  // Топ-5 по запускам
+}
+```
+
+### Применение
+
+- Выявление узких мест в процессах
+- Анализ пиковой нагрузки (часы, дни недели)
+- Мониторинг эффективности (completion rate)
+- Оценка производительности по длительности выполнения
+
+## Библиотека шаблонов процессов
+
+### Описание
+
+Готовые BPMN-шаблоны для быстрого старта с категоризацией и поиском.
+
+### Структура сервиса
+
+```
+bpmn/
+├── bpmn-templates.service.ts       # Управление шаблонами
+├── bpmn-templates.controller.ts    # REST API
+├── bpmn-templates.service.spec.ts  # Unit тесты
+└── templates/                      # BPMN XML файлы шаблонов
+    ├── simple-approval.bpmn
+    ├── support-ticket.bpmn
+    └── ...
+```
+
+### Категории шаблонов
+
+| Категория | Label | Описание |
+|-----------|-------|----------|
+| approval | Согласование | Процессы утверждения документов, заявок |
+| support | Техподдержка | Обработка тикетов, инцидентов |
+| hr | HR | Онбординг, отпуска, увольнения |
+| finance | Финансы | Платежи, согласование бюджетов |
+| operations | Операции | Закупки, логистика |
+| it | IT | Заявки на оборудование, доступы |
+| other | Прочее | Остальные шаблоны |
+
+### Метаданные шаблона
+
+```typescript
+interface BpmnTemplate {
+  id: string;           // Уникальный идентификатор
+  name: string;         // Название
+  description: string;  // Описание
+  category: TemplateCategory;
+  tags: string[];       // Теги для поиска
+  difficulty: 'simple' | 'medium' | 'advanced';
+  estimatedDuration: string;  // "1-2 часа", "5-10 мин" и т.д.
+  bpmnXml?: string;     // BPMN XML (только при запросе конкретного шаблона)
+}
+```
+
+### API поиска
+
+Поиск выполняется по:
+- Названию шаблона (частичное совпадение, регистронезависимо)
+- Описанию
+- Тегам
+
+## ML-рекомендации (Recommendations)
+
+### Описание
+
+Система интеллектуальных рекомендаций на основе статистического анализа. Работает без внешних ML-сервисов, используя алгоритмы скоринга и анализа текста.
+
+### Структура сервиса
+
+```
+entity/recommendations/
+├── recommendations.service.ts       # Алгоритмы рекомендаций
+├── recommendations.controller.ts    # REST API
+└── recommendations.service.spec.ts  # Unit тесты
+```
+
+### Рекомендации исполнителей
+
+**Алгоритм скоринга:**
+```typescript
+score =
+  workloadScore * 0.4 +           // Текущая нагрузка (меньше = лучше)
+  completionRateScore * 0.3 +     // Процент завершённых задач
+  responseTimeScore * 0.3         // Среднее время ответа
+
+// Результат
+interface AssigneeRecommendation {
+  userId: string;
+  displayName: string;
+  score: number;        // 0-100
+  reason: string;       // "Низкая нагрузка, высокий % завершения"
+  currentWorkload: number;
+  avgResponseTimeMinutes: number;
+}
+```
+
+### Рекомендация приоритета
+
+**Определение по ключевым словам:**
+```typescript
+const PRIORITY_KEYWORDS = {
+  critical: ['срочно', 'критично', 'авария', 'urgent', 'asap', 'emergency'],
+  high: ['важно', 'приоритет', 'быстро', 'important', 'high'],
+  medium: ['обычный', 'стандартный', 'normal'],
+  low: ['не срочно', 'когда будет время', 'low']
+};
+
+interface PriorityRecommendation {
+  suggestedPriority: 'critical' | 'high' | 'medium' | 'low';
+  confidence: number;     // 0-100
+  matchedKeywords: string[];
+}
+```
+
+### Оценка времени ответа
+
+Рассчитывается на основе:
+- Исторических данных по похожим заявкам
+- Среднего времени ответа в workspace
+- Текущей нагрузки команды
+
+```typescript
+interface ResponseTimeEstimate {
+  estimatedMinutes: number;
+  confidenceLevel: 'high' | 'medium' | 'low';
+  basedOnSamples: number;   // Количество похожих заявок
+}
+```
+
+### Поиск похожих заявок
+
+**Алгоритм Jaccard Similarity:**
+```typescript
+// Извлечение ключевых слов (без стоп-слов RU/EN)
+keywords = extractKeywords(title + ' ' + description);
+
+// Сравнение с существующими заявками
+similarity = |A ∩ B| / |A ∪ B|  // Jaccard coefficient
+
+interface SimilarEntity {
+  entityId: string;
+  title: string;
+  similarity: number;  // 0-1
+  resolution?: string; // Как была решена
+}
+```
+
+### Стоп-слова
+
+Сервис фильтрует распространённые слова:
+- **Русские:** и, в, на, не, что, это, как, для, по, из, с, то, а, о, от...
+- **Английские:** the, a, an, and, or, but, in, on, at, to, for, of, is, it...
 
 ## Масштабирование
 

@@ -16,6 +16,7 @@ import {
   ProcessInstanceStatus,
 } from './entities/process-instance.entity';
 import { BpmnWorkersService } from './bpmn-workers.service';
+import { ConnectorsService } from '../connectors/connectors.service';
 
 @Injectable()
 export class BpmnService implements OnModuleInit, OnModuleDestroy {
@@ -35,6 +36,8 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     private processInstanceRepository: Repository<ProcessInstance>,
     @Inject(forwardRef(() => BpmnWorkersService))
     private workersService: BpmnWorkersService,
+    @Inject(forwardRef(() => ConnectorsService))
+    private connectorsService: ConnectorsService,
   ) {}
 
   async onModuleInit() {
@@ -92,8 +95,9 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
         `Connected to Zeebe cluster: ${topology.brokers.length} broker(s), partitions: ${topology.partitionsCount}`,
       );
 
-      // Pass the client to workers service
+      // Pass the client to workers service and connectors service
       this.workersService.setZeebeClient(this.zeebeClient);
+      this.connectorsService.setZeebeClient(this.zeebeClient);
     } catch (error) {
       this.isConnected = false;
       this.reconnectAttempts++;

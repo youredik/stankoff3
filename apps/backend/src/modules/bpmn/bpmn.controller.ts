@@ -160,7 +160,13 @@ export class BpmnController {
   // ==================== Templates ====================
 
   @Get('templates')
-  async getTemplates(@Query('category') category?: string) {
+  async getTemplates(
+    @Query('category') category?: string,
+    @Query('search') search?: string,
+  ) {
+    if (search) {
+      return this.templatesService.searchTemplates(search);
+    }
     if (category) {
       return this.templatesService.getTemplatesByCategory(category);
     }

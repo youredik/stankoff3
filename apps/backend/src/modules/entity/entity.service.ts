@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository, DataSource } from 'typeorm';
@@ -15,6 +15,9 @@ import { AuditActionType } from '../audit-log/audit-log.entity';
 import { EmailService } from '../email/email.service';
 import { AutomationService } from '../automation/automation.service';
 import { TriggerType } from '../automation/automation-rule.entity';
+import { TriggersService } from '../bpmn/triggers/triggers.service';
+import { TriggerType as BpmnTriggerType } from '../bpmn/entities/process-trigger.entity';
+import { SlaService } from '../sla/sla.service';
 
 @Injectable()
 export class EntityService {
@@ -39,6 +42,10 @@ export class EntityService {
     private configService: ConfigService,
     @Inject(forwardRef(() => AutomationService))
     private automationService: AutomationService,
+    @Optional()
+    @Inject(forwardRef(() => TriggersService))
+    private triggersService: TriggersService,
+    private slaService: SlaService,
   ) {
     this.frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
   }
@@ -206,6 +213,46 @@ export class EntityService {
       this.logger.error(`Automation error on create: ${err.message}`);
     }
 
+    // BPMN триггеры: entity_created
+    if (this.triggersService) {
+      try {
+        await this.triggersService.evaluateTriggers(
+          BpmnTriggerType.ENTITY_CREATED,
+          {
+            entityId: saved.id,
+            workspaceId: saved.workspaceId,
+            title: saved.title,
+            status: saved.status,
+            priority: saved.priority,
+            customId: saved.customId,
+            createdById: actorId,
+          },
+          saved.workspaceId,
+        );
+      } catch (err) {
+        this.logger.error(`BPMN trigger error on create: ${err.message}`);
+      }
+    }
+
+    // SLA: создаём SLA instance для новой заявки
+    try {
+      const slaInstance = await this.slaService.createInstance(
+        saved.workspaceId,
+        'entity',
+        saved.id,
+        {
+          status: saved.status,
+          priority: saved.priority,
+          ...saved.data,
+        },
+      );
+      if (slaInstance) {
+        this.logger.log(`SLA instance created for entity ${saved.id}: ${slaInstance.id}`);
+      }
+    } catch (err) {
+      this.logger.error(`SLA creation error: ${err.message}`);
+    }
+
     return saved;
   }
 
@@ -293,6 +340,39 @@ export class EntityService {
       } catch (err) {
         this.logger.error(`Automation error on status change: ${err.message}`);
       }
+
+      // BPMN триггеры: status_changed
+      if (this.triggersService) {
+        try {
+          await this.triggersService.evaluateTriggers(
+            BpmnTriggerType.STATUS_CHANGED,
+            {
+              entityId: id,
+              workspaceId: current.workspaceId,
+              oldStatus,
+              newStatus: status,
+              title: updated.title,
+              priority: updated.priority,
+              assigneeId: updated.assigneeId,
+              userId: actorId,
+            },
+            current.workspaceId,
+          );
+        } catch (err) {
+          this.logger.error(`BPMN trigger error on status change: ${err.message}`);
+        }
+      }
+
+      // SLA: отмечаем закрытие при переходе в финальный статус
+      const closedStatuses = ['closed', 'done', 'resolved', 'cancelled', 'completed'];
+      if (closedStatuses.includes(status.toLowerCase())) {
+        try {
+          await this.slaService.recordResolution('entity', id);
+          this.logger.log(`SLA resolution recorded for entity ${id}`);
+        } catch (err) {
+          this.logger.error(`SLA resolution error: ${err.message}`);
+        }
+      }
     }
 
     return updated;
@@ -356,6 +436,28 @@ export class EntityService {
         });
       } catch (err) {
         this.logger.error(`Automation error on assign: ${err.message}`);
+      }
+
+      // BPMN триггеры: assignee_changed
+      if (this.triggersService) {
+        try {
+          await this.triggersService.evaluateTriggers(
+            BpmnTriggerType.ASSIGNEE_CHANGED,
+            {
+              entityId: id,
+              workspaceId: current.workspaceId,
+              oldAssigneeId: previousAssigneeId,
+              newAssigneeId: assigneeId,
+              title: updated.title,
+              status: updated.status,
+              priority: updated.priority,
+              assignedById: actorId,
+            },
+            current.workspaceId,
+          );
+        } catch (err) {
+          this.logger.error(`BPMN trigger error on assignee change: ${err.message}`);
+        }
       }
     }
 

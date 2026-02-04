@@ -25,6 +25,8 @@ import {
   operatorLabels,
   CreateRuleDto,
 } from '@/lib/api/automation';
+import { getTables } from '@/lib/api/dmn';
+import type { DecisionTable } from '@/types';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useEntityStore } from '@/store/useEntityStore';
 
@@ -388,6 +390,24 @@ function AutomationRuleModal({
     rule?.actions || [{ type: 'set_status', config: {} }]
   );
   const [saving, setSaving] = useState(false);
+  const [decisionTables, setDecisionTables] = useState<DecisionTable[]>([]);
+  const [loadingTables, setLoadingTables] = useState(false);
+
+  // Загружаем таблицы решений при открытии модала
+  useEffect(() => {
+    const loadDecisionTables = async () => {
+      setLoadingTables(true);
+      try {
+        const tables = await getTables(workspaceId);
+        setDecisionTables(tables.filter((t) => t.isActive));
+      } catch (err) {
+        console.error('Failed to load decision tables:', err);
+      } finally {
+        setLoadingTables(false);
+      }
+    };
+    loadDecisionTables();
+  }, [workspaceId]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -653,6 +673,63 @@ function AutomationRuleModal({
                             rows={2}
                             className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           />
+                        )}
+
+                        {action.type === 'evaluate_dmn' && (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                Таблица решений *
+                              </label>
+                              <select
+                                value={action.config.decisionTableId || ''}
+                                onChange={(e) =>
+                                  updateAction(index, {
+                                    config: { ...action.config, decisionTableId: e.target.value },
+                                  })
+                                }
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                disabled={loadingTables}
+                              >
+                                <option value="">
+                                  {loadingTables ? 'Загрузка...' : 'Выберите таблицу'}
+                                </option>
+                                {decisionTables.map((table) => (
+                                  <option key={table.id} value={table.id}>
+                                    {table.name}
+                                    {table.description && ` — ${table.description}`}
+                                  </option>
+                                ))}
+                              </select>
+                              {decisionTables.length === 0 && !loadingTables && (
+                                <p className="text-xs text-gray-400 mt-1">
+                                  Нет активных таблиц решений. Создайте таблицу в разделе DMN.
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`apply-output-${index}`}
+                                checked={action.config.applyOutputToEntity !== false}
+                                onChange={(e) =>
+                                  updateAction(index, {
+                                    config: { ...action.config, applyOutputToEntity: e.target.checked },
+                                  })
+                                }
+                                className="rounded border-gray-300 dark:border-gray-600"
+                              />
+                              <label htmlFor={`apply-output-${index}`} className="text-sm text-gray-700 dark:text-gray-300">
+                                Применить результат к заявке (статус, приоритет, поля)
+                              </label>
+                            </div>
+
+                            <p className="text-xs text-gray-400">
+                              Данные заявки (статус, приоритет, кастомные поля) будут переданы как входные данные.
+                              Результат DMN таблицы будет применён к заявке автоматически.
+                            </p>
+                          </div>
                         )}
                       </div>
 

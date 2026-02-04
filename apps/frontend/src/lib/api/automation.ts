@@ -15,7 +15,8 @@ export type ActionType =
   | 'set_priority'
   | 'set_field'
   | 'send_notification'
-  | 'send_email';
+  | 'send_email'
+  | 'evaluate_dmn';
 
 // Операторы условий
 export type ConditionOperator =
@@ -47,6 +48,11 @@ export interface RuleAction {
     recipientId?: string;
     message?: string;
     subject?: string;
+    // Для EVALUATE_DMN
+    decisionTableId?: string;
+    inputMapping?: Record<string, string>;
+    outputMapping?: Record<string, string>;
+    applyOutputToEntity?: boolean;
   };
 }
 
@@ -128,6 +134,7 @@ export const actionLabels: Record<ActionType, string> = {
   set_field: 'Установить значение поля',
   send_notification: 'Отправить уведомление',
   send_email: 'Отправить email',
+  evaluate_dmn: 'Выполнить DMN таблицу',
 };
 
 export const operatorLabels: Record<ConditionOperator, string> = {

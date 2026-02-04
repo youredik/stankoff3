@@ -9,6 +9,7 @@ import {
   ProcessInstanceStatus,
 } from './entities/process-instance.entity';
 import { BpmnWorkersService } from './bpmn-workers.service';
+import { ConnectorsService } from '../connectors/connectors.service';
 
 describe('BpmnService', () => {
   let service: BpmnService;
@@ -79,6 +80,11 @@ describe('BpmnService', () => {
       setZeebeClient: jest.fn(),
     };
 
+    const mockConnectorsService = {
+      setZeebeClient: jest.fn(),
+      executeConnector: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BpmnService,
@@ -93,6 +99,10 @@ describe('BpmnService', () => {
         {
           provide: BpmnWorkersService,
           useValue: mockWorkersService,
+        },
+        {
+          provide: ConnectorsService,
+          useValue: mockConnectorsService,
         },
       ],
     }).compile();
