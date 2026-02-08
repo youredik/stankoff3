@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react';
 import { X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { fieldRegistry } from '@/components/fields';
+import { evaluateVisibility, evaluateRequired, evaluateComputed } from '@/lib/field-rules';
 import type { Field, Section } from '@/types';
 
 const PRIORITIES = [
@@ -16,102 +18,24 @@ const PRIORITIES = [
 const SYSTEM_FIELD_TYPES = ['status'];
 const SYSTEM_FIELD_IDS = ['title', 'assignee', 'priority'];
 
-// Компонент для отображения поля ввода
+// Компонент для отображения поля ввода — dispatch через field registry
 function FormField({
   field,
   value,
   users,
   onChange,
+  allData,
 }: {
   field: Field;
   value: any;
   users: any[];
   onChange: (value: any) => void;
+  allData?: Record<string, any>;
 }) {
-  // Select поле
-  if (field.type === 'select' && field.options) {
-    return (
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-      >
-        <option value="">Не выбрано</option>
-        {field.options.map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  // User поле
-  if (field.type === 'user') {
-    return (
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-      >
-        <option value="">Не выбрано</option>
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.firstName} {u.lastName}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  // Date поле
-  if (field.type === 'date') {
-    return (
-      <input
-        type="date"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-      />
-    );
-  }
-
-  // Number поле
-  if (field.type === 'number') {
-    return (
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-        placeholder={field.description || ''}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-      />
-    );
-  }
-
-  // Textarea поле
-  if (field.type === 'textarea') {
-    return (
-      <textarea
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={field.description || ''}
-        rows={3}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-      />
-    );
-  }
-
-  // Text поле (по умолчанию)
-  return (
-    <input
-      type="text"
-      value={value || ''}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={field.description || ''}
-      className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-    />
-  );
+  const renderer = fieldRegistry[field.type];
+  if (!renderer) return null;
+  const Comp = renderer.Form;
+  return <Comp field={field} value={value} users={users} onChange={onChange} allData={allData} />;
 }
 
 // Секция с полями
@@ -127,13 +51,17 @@ function FormSection({
   onChange: (fieldId: string, value: any) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const allSectionFields = section.fields;
 
-  // Фильтруем системные поля
-  const customFields = section.fields.filter(
+  // Фильтруем системные поля и применяем правила видимости
+  const customFields = allSectionFields.filter(
     (f) => !SYSTEM_FIELD_TYPES.includes(f.type) && !SYSTEM_FIELD_IDS.includes(f.id)
   );
+  const visibleFields = customFields.filter((f) =>
+    evaluateVisibility(f, allSectionFields, formData)
+  );
 
-  if (customFields.length === 0) return null;
+  if (visibleFields.length === 0) return null;
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -151,20 +79,31 @@ function FormSection({
       </button>
       {isExpanded && (
         <div className="p-4 space-y-3 bg-white dark:bg-gray-800">
-          {customFields.map((field) => (
-            <div key={field.id}>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
-                {field.name}
-                {field.required && <span className="text-red-500 ml-0.5">*</span>}
-              </label>
-              <FormField
-                field={field}
-                value={formData[field.id]}
-                users={users}
-                onChange={(value) => onChange(field.id, value)}
-              />
-            </div>
-          ))}
+          {visibleFields.map((field) => {
+            const isRequired = evaluateRequired(field, allSectionFields, formData);
+            const computed = evaluateComputed(field, allSectionFields, formData);
+            return (
+              <div key={field.id}>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
+                  {field.name}
+                  {isRequired && <span className="text-red-500 ml-0.5">*</span>}
+                </label>
+                {computed ? (
+                  <div className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded-lg font-medium">
+                    {computed.value !== null ? String(computed.value) : '—'}
+                  </div>
+                ) : (
+                  <FormField
+                    field={field}
+                    value={formData[field.id]}
+                    users={users}
+                    onChange={(value) => onChange(field.id, value)}
+                    allData={formData}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -196,16 +135,18 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
     );
   }, [currentWorkspace]);
 
-  // Проверяем обязательные поля
+  // Проверяем обязательные поля (с учётом правил видимости и required_if)
   const requiredFieldsMissing = useMemo(() => {
     if (!currentWorkspace?.sections) return false;
     for (const section of currentWorkspace.sections) {
-      for (const field of section.fields) {
-        if (
-          field.required &&
-          !SYSTEM_FIELD_TYPES.includes(field.type) &&
-          !SYSTEM_FIELD_IDS.includes(field.id)
-        ) {
+      const sectionFields = section.fields;
+      for (const field of sectionFields) {
+        if (SYSTEM_FIELD_TYPES.includes(field.type) || SYSTEM_FIELD_IDS.includes(field.id)) continue;
+        // Невидимые поля не проверяем
+        if (!evaluateVisibility(field, sectionFields, formData)) continue;
+        // Проверяем динамическую обязательность
+        const isRequired = evaluateRequired(field, sectionFields, formData);
+        if (isRequired) {
           const value = formData[field.id];
           if (value === undefined || value === null || value === '') {
             return true;

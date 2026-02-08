@@ -5,6 +5,7 @@ import { useNotificationStore } from '@/store/useNotificationStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSlaStore, SlaUpdate } from '@/store/useSlaStore';
+import { usePresenceStore } from '@/store/usePresenceStore';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -209,6 +210,11 @@ export function useWebSocket() {
         workspaceId: data.workspaceId,
         urgent: true,
       });
+    });
+
+    // Presence tracking
+    socket.on('presence:update', (data: { onlineUserIds: string[] }) => {
+      usePresenceStore.getState().setOnlineUsers(data.onlineUserIds);
     });
 
     // SLA batch updates (real-time timer countdown)

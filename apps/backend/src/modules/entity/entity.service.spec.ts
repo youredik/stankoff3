@@ -14,6 +14,8 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { EmailService } from '../email/email.service';
 import { AutomationService } from '../automation/automation.service';
 import { SlaService } from '../sla/sla.service';
+import { FieldValidationService } from './field-validation.service';
+import { FormulaEvaluatorService } from './formula-evaluator.service';
 
 describe('EntityService', () => {
   let service: EntityService;
@@ -152,6 +154,8 @@ describe('EntityService', () => {
         { provide: AutomationService, useValue: mockAutomationService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: SlaService, useValue: mockSlaService },
+        { provide: FieldValidationService, useValue: { validateEntityData: jest.fn() } },
+        { provide: FormulaEvaluatorService, useValue: { computeFields: jest.fn((data) => data) } },
       ],
     }).compile();
 

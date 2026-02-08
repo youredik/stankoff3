@@ -11,6 +11,10 @@ import {
   User,
   Paperclip,
   Link2,
+  ToggleLeft,
+  Globe,
+  MapPin,
+  Users,
 } from 'lucide-react';
 import type { FieldType } from '@/types';
 
@@ -75,6 +79,30 @@ const FIELD_TYPES: FieldTypeConfig[] = [
     label: 'Связь',
     icon: <Link2 className="w-4 h-4" />,
     description: 'Связь с другой сущностью',
+  },
+  {
+    type: 'checkbox',
+    label: 'Чекбокс',
+    icon: <ToggleLeft className="w-4 h-4" />,
+    description: 'Да / Нет (toggle)',
+  },
+  {
+    type: 'url',
+    label: 'Ссылка',
+    icon: <Globe className="w-4 h-4" />,
+    description: 'URL-адрес',
+  },
+  {
+    type: 'geolocation',
+    label: 'Геолокация',
+    icon: <MapPin className="w-4 h-4" />,
+    description: 'Адрес и координаты',
+  },
+  {
+    type: 'client',
+    label: 'Клиент',
+    icon: <Users className="w-4 h-4" />,
+    description: 'ФИО, телефон, email, мессенджеры',
   },
 ];
 

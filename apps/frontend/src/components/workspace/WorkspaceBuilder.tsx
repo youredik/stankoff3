@@ -147,7 +147,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
           required: false,
         };
 
-        // Initialize options for select/status
+        // Initialize defaults per field type
         if (fieldType === 'status') {
           newField.options = [
             { id: 'new', label: 'Новая', color: '#3B82F6' },
@@ -159,6 +159,8 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
             { id: 'opt-1', label: 'Вариант 1', color: '#3B82F6' },
             { id: 'opt-2', label: 'Вариант 2', color: '#10B981' },
           ];
+        } else if (fieldType === 'checkbox') {
+          newField.defaultValue = false;
         }
 
         addField(targetSectionId, newField);
@@ -569,6 +571,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
           field={editingField.field}
           sectionId={editingField.sectionId}
           workspaces={workspaces.filter((w) => w.id !== currentWorkspace.id)}
+          allFields={currentWorkspace.sections.flatMap((s) => s.fields)}
           onSave={updateField}
           onClose={() => setEditingField(null)}
         />

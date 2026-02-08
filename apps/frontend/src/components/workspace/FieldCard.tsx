@@ -15,6 +15,10 @@ import {
   User,
   Paperclip,
   Link2,
+  ToggleLeft,
+  Globe,
+  MapPin,
+  Users,
 } from 'lucide-react';
 import type { Field, FieldType } from '@/types';
 
@@ -35,6 +39,10 @@ const FIELD_ICONS: Record<FieldType, React.ReactNode> = {
   user: <User className="w-4 h-4" />,
   file: <Paperclip className="w-4 h-4" />,
   relation: <Link2 className="w-4 h-4" />,
+  checkbox: <ToggleLeft className="w-4 h-4" />,
+  url: <Globe className="w-4 h-4" />,
+  geolocation: <MapPin className="w-4 h-4" />,
+  client: <Users className="w-4 h-4" />,
 };
 
 const FIELD_TYPE_LABELS: Record<FieldType, string> = {
@@ -47,6 +55,10 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   user: 'Пользователь',
   file: 'Файл',
   relation: 'Связь',
+  checkbox: 'Чекбокс',
+  url: 'Ссылка',
+  geolocation: 'Геолокация',
+  client: 'Клиент',
 };
 
 export function FieldCard({

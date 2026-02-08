@@ -28,6 +28,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
+  // userId → Set<socketId> (один пользователь может иметь несколько вкладок)
+  private onlineUsers = new Map<string, Set<string>>();
+
   constructor(private jwtService: JwtService) {}
 
   handleConnection(client: AuthenticatedSocket) {
@@ -41,6 +44,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const payload = this.jwtService.verify(token);
         client.data.user = payload;
         console.log(`Client connected: ${client.id}, user: ${payload.email}`);
+
+        // Presence tracking
+        this.addUserPresence(payload.sub, client.id);
       } else {
         // Разрешаем анонимные подключения (для обратной совместимости)
         console.log(`Client connected (anonymous): ${client.id}`);
@@ -54,6 +60,40 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(client: AuthenticatedSocket) {
     const userEmail = client.data?.user?.email || 'anonymous';
     console.log(`Client disconnected: ${client.id}, user: ${userEmail}`);
+
+    // Presence tracking
+    const userId = client.data?.user?.sub;
+    if (userId) {
+      this.removeUserPresence(userId, client.id);
+    }
+  }
+
+  private addUserPresence(userId: string, socketId: string) {
+    if (!this.onlineUsers.has(userId)) {
+      this.onlineUsers.set(userId, new Set());
+    }
+    this.onlineUsers.get(userId)!.add(socketId);
+    this.broadcastPresence();
+  }
+
+  private removeUserPresence(userId: string, socketId: string) {
+    const sockets = this.onlineUsers.get(userId);
+    if (sockets) {
+      sockets.delete(socketId);
+      if (sockets.size === 0) {
+        this.onlineUsers.delete(userId);
+      }
+    }
+    this.broadcastPresence();
+  }
+
+  private broadcastPresence() {
+    const onlineIds = Array.from(this.onlineUsers.keys());
+    this.server.emit('presence:update', { onlineUserIds: onlineIds });
+  }
+
+  getOnlineUserIds(): string[] {
+    return Array.from(this.onlineUsers.keys());
   }
 
   // Методы для отправки событий

@@ -52,12 +52,14 @@ export class Workspace {
     fields: {
       id: string;
       name: string;
-      type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'status' | 'user' | 'file' | 'relation';
+      type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'status' | 'user' | 'file' | 'relation' | 'checkbox' | 'url' | 'geolocation' | 'client';
       required?: boolean;
-      options?: { id: string; label: string; color?: string }[];
+      options?: { id: string; label: string; color?: string; parentId?: string }[];
       defaultValue?: any;
       description?: string;
       relatedWorkspaceId?: string;
+      config?: Record<string, any>;
+      rules?: { id: string; type: string; condition: Record<string, any>; action: Record<string, any> }[];
     }[];
     order: number;
   }[];

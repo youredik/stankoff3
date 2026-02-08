@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Search, User, Tag, Calendar, ChevronDown, Hash, Type } from 'lucide-react';
+import { X, Search, User, Tag, Calendar, ChevronDown, Hash, Type, ToggleLeft, Link2, MapPin, Users } from 'lucide-react';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { fieldRegistry } from '@/components/fields';
 import type { Field, FieldType, FieldOption, User as UserType } from '@/types';
 
 export interface FilterState {
@@ -29,7 +30,7 @@ const PRIORITY_OPTIONS: FieldOption[] = [
 ];
 
 const BUILT_IN_FIELD_IDS = ['title', 'assignee', 'priority'];
-const SKIP_FILTER_TYPES: FieldType[] = ['status', 'file', 'relation'];
+const SKIP_FILTER_TYPES: FieldType[] = ['status', 'file', 'relation', 'geolocation'];
 
 function getFieldIcon(type: FieldType) {
   switch (type) {
@@ -44,6 +45,14 @@ function getFieldIcon(type: FieldType) {
       return Tag;
     case 'user':
       return User;
+    case 'checkbox':
+      return ToggleLeft;
+    case 'url':
+      return Link2;
+    case 'geolocation':
+      return MapPin;
+    case 'client':
+      return Users;
     default:
       return Tag;
   }
@@ -51,6 +60,7 @@ function getFieldIcon(type: FieldType) {
 
 export function isFilterActive(value: any): boolean {
   if (value == null) return false;
+  if (typeof value === 'boolean') return true;
   if (Array.isArray(value)) return value.length > 0;
   if (typeof value === 'string') return value.trim() !== '';
   if (typeof value === 'object') {
@@ -151,170 +161,25 @@ export function FilterPanel({
   const inputClass =
     'w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500';
 
-  const renderSelectFilter = (field: Field) => {
-    if (!field.options) return null;
-    return (
-      <div className="mt-2 space-y-1">
-        {field.options.map((option) => (
-          <label
-            key={option.id}
-            className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-          >
-            <input
-              type="checkbox"
-              checked={
-                filters.customFilters[field.id]?.includes(option.id) || false
-              }
-              onChange={() => toggleCustomMultiSelect(field.id, option.id)}
-              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-            />
-            {option.color && (
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: option.color }}
-              />
-            )}
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              {option.label}
-            </span>
-          </label>
-        ))}
-      </div>
-    );
-  };
-
-  const renderUserFilter = (field: Field) => (
-    <div className="mt-2 space-y-1">
-      {users.map((user) => (
-        <label
-          key={user.id}
-          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          <input
-            type="checkbox"
-            checked={
-              filters.customFilters[field.id]?.includes(user.id) || false
-            }
-            onChange={() => toggleCustomMultiSelect(field.id, user.id)}
-            className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-          />
-          <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs">{user.firstName[0]}</span>
-          </div>
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            {user.firstName} {user.lastName}
-          </span>
-        </label>
-      ))}
-    </div>
-  );
-
-  const renderTextFilter = (field: Field) => (
-    <div className="mt-2">
-      <input
-        type="text"
-        value={filters.customFilters[field.id] || ''}
-        onChange={(e) => setCustomFilter(field.id, e.target.value)}
-        placeholder={`Поиск по "${field.name}"...`}
-        className={inputClass}
-      />
-    </div>
-  );
-
-  const renderNumberFilter = (field: Field) => {
-    const range = filters.customFilters[field.id] || {};
-    return (
-      <div className="mt-2 flex gap-2">
-        <div className="flex-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">
-            Мин
-          </label>
-          <input
-            type="number"
-            value={range.min ?? ''}
-            onChange={(e) =>
-              setCustomFilter(field.id, {
-                ...range,
-                min: e.target.value === '' ? undefined : Number(e.target.value),
-              })
-            }
-            placeholder="Мин"
-            className={inputClass}
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">
-            Макс
-          </label>
-          <input
-            type="number"
-            value={range.max ?? ''}
-            onChange={(e) =>
-              setCustomFilter(field.id, {
-                ...range,
-                max: e.target.value === '' ? undefined : Number(e.target.value),
-              })
-            }
-            placeholder="Макс"
-            className={inputClass}
-          />
-        </div>
-      </div>
-    );
-  };
-
-  const renderDateFilter = (field: Field) => {
-    const range = filters.customFilters[field.id] || {};
-    return (
-      <div className="mt-2 space-y-2">
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">От</label>
-          <input
-            type="date"
-            value={range.from || ''}
-            onChange={(e) =>
-              setCustomFilter(field.id, {
-                ...range,
-                from: e.target.value || undefined,
-              })
-            }
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">До</label>
-          <input
-            type="date"
-            value={range.to || ''}
-            onChange={(e) =>
-              setCustomFilter(field.id, {
-                ...range,
-                to: e.target.value || undefined,
-              })
-            }
-            className={inputClass}
-          />
-        </div>
-      </div>
-    );
-  };
+  // Все поля из всех секций (для cascadeFrom в фильтрах)
+  const allWorkspaceFields = (currentWorkspace?.sections || []).flatMap((s) => s.fields);
 
   const renderFieldFilter = (field: Field) => {
-    switch (field.type) {
-      case 'select':
-        return renderSelectFilter(field);
-      case 'user':
-        return renderUserFilter(field);
-      case 'text':
-      case 'textarea':
-        return renderTextFilter(field);
-      case 'number':
-        return renderNumberFilter(field);
-      case 'date':
-        return renderDateFilter(field);
-      default:
-        return null;
-    }
+    const renderer = fieldRegistry[field.type];
+    if (!renderer?.Filter) return null;
+    const FilterComp = renderer.Filter;
+    return (
+      <FilterComp
+        field={field}
+        filterValue={filters.customFilters[field.id]}
+        users={users}
+        onChange={(value: any) => setCustomFilter(field.id, value)}
+        toggleMultiSelect={(optionId: string) => toggleCustomMultiSelect(field.id, optionId)}
+        inputClass={inputClass}
+        allFields={allWorkspaceFields}
+        allFilterValues={filters.customFilters}
+      />
+    );
   };
 
   return (
@@ -659,15 +524,26 @@ export function applyFilters(
 
       const entityValue = entity.data?.[fieldId];
 
-      if (Array.isArray(filterValue)) {
-        // select / user: multi-select match
-        if (!entityValue || !filterValue.includes(entityValue)) {
+      if (typeof filterValue === 'boolean') {
+        // checkbox: exact match
+        if (Boolean(entityValue) !== filterValue) return false;
+      } else if (Array.isArray(filterValue)) {
+        // select / user: multi-select match (also handles multi-select values)
+        if (Array.isArray(entityValue)) {
+          if (!filterValue.some((v: string) => entityValue.includes(v))) return false;
+        } else if (!entityValue || !filterValue.includes(entityValue)) {
           return false;
         }
       } else if (typeof filterValue === 'string') {
-        // text / textarea: substring search
-        const strValue = entityValue?.toString() || '';
-        if (!strValue.toLowerCase().includes(filterValue.toLowerCase())) {
+        // text / textarea / url / client: substring search
+        let searchStr = '';
+        if (typeof entityValue === 'object' && entityValue !== null) {
+          // client field: search across name/phone/email
+          searchStr = Object.values(entityValue).filter(Boolean).join(' ');
+        } else {
+          searchStr = entityValue?.toString() || '';
+        }
+        if (!searchStr.toLowerCase().includes(filterValue.toLowerCase())) {
           return false;
         }
       } else if (typeof filterValue === 'object' && filterValue !== null) {

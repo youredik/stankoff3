@@ -24,6 +24,7 @@ import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { LegacyModule } from './modules/legacy/legacy.module';
 import { AiModule } from './modules/ai/ai.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { GeocodingModule } from './modules/geocoding/geocoding.module';
 import { SeedService } from './seed.service';
 import { SeedServiceDepartment } from './seed-service-department';
 import { User } from './modules/user/user.entity';
@@ -83,6 +84,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     LegacyModule,
     AiModule,
     OnboardingModule,
+    GeocodingModule,
   ],
   providers: [
     SeedService,

@@ -68,9 +68,9 @@ Stankoff Portal - это корпоративная система управл�
 - `KanbanCard.tsx` - Draggable карточка сущности (отключается для viewer)
 - `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями, вложениями, кастомными полями, ML-рекомендациями исполнителей и tooltips на заблокированных элементах
 - `CreateEntityModal.tsx` - Создание новой сущности с поддержкой кастомных полей из структуры workspace
-- `FilterPanel.tsx` - Панель фильтрации по всем полям
+- `FilterPanel.tsx` - Панель фильтрации по всем полям (поддержка cascadeFrom — фильтрация дочерних опций по выбранному родителю)
 
-> **Кастомные поля:** Поля, определённые в структуре workspace (sections → fields), автоматически отображаются при просмотре и создании сущности. Системные поля (status, title, assignee, priority) обрабатываются отдельно. Значения кастомных полей хранятся в `entity.data` (JSONB).
+> **Кастомные поля:** Поля, определённые в структуре workspace (sections → fields), автоматически отображаются при просмотре и создании сущности. Системные поля (status, title, assignee, priority) обрабатываются отдельно. Значения кастомных полей хранятся в `entity.data` (JSONB). Рендеринг полей — через `fieldRegistry` (единый dispatch, 13 типов). Правила видимости и динамической обязательности (Rule Engine) вычисляются на клиенте через `lib/field-rules.ts`.
 
 **Entity**
 - `CommentEditor.tsx` - Rich text редактор с Tiptap, @mentions и вложениями
@@ -82,9 +82,28 @@ Stankoff Portal - это корпоративная система управл�
 - `WorkspaceBuilder.tsx` - Drag & Drop конструктор рабочих мест (редактирование названия, иконки, секций и полей)
 - `WorkspaceMembers.tsx` - Управление участниками workspace с ролями
 - `AutomationRules.tsx` - Управление правилами автоматизации (триггеры, условия, действия)
-- `FieldPalette.tsx` - Палитра типов полей
-- `FieldEditor.tsx` - Редактор свойств полей
+- `FieldPalette.tsx` - Палитра типов полей (13 типов)
+- `FieldEditor.tsx` - Редактор свойств полей (type-specific config, rules)
+- `FieldCard.tsx` - Карточка поля в конструкторе
+- `RuleBuilder.tsx` - Визуальный конструктор правил (visibility, required_if, computed с формулами)
 - `SectionCard.tsx` - Секция с полями
+
+**Fields (Field Registry)**
+- `fields/index.ts` - Реестр `fieldRegistry: Record<FieldType, FieldRenderer>` — единая точка dispatch для 13 типов
+- `fields/types.ts` - Интерфейсы `FieldRenderer` (Renderer, Form, Filter)
+- `fields/TextField.tsx` - Текст (maxLength, маски phone/inn, trim)
+- `fields/TextareaField.tsx` - Многострочный (autoResize, collapsible, collapsedLines, markdown → Tiptap RichText)
+- `fields/RichTextEditor.tsx` - Tiptap rich text editor (Bold, Italic, Strike, Link, Lists) + RichTextView (read-only HTML)
+- `fields/NumberField.tsx` - Число (subtypes: integer/decimal/money/percent/inn, prefix/suffix, min/max)
+- `fields/DateField.tsx` - Дата (includeTime → datetime-local, quickPicks: Сегодня/Завтра/+1 нед)
+- `fields/SelectField.tsx` - Выбор (multiSelect, searchable, allowCreate — создание вариантов из dropdown, cascadeFrom — каскадные списки по parentId)
+- `fields/UserField.tsx` - Пользователь (multiSelect, departmentFilter — фильтр по отделу, showOnlineStatus — зелёная точка у онлайн-пользователей)
+- `fields/CheckboxField.tsx` - Чекбокс (toggle switch, три-state фильтр)
+- `fields/UrlField.tsx` - Ссылка (OG Preview с кэшированием)
+- `fields/GeolocationField.tsx` - Геолокация (Yandex Geocoder, Static Maps, клик на карте)
+- `fields/ClientField.tsx` - Клиент (композитный: ФИО, телефон, email, telegram, контрагент, Legacy CRM)
+- `fields/FileField.tsx` - Файл (drag & drop upload)
+- `fields/RelationField.tsx` - Связь (linked entities)
 
 **Section (Разделы)**
 - `SectionMembersModal.tsx` - Модальное окно управления участниками раздела (добавление, удаление, изменение ролей viewer/admin)
@@ -337,6 +356,19 @@ interface SlaStore {
 
 > Хранит real-time обновления SLA от WebSocket. Backend отправляет batch-обновления каждые 10 секунд, клиент интерполирует значения между обновлениями (1 секунда интервал) для плавного обратного отсчёта.
 
+**usePresenceStore**
+```typescript
+interface PresenceState {
+  onlineUserIds: Set<string>;
+  setOnlineUsers(ids: string[]): void;
+  addOnline(userId: string): void;
+  removeOnline(userId: string): void;
+  isOnline(userId: string): boolean;
+}
+```
+
+> Хранит список онлайн-пользователей, обновляется через WebSocket событие `presence:update`. Используется в UserField при `showOnlineStatus = true`.
+
 #### Hooks
 
 **useWebSocket**
@@ -346,6 +378,7 @@ interface SlaStore {
 - `status:changed` - Изменение статуса
 - `comment:created` - Новый комментарий
 - `user:assigned` - Назначение ответственного
+- `presence:update` - Обновление списка онлайн-пользователей (сохраняется в usePresenceStore)
 - `sla:warning` - SLA приближается к дедлайну (toast уведомление)
 - `sla:breached` - SLA нарушен (urgent toast уведомление, показывается дольше)
 - `sla:batch-update` - Batch обновления SLA таймеров (каждые 10 сек, сохраняется в useSlaStore)
@@ -442,19 +475,44 @@ interface Section {
 interface FieldOption {
   id: string;
   label: string;
-  color?: string;  // Цвет для статусов и select
+  color?: string;       // Цвет для статусов и select
+  parentId?: string;    // Для иерархических select (каскадные списки)
 }
 
 interface Field {
   id: string;
   name: string;
-  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'status' | 'user' | 'file' | 'relation';
+  type: FieldType;      // 13 типов (см. ниже)
   required?: boolean;
-  options?: FieldOption[];  // Для select и status
+  options?: FieldOption[];      // Для select и status
   defaultValue?: any;
   description?: string;
   relatedWorkspaceId?: string;  // Для relation типа
+  config?: FieldConfig;         // Type-specific настройки (maxLength, mask, multiSelect и т.д.)
+  rules?: FieldRule[];          // Правила видимости и обязательности
 }
+
+type FieldType =
+  | 'text' | 'textarea' | 'number' | 'date' | 'select'
+  | 'status' | 'user' | 'file' | 'relation'
+  | 'checkbox' | 'url' | 'geolocation' | 'client';
+
+// Rule Engine — условные правила для полей
+interface FieldRule {
+  id: string;
+  type: 'visibility' | 'required_if' | 'computed';
+  condition: { fieldId: string; operator: FieldRuleOperator; value?: any };
+  action: { visible?: boolean; required?: boolean; formula?: string };
+}
+type FieldRuleOperator = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'not_in' | 'is_empty' | 'is_not_empty' | 'contains';
+
+// Formula Parser (lib/rules/formula-parser.ts)
+// Безопасный парсер формул: tokenizer → AST → evaluator (без eval)
+// Поддержка: +, -, *, /, (), {fieldId}, round(), ceil(), floor(), abs(), min(), max(), sum()
+// Строковая конкатенация: "текст" + {field}
+evaluateFormula(formula: string, data: Record<string, any>): number | string | null
+validateFormula(formula: string): string | null
+extractFieldRefs(formula: string): string[]
 ```
 
 > **Важно:** Поле типа `status` определяет колонки канбан-доски. Каждый вариант статуса (`FieldOption`) становится отдельной колонкой.
@@ -462,7 +520,13 @@ interface Field {
 > **Автогенерация номеров:** При создании сущности `customId` генерируется автоматически на сервере в формате `{prefix}-{number}` (например, TP-1340, REK-1341). Номера **глобально уникальны** во всём портале - используется единый счётчик в таблице `global_counters` с пессимистической блокировкой транзакции. Поле customId имеет UNIQUE constraint в БД.
 
 **EntityModule**
-Сущности (заявки, рекламации и т.д.) и комментарии.
+Сущности (заявки, рекламации и т.д.), комментарии, OG Preview и серверная валидация полей.
+
+Дополнительные сервисы:
+- `FieldValidationService` — валидация `entity.data` по определениям полей workspace (required, тип, config: maxLength, min/max, select options и т.д.). Пропускает required-валидацию для computed полей (определяет по `rules[].type === 'computed'`).
+- `FormulaEvaluatorService` — серверный безопасный парсер формул (tokenizer → AST → evaluator, без eval). Пересчитывает значения computed полей в `entity.data` при create/update. Поддержка: арифметика, ссылки на поля `{fieldId}`, строки, функции (round, ceil, floor, abs, min, max, sum).
+- `OgPreviewService` — HTTP fetch URL, парсинг OG meta-тегов, in-memory кэш (1 час, 500 записей)
+- `OgPreviewController` — `GET /api/og-preview?url=...` (JWT, только http/https)
 
 ```typescript
 interface WorkspaceEntity {
@@ -1175,6 +1239,24 @@ import { AiUsageDashboard } from '@/components/ai';
    - Формат с BOM для корректного отображения в Excel
    - Колонки: ID, Номер, Название, Статус, Приоритет, Исполнитель, Дата создания
 
+**GeocodingModule**
+Геокодирование через Yandex Geocoder API.
+
+```
+geocoding/
+├── geocoding.module.ts
+├── geocoding.controller.ts    # search, reverse
+├── geocoding.service.ts       # geocode, reverseGeocode
+├── geocoding.service.spec.ts
+└── geocoding.controller.spec.ts
+```
+
+- `geocode(address)` — прямое геокодирование (адрес -> координаты), возвращает массив `GeocodingResult[]`
+- `reverseGeocode(lat, lng)` — обратное геокодирование (координаты -> адрес), возвращает `GeocodingResult | null`
+- In-memory кеш с TTL 5 минут и максимальным размером 1000 записей
+- Graceful degradation: если `YANDEX_GEOCODER_API_KEY` не задан, возвращает пустые результаты
+- Таймаут HTTP-запросов: 5 секунд
+
 #### API Endpoints
 
 | Метод | URL | Описание |
@@ -1310,6 +1392,8 @@ import { AiUsageDashboard } from '@/components/ai';
 | GET | /api/dmn/tables/:id/evaluations | История вычислений |
 | GET | /api/dmn/tables/:id/statistics | Статистика правил |
 | GET | /api/dmn/evaluations/target/:type/:id | Вычисления для цели |
+| GET | /api/geocoding/search?q=адрес | Прямое геокодирование (адрес → координаты) |
+| GET | /api/geocoding/reverse?lat=55.75&lng=37.61 | Обратное геокодирование (координаты → адрес) |
 
 ## Потоки данных
 

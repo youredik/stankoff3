@@ -498,6 +498,13 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 **Примечание по AI:**
 RAG использует данные из legacy CRM (QD_requests + QD_answers). Результаты поиска включают ссылки на legacy систему (https://www.stankoff.ru/crm/request/:id). Индексация создаёт embeddings для закрытых заявок с ответами.
 
+**Геокодирование (Yandex Geocoder API):**
+- `GET /api/geocoding/search?q=адрес` — прямое геокодирование (адрес → координаты)
+- `GET /api/geocoding/reverse?lat=55.75&lng=37.61` — обратное геокодирование (координаты → адрес)
+
+**OG Preview:**
+- `GET /api/og-preview?url=https://...` — получить OG meta-теги страницы (title, description, image, siteName)
+
 **Legacy CRM (Read-Only интеграция с MariaDB):**
 - `GET /api/legacy/health` — статус подключения к legacy БД
 - `GET /api/legacy/customers/search?q=текст&limit=10&employeesOnly=false` — поиск клиентов
@@ -525,3 +532,4 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `status:changed` — изменение статуса
 - `comment:created` — новый комментарий
 - `user:assigned` — назначение ответственного
+- `presence:update` — список онлайн-пользователей (usePresenceStore)

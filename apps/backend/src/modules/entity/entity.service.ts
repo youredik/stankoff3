@@ -18,6 +18,8 @@ import { TriggerType } from '../automation/automation-rule.entity';
 import { TriggersService } from '../bpmn/triggers/triggers.service';
 import { TriggerType as BpmnTriggerType } from '../bpmn/entities/process-trigger.entity';
 import { SlaService } from '../sla/sla.service';
+import { FieldValidationService } from './field-validation.service';
+import { FormulaEvaluatorService } from './formula-evaluator.service';
 
 @Injectable()
 export class EntityService {
@@ -46,6 +48,8 @@ export class EntityService {
     @Inject(forwardRef(() => TriggersService))
     private triggersService: TriggersService,
     private slaService: SlaService,
+    private fieldValidationService: FieldValidationService,
+    private formulaEvaluatorService: FormulaEvaluatorService,
   ) {
     this.frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
   }
@@ -147,6 +151,13 @@ export class EntityService {
 
       if (!workspace) {
         throw new NotFoundException(`Workspace ${dto.workspaceId} not found`);
+      }
+
+      // Валидация data по полям workspace
+      if (dto.data && workspace.sections) {
+        this.fieldValidationService.validateEntityData(dto.data, workspace.sections);
+        // Пересчёт computed полей
+        dto.data = this.formulaEvaluatorService.computeFields(dto.data, workspace.sections);
       }
 
       // Получаем или создаём глобальный счётчик с блокировкой
@@ -258,6 +269,19 @@ export class EntityService {
 
   async update(id: string, dto: UpdateEntityDto, actorId?: string): Promise<WorkspaceEntity> {
     const current = await this.findOne(id);
+
+    // Валидация data по полям workspace
+    if (dto.data) {
+      const workspace = await this.workspaceRepository.findOne({
+        where: { id: current.workspaceId },
+      });
+      if (workspace?.sections) {
+        this.fieldValidationService.validateEntityData(dto.data, workspace.sections);
+        // Пересчёт computed полей
+        dto.data = this.formulaEvaluatorService.computeFields(dto.data, workspace.sections);
+      }
+    }
+
     const oldValues: Record<string, any> = {};
     const newValues: Record<string, any> = {};
     const changedFields: string[] = [];

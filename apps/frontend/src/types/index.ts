@@ -2,19 +2,24 @@
 
 export type FieldType =
   | 'text'
-  | 'textarea'  // Многострочный текст
+  | 'textarea'
   | 'number'
   | 'date'
   | 'select'
-  | 'status'   // Специальный тип - определяет колонки канбана
+  | 'status'       // Специальный тип - определяет колонки канбана
   | 'user'
   | 'file'
-  | 'relation';
+  | 'relation'
+  | 'checkbox'
+  | 'url'
+  | 'geolocation'
+  | 'client';
 
 export interface FieldOption {
   id: string;
   label: string;
-  color?: string;  // Цвет для статусов и select
+  color?: string;
+  parentId?: string;  // Для иерархических select
 }
 
 export interface Field {
@@ -26,6 +31,132 @@ export interface Field {
   defaultValue?: any;
   description?: string;
   relatedWorkspaceId?: string;  // Для relation типа
+  config?: FieldConfig;   // Type-specific настройки
+  rules?: FieldRule[];    // Правила видимости/вычислений
+}
+
+// ==================== Field Config (type-specific) ====================
+
+export interface TextFieldConfig {
+  maxLength?: number;
+  mask?: 'phone' | 'inn' | string;
+  trim?: boolean;
+}
+
+export interface TextareaFieldConfig {
+  maxLength?: number;
+  autoResize?: boolean;
+  markdown?: boolean;
+  collapsible?: boolean;
+  collapsedLines?: number;
+}
+
+export interface NumberFieldConfig {
+  subtype?: 'integer' | 'decimal' | 'money' | 'percent' | 'inn';
+  min?: number;
+  max?: number;
+  step?: number;
+  prefix?: string;
+  suffix?: string;
+  decimalPlaces?: number;
+}
+
+export interface DateFieldConfig {
+  includeTime?: boolean;
+  quickPicks?: boolean;
+  timezone?: string;
+}
+
+export interface SelectFieldConfig {
+  multiSelect?: boolean;
+  searchable?: boolean;
+  allowCreate?: boolean;
+  cascadeFrom?: string;  // fieldId для зависимого select
+}
+
+export interface UserFieldConfig {
+  multiSelect?: boolean;
+  departmentFilter?: string;
+  showOnlineStatus?: boolean;
+}
+
+export interface RelationFieldConfig {
+  relationType?: 'one-to-one' | 'one-to-many' | 'many-to-many';
+  displayFields?: string[];
+}
+
+export interface UrlFieldConfig {
+  showPreview?: boolean;
+}
+
+export interface GeolocationFieldConfig {
+  defaultCenter?: { lat: number; lng: number };
+  defaultZoom?: number;
+}
+
+export interface ClientFieldConfig {
+  requiredSubFields?: ('phone' | 'email' | 'telegram' | 'whatsapp' | 'counterparty')[];
+  showLegacyPicker?: boolean;
+  showCounterparty?: boolean;
+}
+
+export type FieldConfig =
+  | ({ type: 'text' } & TextFieldConfig)
+  | ({ type: 'textarea' } & TextareaFieldConfig)
+  | ({ type: 'number' } & NumberFieldConfig)
+  | ({ type: 'date' } & DateFieldConfig)
+  | ({ type: 'select' } & SelectFieldConfig)
+  | ({ type: 'user' } & UserFieldConfig)
+  | ({ type: 'relation' } & RelationFieldConfig)
+  | ({ type: 'url' } & UrlFieldConfig)
+  | ({ type: 'geolocation' } & GeolocationFieldConfig)
+  | ({ type: 'client' } & ClientFieldConfig)
+  | { type: 'checkbox' }
+  | { type: 'status' }
+  | { type: 'file' };
+
+// ==================== Field Rules ====================
+
+export type FieldRuleOperator = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'not_in' | 'is_empty' | 'is_not_empty' | 'contains';
+
+export interface FieldRuleCondition {
+  fieldId: string;
+  operator: FieldRuleOperator;
+  value?: any;
+}
+
+export type FieldRuleType = 'visibility' | 'computed' | 'required_if';
+
+export interface FieldRuleAction {
+  visible?: boolean;
+  formula?: string;
+  required?: boolean;
+}
+
+export interface FieldRule {
+  id: string;
+  type: FieldRuleType;
+  condition: FieldRuleCondition;  // Обязательно для visibility/required_if, опционально для computed
+  action: FieldRuleAction;
+}
+
+// ==================== Field Value Types ====================
+
+export interface GeolocationValue {
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export interface ClientFieldValue {
+  name?: string;
+  phone?: string;
+  email?: string;
+  telegram?: string;
+  whatsapp?: string;
+  counterpartyId?: number;
+  counterpartyName?: string;
+  legacyCustomerId?: number;
 }
 
 // Секция внутри структуры workspace (группа полей)

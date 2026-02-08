@@ -11,6 +11,10 @@ import { CommentService } from './comment.service';
 import { CommentController } from './comment.controller';
 import { RecommendationsService } from './recommendations/recommendations.service';
 import { RecommendationsController } from './recommendations/recommendations.controller';
+import { OgPreviewService } from './og-preview.service';
+import { OgPreviewController } from './og-preview.controller';
+import { FieldValidationService } from './field-validation.service';
+import { FormulaEvaluatorService } from './formula-evaluator.service';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { S3Module } from '../s3/s3.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
@@ -30,8 +34,8 @@ import { SlaModule } from '../sla/sla.module';
     forwardRef(() => BpmnModule),
     SlaModule,
   ],
-  providers: [EntityService, CommentService, RecommendationsService],
-  controllers: [EntityController, CommentController, RecommendationsController],
+  providers: [EntityService, CommentService, RecommendationsService, OgPreviewService, FieldValidationService, FormulaEvaluatorService],
+  controllers: [EntityController, CommentController, RecommendationsController, OgPreviewController],
   exports: [EntityService, RecommendationsService],
 })
 export class EntityModule {}

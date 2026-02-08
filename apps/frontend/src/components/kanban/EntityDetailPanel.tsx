@@ -15,6 +15,8 @@ import { AiClassificationPanel } from '@/components/ai/AiClassificationPanel';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment, Field, Section, Attachment } from '@/types';
+import { fieldRegistry } from '@/components/fields';
+import { evaluateVisibility, evaluateRequired, evaluateComputed } from '@/lib/field-rules';
 import { filesApi } from '@/lib/api/files';
 import { bpmnApi } from '@/lib/api/bpmn';
 import { getAssigneeRecommendations, type AssigneeRecommendation } from '@/lib/api/recommendations';
@@ -46,326 +48,26 @@ const PRIORITY_LABELS: Record<string, string> = {
 const SYSTEM_FIELD_TYPES = ['status'];
 const SYSTEM_FIELD_IDS = ['title', 'assignee', 'priority'];
 
-// Компонент для отображения значения поля
+// Компонент для отображения значения поля — dispatch через field registry
 function FieldValue({
   field,
   value,
   users,
   canEdit,
   onUpdate,
+  allData,
 }: {
   field: Field;
   value: any;
   users: any[];
   canEdit: boolean;
   onUpdate: (value: any) => void;
+  allData?: Record<string, any>;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value ?? '');
-
-  const handleSave = () => {
-    onUpdate(editValue);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSave();
-    }
-    if (e.key === 'Escape') {
-      setEditValue(value ?? '');
-      setIsEditing(false);
-    }
-  };
-
-  // Рендер select поля
-  if (field.type === 'select' && field.options) {
-    const selectedOption = field.options.find(o => o.id === value);
-    if (!canEdit) {
-      return selectedOption ? (
-        <span
-          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-          style={{
-            backgroundColor: selectedOption.color ? `${selectedOption.color}20` : '#f3f4f6',
-            color: selectedOption.color || '#374151',
-          }}
-        >
-          {selectedOption.color && (
-            <span
-              className="w-2 h-2 rounded-full mr-1.5"
-              style={{ backgroundColor: selectedOption.color }}
-            />
-          )}
-          {selectedOption.label}
-        </span>
-      ) : (
-        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-      );
-    }
-    return (
-      <select
-        value={value || ''}
-        onChange={(e) => onUpdate(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
-      >
-        <option value="">Не выбрано</option>
-        {field.options.map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  // Рендер user поля
-  if (field.type === 'user') {
-    const selectedUser = users.find(u => u.id === value);
-    if (!canEdit) {
-      return selectedUser ? (
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
-            <span className="text-white text-[10px] font-medium">
-              {selectedUser.firstName[0]}{selectedUser.lastName[0]}
-            </span>
-          </div>
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            {selectedUser.firstName} {selectedUser.lastName}
-          </span>
-        </div>
-      ) : (
-        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-      );
-    }
-    return (
-      <select
-        value={value || ''}
-        onChange={(e) => onUpdate(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
-      >
-        <option value="">Не выбрано</option>
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.firstName} {u.lastName}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  // Рендер date поля
-  if (field.type === 'date') {
-    if (!canEdit) {
-      return value ? (
-        <span className="text-sm text-gray-700 dark:text-gray-300">
-          {format(new Date(value), 'dd.MM.yyyy', { locale: ru })}
-        </span>
-      ) : (
-        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-      );
-    }
-    return (
-      <input
-        type="date"
-        value={value || ''}
-        onChange={(e) => onUpdate(e.target.value || null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
-      />
-    );
-  }
-
-  // Рендер number поля
-  if (field.type === 'number') {
-    if (!canEdit) {
-      return value !== undefined && value !== null && value !== '' ? (
-        <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
-      ) : (
-        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-      );
-    }
-    return (
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onUpdate(e.target.value ? Number(e.target.value) : null)}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        placeholder={field.description || ''}
-      />
-    );
-  }
-
-  // Рендер textarea поля
-  if (field.type === 'textarea') {
-    if (!canEdit) {
-      return value ? (
-        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{value}</p>
-      ) : (
-        <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-      );
-    }
-    if (isEditing) {
-      return (
-        <div>
-          <textarea
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={handleKeyDown}
-            rows={3}
-            className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
-            autoFocus
-          />
-        </div>
-      );
-    }
-    return (
-      <div
-        onClick={() => setIsEditing(true)}
-        className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 py-1 -mx-2 -my-1"
-      >
-        {value || <span className="text-gray-400 dark:text-gray-500">Нажмите для ввода...</span>}
-      </div>
-    );
-  }
-
-  // Рендер file поля
-  if (field.type === 'file') {
-    const files: Attachment[] = Array.isArray(value) ? value : value ? [value] : [];
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const fileList = e.target.files;
-      if (!fileList || fileList.length === 0) return;
-
-      const uploadedFiles: Attachment[] = [...files];
-      for (const file of Array.from(fileList)) {
-        try {
-          const uploaded = await filesApi.upload(file);
-          uploadedFiles.push(uploaded as Attachment);
-        } catch (error) {
-          console.error('Ошибка загрузки файла:', error);
-        }
-      }
-      onUpdate(uploadedFiles);
-      e.target.value = '';
-    };
-
-    const handleRemoveFile = (fileId: string) => {
-      onUpdate(files.filter(f => f.id !== fileId));
-    };
-
-    return (
-      <div className="space-y-2">
-        {files.length > 0 && (
-          <div className="space-y-1">
-            {files.map((file) => (
-              <div key={file.id} className="flex items-center gap-2">
-                <div className="flex-1">
-                  <AttachmentPreview
-                    attachment={file}
-                    allAttachments={files}
-                    showThumbnail={false}
-                  />
-                </div>
-                {canEdit && (
-                  <button
-                    onClick={() => handleRemoveFile(file.id)}
-                    className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                    title="Удалить"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        {canEdit && (
-          <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 dark:border-gray-600 rounded cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            <Upload className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-500 dark:text-gray-400">Загрузить файл</span>
-            <input
-              type="file"
-              multiple
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
-        )}
-        {files.length === 0 && !canEdit && (
-          <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-        )}
-      </div>
-    );
-  }
-
-  // Рендер relation поля
-  if (field.type === 'relation') {
-    const linkedIds: string[] = Array.isArray(value) ? value : value ? [value] : [];
-
-    return (
-      <div className="space-y-2">
-        {linkedIds.length > 0 ? (
-          <div className="space-y-1">
-            {linkedIds.map((id) => (
-              <div
-                key={id}
-                className="flex items-center gap-2 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded text-sm"
-              >
-                <Link2 className="w-3.5 h-3.5 text-gray-400" />
-                <span className="flex-1 text-gray-700 dark:text-gray-300 truncate">
-                  {id}
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-        )}
-        {canEdit && field.relatedWorkspaceId && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Связь настраивается через LinkedEntities
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  // Рендер text поля (по умолчанию)
-  if (!canEdit) {
-    return value ? (
-      <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
-    ) : (
-      <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>
-    );
-  }
-
-  if (isEditing) {
-    return (
-      <input
-        type="text"
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={handleKeyDown}
-        className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        autoFocus
-      />
-    );
-  }
-
-  return (
-    <div
-      onClick={() => {
-        setEditValue(value ?? '');
-        setIsEditing(true);
-      }}
-      className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 py-1 -mx-2 -my-1 min-h-[28px] flex items-center"
-    >
-      {value || <span className="text-gray-400 dark:text-gray-500">Нажмите для ввода...</span>}
-    </div>
-  );
+  const renderer = fieldRegistry[field.type];
+  if (!renderer) return null;
+  const Comp = renderer.Renderer;
+  return <Comp field={field} value={value} users={users} canEdit={canEdit} onUpdate={onUpdate} allData={allData} />;
 }
 
 // Компонент секции с полями
@@ -384,12 +86,18 @@ function FieldSection({
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // Фильтруем системные поля
-  const customFields = section.fields.filter(
+  const entityData = entity.data || {};
+  const allSectionFields = section.fields;
+
+  // Фильтруем системные поля и применяем правила видимости
+  const customFields = allSectionFields.filter(
     (f) => !SYSTEM_FIELD_TYPES.includes(f.type) && !SYSTEM_FIELD_IDS.includes(f.id)
   );
+  const visibleFields = customFields.filter((f) =>
+    evaluateVisibility(f, allSectionFields, entityData)
+  );
 
-  if (customFields.length === 0) return null;
+  if (visibleFields.length === 0) return null;
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded overflow-hidden bg-white dark:bg-gray-800">
@@ -403,32 +111,43 @@ function FieldSection({
           <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
         )}
         <span className="font-medium text-gray-700 dark:text-gray-200">{section.name}</span>
-        <span className="text-xs text-gray-400 dark:text-gray-500">({customFields.length} полей)</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">({visibleFields.length} полей)</span>
       </button>
       {isExpanded && (
         <div className="divide-y divide-gray-100 dark:divide-gray-700">
-          {customFields.map((field) => (
-            <div key={field.id} className="px-4 py-3 flex items-start gap-4">
-              <div className="w-1/3 flex-shrink-0">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                  {field.name}
-                  {field.required && <span className="text-red-500 ml-0.5">*</span>}
-                </span>
-                {field.description && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{field.description}</p>
-                )}
+          {visibleFields.map((field) => {
+            const isRequired = evaluateRequired(field, allSectionFields, entityData);
+            const computed = evaluateComputed(field, allSectionFields, entityData);
+            return (
+              <div key={field.id} className="px-4 py-3 flex items-start gap-4">
+                <div className="w-1/3 flex-shrink-0">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                    {field.name}
+                    {isRequired && <span className="text-red-500 ml-0.5">*</span>}
+                  </span>
+                  {field.description && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{field.description}</p>
+                  )}
+                </div>
+                <div className="flex-1">
+                  {computed ? (
+                    <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                      {computed.value !== null ? String(computed.value) : '—'}
+                    </span>
+                  ) : (
+                    <FieldValue
+                      field={field}
+                      value={entityData[field.id]}
+                      users={users}
+                      canEdit={canEdit}
+                      onUpdate={(value) => onUpdateField(field.id, value)}
+                      allData={entityData}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="flex-1">
-                <FieldValue
-                  field={field}
-                  value={entity.data?.[field.id]}
-                  users={users}
-                  canEdit={canEdit}
-                  onUpdate={(value) => onUpdateField(field.id, value)}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
