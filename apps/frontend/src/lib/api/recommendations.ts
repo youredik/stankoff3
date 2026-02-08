@@ -109,3 +109,67 @@ export async function findSimilarEntities(
     .get<SimilarEntity[]>(`/recommendations/similar?${params}`)
     .then((r) => r.data);
 }
+
+// ==================== AI ASSISTANT ====================
+
+/**
+ * Похожий случай из базы знаний (legacy)
+ */
+export interface SimilarCase {
+  requestId: number;
+  subject: string;
+  resolution?: string;
+  similarity: number;
+  resolutionTimeHours?: number;
+  legacyUrl: string;
+  specialists?: string[];
+}
+
+/**
+ * Рекомендуемый эксперт
+ */
+export interface SuggestedExpert {
+  name: string;
+  managerId?: number;
+  department?: string;
+  relevantCases: number;
+  topics: string[];
+}
+
+/**
+ * Связанный контекст (контрагенты, сделки)
+ */
+export interface RelatedContext {
+  counterpartyName?: string;
+  counterpartyUrl?: string;
+  deals?: Array<{
+    id: number;
+    name: string;
+    sum: number;
+    url: string;
+  }>;
+  customerTotalRequests?: number;
+}
+
+/**
+ * Ответ AI помощника
+ */
+export interface AiAssistantResponse {
+  available: boolean;
+  similarCases: SimilarCase[];
+  suggestedExperts: SuggestedExpert[];
+  relatedContext?: RelatedContext;
+  suggestedResponse?: string;
+  suggestedActions?: string[];
+  keywords?: string[];
+}
+
+/**
+ * Get AI assistance for an entity
+ * Возвращает похожие случаи, экспертов, контекст и рекомендации
+ */
+export async function getAiAssistance(entityId: string): Promise<AiAssistantResponse> {
+  return apiClient
+    .get<AiAssistantResponse>(`/ai/assist/${entityId}`)
+    .then((r) => r.data);
+}

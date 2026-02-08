@@ -1,0 +1,46 @@
+# Docker Compose для локального AI (Ollama)
+#
+# Использование:
+#   docker compose -f docker-compose.ollama.yml up -d
+#
+# После запуска загрузите нужные модели:
+#   docker compose -f docker-compose.ollama.yml exec ollama ollama pull nomic-embed-text
+#   docker compose -f docker-compose.ollama.yml exec ollama ollama pull qwen2.5:14b
+#
+# Или используйте скрипт:
+#   ./scripts/setup-ollama.sh
+#
+# Модели будут сохранены в volume и переиспользованы при перезапуске.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: stankoff-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      # Количество параллельных запросов
+      - OLLAMA_NUM_PARALLEL=2
+      # Максимальное время загрузки модели (секунды)
+      - OLLAMA_KEEP_ALIVE=5m
+    # Для GPU (раскомментируйте если есть NVIDIA GPU):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  ollama-data:
+    name: stankoff-ollama-data

@@ -9,6 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { KeycloakService } from './keycloak.service';
+import { KeycloakAdminService } from './keycloak-admin.service';
 
 @Module({
   imports: [
@@ -27,11 +28,12 @@ import { KeycloakService } from './keycloak.service';
   providers: [
     AuthService,
     KeycloakService,
+    KeycloakAdminService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
   ],
   controllers: [AuthController],
-  exports: [AuthService, KeycloakService, JwtModule, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, KeycloakService, KeycloakAdminService, JwtModule, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

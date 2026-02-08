@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_ServiceSupportV2" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="service-support-v2" name="Техническая поддержка (полный цикл)" isExecutable="true">
+
+    <!-- === START === -->
+    <bpmn:startEvent id="Start" name="Заявка поступила">
+      <bpmn:outgoing>Flow_ToLog</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- Логирование получения -->
+    <bpmn:serviceTask id="Task_LogReceived" name="Зафиксировать получение">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="log-activity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+          <zeebe:input source="= &quot;process:started&quot;" target="action" />
+          <zeebe:input source="= &quot;Запущен процесс обработки заявки техподдержки&quot;" target="details" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToLog</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSetNew</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Статус: Новая -->
+    <bpmn:serviceTask id="Task_SetNew" name="Статус: Новая">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;new&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSetNew</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToClassify</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- AI Классификация -->
+    <bpmn:serviceTask id="Task_Classify" name="AI Классификация">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="classify-entity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToClassify</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSetClassified</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Статус: Классифицирована -->
+    <bpmn:serviceTask id="Task_SetClassified" name="Статус: Классифицирована">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;classified&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSetClassified</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRoute</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Маршрутизация (выбор исполнителя) -->
+    <bpmn:userTask id="Task_Route" name="Назначить исполнителя">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition candidateGroups="l1-supervisors" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:support-route-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRoute</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToAssign</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- Назначить исполнителя -->
+    <bpmn:serviceTask id="Task_Assign" name="Назначить исполнителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="set-assignee" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= selectedAssigneeId" target="assigneeId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToAssign</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSetAssigned</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Статус: Назначена -->
+    <bpmn:serviceTask id="Task_SetAssigned" name="Статус: Назначена">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;assigned&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSetAssigned</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotify</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Уведомить исполнителя -->
+    <bpmn:serviceTask id="Task_NotifyAssignee" name="Уведомить исполнителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= selectedAssigneeId" target="userId" />
+          <zeebe:input source="= &quot;Вам назначена новая заявка техподдержки&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotify</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSetInProgress</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Статус: В работе -->
+    <bpmn:serviceTask id="Task_SetInProgress" name="Статус: В работе">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;in_progress&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSetInProgress</bpmn:incoming>
+      <bpmn:incoming>Flow_ReopenToWork</bpmn:incoming>
+      <bpmn:incoming>Flow_ClientResponsed</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToWork</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- === ОСНОВНАЯ РАБОТА === -->
+    <bpmn:userTask id="Task_Work" name="Работа над заявкой">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= selectedAssigneeId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:support-work-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToWork</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToDecision</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- Развилка: Решение -->
+    <bpmn:exclusiveGateway id="Gateway_Decision" name="Решение">
+      <bpmn:incoming>Flow_ToDecision</bpmn:incoming>
+      <bpmn:outgoing>Flow_NeedInfo</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Escalate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToClaim</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Resolved</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- === ВЕТКА: Ожидание клиента === -->
+    <bpmn:serviceTask id="Task_SetWaitingClient" name="Статус: Ожидает клиента">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;waiting_client&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NeedInfo</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyClient</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyClientInfo" name="Запросить информацию у клиента">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= &quot;Требуется дополнительная информация по вашей заявке&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotifyClient</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToWaitEvent</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:eventBasedGateway id="Gateway_WaitResponse" name="Ожидание ответа">
+      <bpmn:incoming>Flow_ToWaitEvent</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToWaitMsg</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToWaitTimer</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+
+    <bpmn:intermediateCatchEvent id="Event_ClientResponse" name="Ответ клиента">
+      <bpmn:incoming>Flow_ToWaitMsg</bpmn:incoming>
+      <bpmn:outgoing>Flow_ClientResponsed</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_ClientResponse" messageRef="Message_ClientResponse" />
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:intermediateCatchEvent id="Event_Timeout48h" name="48ч без ответа">
+      <bpmn:incoming>Flow_ToWaitTimer</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToAutoClose</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_48h">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT48H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+
+    <!-- Автозакрытие по таймауту -->
+    <bpmn:serviceTask id="Task_AutoClose" name="Автозакрытие (нет ответа)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;closed&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToAutoClose</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToLogAutoClose</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_LogAutoClose" name="Логировать автозакрытие">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="log-activity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+          <zeebe:input source="= &quot;entity:auto_closed&quot;" target="action" />
+          <zeebe:input source="= &quot;Заявка автоматически закрыта: нет ответа от клиента 48ч&quot;" target="details" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToLogAutoClose</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndAutoClose</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_AutoClose" name="Автозакрытие">
+      <bpmn:incoming>Flow_ToEndAutoClose</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- === ВЕТКА: Эскалация L2 === -->
+    <bpmn:serviceTask id="Task_SetEscalated" name="Статус: Назначена (L2)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;assigned&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Escalate</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyL2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyL2" name="Уведомить руководителя L2">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= l2SupervisorId" target="userId" />
+          <zeebe:input source="= &quot;Заявка эскалирована на уровень L2&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotifyL2</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToL2Work</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_L2Work" name="Расследование L2">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition candidateGroups="l2-support" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:support-l2-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToL2Work</bpmn:incoming>
+      <bpmn:outgoing>Flow_L2ToResolved</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- === ВЕТКА: Переквалификация в рекламацию === -->
+    <bpmn:serviceTask id="Task_CreateClaim" name="Создать рекламацию">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="create-entity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="sourceEntityId" />
+          <zeebe:input source="= claimsWorkspaceId" target="targetWorkspaceId" />
+          <zeebe:input source="= &quot;Рекламация из заявки ТП&quot;" target="title" />
+          <zeebe:input source="= &quot;received&quot;" target="status" />
+          <zeebe:input source="= &quot;spawned&quot;" target="linkType" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToClaim</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCloseAsClaim</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_CloseAsClaim" name="Закрыть (переведена в рекламацию)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;closed&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCloseAsClaim</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndClaim</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Claim" name="Переведена в рекламацию">
+      <bpmn:incoming>Flow_ToEndClaim</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- === ВЕТКА: Решено === -->
+    <bpmn:serviceTask id="Task_SetResolved" name="Статус: Решена">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;resolved&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Resolved</bpmn:incoming>
+      <bpmn:incoming>Flow_L2ToResolved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyResolved</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyResolved" name="Уведомить заявителя о решении">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= &quot;Ваша заявка решена. Пожалуйста, подтвердите закрытие.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotifyResolved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToConfirm</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Подтверждение закрытия -->
+    <bpmn:userTask id="Task_Confirm" name="Подтвердить закрытие">
+      <bpmn:extensionElements>
+        <zeebe:assignmentDefinition assignee="= creatorId" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:support-confirm-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToConfirm</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToConfirmGw</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Confirmed" name="Подтверждено?">
+      <bpmn:incoming>Flow_ToConfirmGw</bpmn:incoming>
+      <bpmn:outgoing>Flow_ConfirmYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ConfirmNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- Закрыто -->
+    <bpmn:serviceTask id="Task_Close" name="Статус: Закрыта">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;closed&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ConfirmYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToLogClosed</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_LogClosed" name="Логировать закрытие">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="log-activity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+          <zeebe:input source="= &quot;entity:closed&quot;" target="action" />
+          <zeebe:input source="= &quot;Заявка закрыта после подтверждения клиентом&quot;" target="details" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToLogClosed</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Closed" name="Заявка закрыта">
+      <bpmn:incoming>Flow_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- Переоткрытие -->
+    <bpmn:serviceTask id="Task_Reopen" name="Статус: Переоткрыта">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="update-entity-status" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= &quot;reopened&quot;" target="newStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ConfirmNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyReopen</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyReopen" name="Уведомить: заявка переоткрыта">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= selectedAssigneeId" target="userId" />
+          <zeebe:input source="= &quot;Заявка переоткрыта клиентом. Требуется повторная обработка.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotifyReopen</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReopenToWork</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- === SEQUENCE FLOWS === -->
+    <bpmn:sequenceFlow id="Flow_ToLog" sourceRef="Start" targetRef="Task_LogReceived" />
+    <bpmn:sequenceFlow id="Flow_ToSetNew" sourceRef="Task_LogReceived" targetRef="Task_SetNew" />
+    <bpmn:sequenceFlow id="Flow_ToClassify" sourceRef="Task_SetNew" targetRef="Task_Classify" />
+    <bpmn:sequenceFlow id="Flow_ToSetClassified" sourceRef="Task_Classify" targetRef="Task_SetClassified" />
+    <bpmn:sequenceFlow id="Flow_ToRoute" sourceRef="Task_SetClassified" targetRef="Task_Route" />
+    <bpmn:sequenceFlow id="Flow_ToAssign" sourceRef="Task_Route" targetRef="Task_Assign" />
+    <bpmn:sequenceFlow id="Flow_ToSetAssigned" sourceRef="Task_Assign" targetRef="Task_SetAssigned" />
+    <bpmn:sequenceFlow id="Flow_ToNotify" sourceRef="Task_SetAssigned" targetRef="Task_NotifyAssignee" />
+    <bpmn:sequenceFlow id="Flow_ToSetInProgress" sourceRef="Task_NotifyAssignee" targetRef="Task_SetInProgress" />
+    <bpmn:sequenceFlow id="Flow_ToWork" sourceRef="Task_SetInProgress" targetRef="Task_Work" />
+    <bpmn:sequenceFlow id="Flow_ToDecision" sourceRef="Task_Work" targetRef="Gateway_Decision" />
+
+    <!-- Ветка: Нужна информация -->
+    <bpmn:sequenceFlow id="Flow_NeedInfo" name="Нужна информация" sourceRef="Gateway_Decision" targetRef="Task_SetWaitingClient">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "need_info"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToNotifyClient" sourceRef="Task_SetWaitingClient" targetRef="Task_NotifyClientInfo" />
+    <bpmn:sequenceFlow id="Flow_ToWaitEvent" sourceRef="Task_NotifyClientInfo" targetRef="Gateway_WaitResponse" />
+    <bpmn:sequenceFlow id="Flow_ToWaitMsg" sourceRef="Gateway_WaitResponse" targetRef="Event_ClientResponse" />
+    <bpmn:sequenceFlow id="Flow_ToWaitTimer" sourceRef="Gateway_WaitResponse" targetRef="Event_Timeout48h" />
+    <bpmn:sequenceFlow id="Flow_ClientResponsed" sourceRef="Event_ClientResponse" targetRef="Task_SetInProgress" />
+    <bpmn:sequenceFlow id="Flow_ToAutoClose" sourceRef="Event_Timeout48h" targetRef="Task_AutoClose" />
+    <bpmn:sequenceFlow id="Flow_ToLogAutoClose" sourceRef="Task_AutoClose" targetRef="Task_LogAutoClose" />
+    <bpmn:sequenceFlow id="Flow_ToEndAutoClose" sourceRef="Task_LogAutoClose" targetRef="End_AutoClose" />
+
+    <!-- Ветка: Эскалация L2 -->
+    <bpmn:sequenceFlow id="Flow_Escalate" name="Эскалация L2" sourceRef="Gateway_Decision" targetRef="Task_SetEscalated">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "escalate_l2"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToNotifyL2" sourceRef="Task_SetEscalated" targetRef="Task_NotifyL2" />
+    <bpmn:sequenceFlow id="Flow_ToL2Work" sourceRef="Task_NotifyL2" targetRef="Task_L2Work" />
+    <bpmn:sequenceFlow id="Flow_L2ToResolved" sourceRef="Task_L2Work" targetRef="Task_SetResolved" />
+
+    <!-- Ветка: Переквалификация в рекламацию -->
+    <bpmn:sequenceFlow id="Flow_ToClaim" name="Перевести в рекламацию" sourceRef="Gateway_Decision" targetRef="Task_CreateClaim">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "to_claim"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToCloseAsClaim" sourceRef="Task_CreateClaim" targetRef="Task_CloseAsClaim" />
+    <bpmn:sequenceFlow id="Flow_ToEndClaim" sourceRef="Task_CloseAsClaim" targetRef="End_Claim" />
+
+    <!-- Ветка: Решено -->
+    <bpmn:sequenceFlow id="Flow_Resolved" name="Решено" sourceRef="Gateway_Decision" targetRef="Task_SetResolved">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= decision = "resolved"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToNotifyResolved" sourceRef="Task_SetResolved" targetRef="Task_NotifyResolved" />
+    <bpmn:sequenceFlow id="Flow_ToConfirm" sourceRef="Task_NotifyResolved" targetRef="Task_Confirm" />
+    <bpmn:sequenceFlow id="Flow_ToConfirmGw" sourceRef="Task_Confirm" targetRef="Gateway_Confirmed" />
+    <bpmn:sequenceFlow id="Flow_ConfirmYes" name="Да" sourceRef="Gateway_Confirmed" targetRef="Task_Close">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= confirmed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ConfirmNo" name="Нет" sourceRef="Gateway_Confirmed" targetRef="Task_Reopen">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= confirmed = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToLogClosed" sourceRef="Task_Close" targetRef="Task_LogClosed" />
+    <bpmn:sequenceFlow id="Flow_ToEnd" sourceRef="Task_LogClosed" targetRef="End_Closed" />
+    <bpmn:sequenceFlow id="Flow_ToNotifyReopen" sourceRef="Task_Reopen" targetRef="Task_NotifyReopen" />
+    <bpmn:sequenceFlow id="Flow_ReopenToWork" sourceRef="Task_NotifyReopen" targetRef="Task_SetInProgress" />
+
+  </bpmn:process>
+
+  <bpmn:message id="Message_ClientResponse" name="client-response">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="= entityId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="service-support-v2">
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start">
+        <dc:Bounds x="152" y="272" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Closed_di" bpmnElement="End_Closed">
+        <dc:Bounds x="2602" y="272" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

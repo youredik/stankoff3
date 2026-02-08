@@ -39,11 +39,11 @@ export class SlaDefinition {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'workspace_id', type: 'uuid' })
   workspaceId: string;
 
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'workspaceId' })
+  @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
 
   @Column({ type: 'varchar', length: 255 })
@@ -52,25 +52,26 @@ export class SlaDefinition {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ name: 'applies_to', type: 'varchar', length: 50 })
   appliesTo: SlaTargetType;
 
   @Column({ type: 'jsonb', default: {} })
   conditions: SlaConditions;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'response_time', type: 'int', nullable: true })
   responseTime: number | null; // minutes
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'resolution_time', type: 'int', nullable: true })
   resolutionTime: number | null; // minutes
 
-  @Column({ type: 'int', default: 80 })
+  @Column({ name: 'warning_threshold', type: 'int', default: 80 })
   warningThreshold: number; // percentage
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'business_hours_only', type: 'boolean', default: true })
   businessHoursOnly: boolean;
 
   @Column({
+    name: 'business_hours',
     type: 'jsonb',
     default: {
       start: '09:00',
@@ -81,26 +82,26 @@ export class SlaDefinition {
   })
   businessHours: BusinessHours;
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ name: 'escalation_rules', type: 'jsonb', default: [] })
   escalationRules: EscalationRule[];
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
   @Column({ type: 'int', default: 0 })
   priority: number; // Higher = more important
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'created_by_id', type: 'uuid', nullable: true })
   createdById: string | null;
 
   @ManyToOne(() => User, { onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'createdById' })
+  @JoinColumn({ name: 'created_by_id' })
   createdBy: User;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
   @OneToMany(() => SlaInstance, (instance) => instance.slaDefinition)

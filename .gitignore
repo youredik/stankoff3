@@ -55,3 +55,4 @@ playwright/.cache/
 
 # Logs
 *.log
+passwords-*.csv

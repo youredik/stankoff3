@@ -20,6 +20,7 @@ export class BpmnWorkersService implements OnModuleInit {
   private emailService?: EmailService;
   private auditLogService?: AuditLogService;
   private eventsGateway?: EventsGateway;
+  private aiClassifierService?: any;
 
   constructor(
     private readonly moduleRef: ModuleRef,
@@ -54,6 +55,15 @@ export class BpmnWorkersService implements OnModuleInit {
     } catch {
       this.logger.warn('EventsGateway not available for workers');
     }
+
+    try {
+      // Dynamically resolve AI classifier (may not be available)
+      this.aiClassifierService = this.moduleRef.get('AiClassifierService', {
+        strict: false,
+      });
+    } catch {
+      this.logger.warn('AiClassifierService not available for workers');
+    }
   }
 
   /**
@@ -76,9 +86,10 @@ export class BpmnWorkersService implements OnModuleInit {
     this.registerLogActivityWorker();
     this.registerSetAssigneeWorker();
     this.registerProcessCompletedWorker();
+    this.registerClassifyEntityWorker();
 
     this.logger.log(
-      'BPMN workers registered: update-entity-status, send-notification, send-email, log-activity, set-assignee, process-completed',
+      'BPMN workers registered: update-entity-status, send-notification, send-email, log-activity, set-assignee, process-completed, classify-entity',
     );
   }
 
@@ -280,6 +291,56 @@ export class BpmnWorkersService implements OnModuleInit {
           return job.fail({
             errorMessage: error.message,
             retries: job.retries - 1,
+          });
+        }
+      },
+    });
+  }
+
+  /**
+   * Worker: Classify entity using AI
+   * Calls AiClassifierService to auto-classify entity (category, priority, skills)
+   * Variables: { entityId: string }
+   */
+  private registerClassifyEntityWorker() {
+    this.zeebeClient!.createWorker({
+      taskType: 'classify-entity',
+      taskHandler: async (job) => {
+        const { entityId } = job.variables as { entityId: string };
+
+        this.logger.log(`[Worker] classify-entity: entity=${entityId}`);
+
+        try {
+          if (this.aiClassifierService && entityId) {
+            const classification =
+              await this.aiClassifierService.classifyAndSave(entityId);
+            this.logger.log(
+              `Entity ${entityId} classified: category=${classification?.category}, priority=${classification?.priority}`,
+            );
+            return job.complete({
+              classified: true,
+              category: classification?.category || 'other',
+              aiPriority: classification?.priority || 'medium',
+              confidence: classification?.confidence || 0,
+            });
+          }
+          // AI not available — continue without classification
+          this.logger.warn(
+            'AiClassifierService not available, skipping classification',
+          );
+          return job.complete({
+            classified: false,
+            reason: 'AI service not available',
+          });
+        } catch (error) {
+          this.logger.error(
+            `Failed to classify entity: ${error.message}`,
+            error.stack,
+          );
+          // Don't fail the job — classification is optional
+          return job.complete({
+            classified: false,
+            error: error.message,
           });
         }
       },

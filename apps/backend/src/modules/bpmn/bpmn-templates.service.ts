@@ -128,6 +128,33 @@ export class BpmnTemplatesService {
         difficulty: 'medium',
         estimatedDuration: '1-3 дня',
       },
+      'service-support-v2': {
+        name: 'Техподдержка (полный цикл)',
+        description:
+          'ITIL-совместимый процесс: AI-классификация, маршрутизация L1/L2, эскалация, ожидание клиента, автозакрытие, переквалификация в рекламацию',
+        category: 'support',
+        tags: ['техподдержка', 'ITIL', 'SLA', 'AI', 'эскалация', 'L1', 'L2'],
+        difficulty: 'advanced',
+        estimatedDuration: '15 мин - 72 ч',
+      },
+      'claims-management': {
+        name: 'Управление рекламациями (ISO 10002)',
+        description:
+          'Полный цикл рекламации: регистрация, расследование, RCA (анализ корневых причин), решение, корректирующие действия, уведомление клиента',
+        category: 'support',
+        tags: ['рекламации', 'ISO 10002', 'RCA', 'качество', 'корректирующие действия'],
+        difficulty: 'advanced',
+        estimatedDuration: '1 - 14 дней',
+      },
+      'sla-escalation': {
+        name: 'Автоэскалация по SLA',
+        description:
+          'Автоматическая эскалация при нарушении SLA: предупреждение (80%), нарушение (100%), критическое (150%) с уведомлением руководства',
+        category: 'support',
+        tags: ['SLA', 'эскалация', 'уведомления', 'руководство'],
+        difficulty: 'simple',
+        estimatedDuration: '1-5 мин',
+      },
     };
 
     try {

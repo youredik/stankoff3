@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
-import { X, MessageSquare, Clock, Paperclip, History, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play } from 'lucide-react';
+import { X, MessageSquare, Clock, Paperclip, History, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -10,6 +10,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { CommentEditor } from '@/components/entity/CommentEditor';
 import { LinkedEntities } from '@/components/entity/LinkedEntities';
 import { ActivityPanel } from '@/components/entity/ActivityPanel';
+import { AiAssistantTab } from '@/components/entity/AiAssistantTab';
+import { AiClassificationPanel } from '@/components/ai/AiClassificationPanel';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment, Field, Section, Attachment } from '@/types';
@@ -455,7 +457,7 @@ export function EntityDetailPanel() {
   const canAssign = user?.role === 'admin' || user?.role === 'manager' || canEditEntity;
 
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'comments' | 'history'>('comments');
+  const [activeTab, setActiveTab] = useState<'comments' | 'history' | 'ai'>('comments');
   const [showStartProcess, setShowStartProcess] = useState(false);
   const [processInstances, setProcessInstances] = useState<ProcessInstance[]>([]);
   const [loadingProcesses, setLoadingProcesses] = useState(false);
@@ -710,6 +712,17 @@ export function EntityDetailPanel() {
                   <History className="w-4 h-4" />
                   <span className="text-sm font-medium">История</span>
                 </button>
+                <button
+                  onClick={() => setActiveTab('ai')}
+                  className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
+                    activeTab === 'ai'
+                      ? 'border-teal-500 text-teal-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-sm font-medium">AI помощник</span>
+                </button>
               </div>
 
               {/* Tab content */}
@@ -773,6 +786,11 @@ export function EntityDetailPanel() {
                 {/* History Tab */}
                 {activeTab === 'history' && (
                   <ActivityPanel entityId={selectedEntity.id} statusOptions={statuses} />
+                )}
+
+                {/* AI Assistant Tab */}
+                {activeTab === 'ai' && (
+                  <AiAssistantTab entityId={selectedEntity.id} />
                 )}
               </div>
 
@@ -1003,6 +1021,17 @@ export function EntityDetailPanel() {
                     targetType="entity"
                     targetId={selectedEntity.id}
                     showDetails={true}
+                  />
+                </div>
+
+                {/* AI Classification */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <AiClassificationPanel
+                    entityId={selectedEntity.id}
+                    title={selectedEntity.title}
+                    description={selectedEntity.data?.description as string | undefined}
+                    workspaceId={currentWorkspace?.id}
+                    readOnly={!canEditEntity}
                   />
                 </div>
 

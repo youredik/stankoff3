@@ -7,7 +7,7 @@
 ## Стек технологий
 
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand, @dnd-kit, Tiptap, Socket.IO Client, bpmn-js
-- **Backend:** NestJS 11, TypeORM, PostgreSQL, Socket.IO, AWS SDK v3 (S3), @camunda8/sdk
+- **Backend:** NestJS 11, TypeORM, PostgreSQL (pgvector), Socket.IO, AWS SDK v3 (S3), @camunda8/sdk, OpenAI SDK
 - **BPMN:** Camunda 8 Platform, Zeebe workflow engine, BPMN 2.0
 - **Инфраструктура:** Docker Swarm (preprod), Docker Compose (dev), Yandex Object Storage, GitHub Actions CI/CD, Nginx, Let's Encrypt SSL
 - **Деплой:** GitHub Container Registry (GHCR), Docker multi-platform builds (AMD64), Zero-downtime deployment (Swarm start-first)
@@ -39,12 +39,13 @@ stankoff-portal/
 
 ### Общие принципы
 
-1. **Не усложняй** — пиши минимально необходимый код для решения задачи
-2. **Не добавляй лишнего** — никаких "улучшений" сверх запроса пользователя
-3. **Редактируй существующее** — предпочитай изменение файлов созданию новых
-4. **Проверяй работоспособность** — после изменений убедись, что код работает
-5. **Всегда документируй** — после любых изменений обновляй документацию
-6. **Перезапускай сервисы сам** — после изменений в backend перезапускай сервер самостоятельно, не проси пользователя
+1. **Чистая архитектура** — всегда применяй принципы Clean Architecture: разделение ответственности, инверсия зависимостей, слабая связанность между модулями
+2. **Не усложняй** — пиши минимально необходимый код для решения задачи
+3. **Не добавляй лишнего** — никаких "улучшений" сверх запроса пользователя
+4. **Редактируй существующее** — предпочитай изменение файлов созданию новых
+5. **Проверяй работоспособность** — после изменений убедись, что код работает
+6. **Всегда документируй** — после любых изменений обновляй документацию
+7. **Перезапускай сервисы сам** — после изменений в backend перезапускай сервер самостоятельно, не проси пользователя
 
 ### Документирование (ОБЯЗАТЕЛЬНО)
 
@@ -351,6 +352,13 @@ docker compose -f docker-compose.camunda.yml up -d  # Запустить Camunda
 # UI: http://localhost:8088 (demo/demo)
 # gRPC: localhost:26500
 
+# AI / Ollama (локальные модели, бесплатно)
+./scripts/setup-ollama.sh                            # Полная настройка Ollama с моделями
+docker compose -f docker-compose.ollama.yml up -d    # Запустить Ollama
+docker compose -f docker-compose.ollama.yml exec ollama ollama list  # Список моделей
+# API: http://localhost:11434
+# Модели: qwen2.5:14b (LLM), nomic-embed-text (embeddings)
+
 # E2E тесты (Playwright)
 cd apps/frontend
 npm run test:e2e         # Запуск всех тестов (с автоочисткой)
@@ -465,6 +473,46 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/dmn/tables/:id/evaluate-quick` — быстрое вычисление
 - `GET /api/dmn/tables/:id/evaluations` — история вычислений
 - `GET /api/dmn/tables/:id/statistics` — статистика правил
+
+**AI (LLM-ассистент, требует OPENAI_API_KEY):**
+- `GET /api/ai/health` — статус AI сервиса
+- `POST /api/ai/classify` — классификация заявки (категория, приоритет, навыки)
+- `POST /api/ai/classify/:entityId` — классификация с сохранением в БД
+- `GET /api/ai/classification/:entityId` — получить сохранённую классификацию
+- `POST /api/ai/classification/:entityId/apply` — применить классификацию к entity
+- `POST /api/ai/search` — RAG поиск по базе знаний (pgvector)
+- `GET /api/ai/knowledge-base/stats` — статистика базы знаний
+
+**AI RAG Indexer (индексация legacy данных):**
+- `GET /api/ai/indexer/health` — статус RAG индексатора
+- `GET /api/ai/indexer/status` — текущий статус индексации
+- `GET /api/ai/indexer/stats` — статистика (legacy + knowledge base + покрытие)
+- `POST /api/ai/indexer/start` — запустить индексацию legacy заявок
+- `POST /api/ai/indexer/reindex/:requestId` — переиндексировать конкретную заявку
+
+**Примечание по AI:**
+RAG использует данные из legacy CRM (QD_requests + QD_answers). Результаты поиска включают ссылки на legacy систему (https://www.stankoff.ru/crm/request/:id). Индексация создаёт embeddings для закрытых заявок с ответами.
+
+**Legacy CRM (Read-Only интеграция с MariaDB):**
+- `GET /api/legacy/health` — статус подключения к legacy БД
+- `GET /api/legacy/customers/search?q=текст&limit=10&employeesOnly=false` — поиск клиентов
+- `GET /api/legacy/customers/:id` — получить клиента по ID
+- `GET /api/legacy/products/search?q=текст&categoryId=123&inStockOnly=false` — поиск товаров
+- `GET /api/legacy/products/:id` — получить товар по ID
+- `GET /api/legacy/categories` — все категории товаров
+- `GET /api/legacy/counterparties/search?q=текст` — поиск контрагентов по названию/ИНН
+- `GET /api/legacy/counterparties/:id` — получить контрагента по ID
+- `GET /api/legacy/deals?counterpartyId=123&employeeUserId=456` — сделки
+- `GET /api/legacy/deals/:id` — получить сделку по ID
+
+**Frontend компоненты Legacy (`components/legacy/`):**
+- `LegacyCustomerPicker` — выбор клиента с поиском и ссылкой на Legacy CRM
+- `LegacyProductPicker` — выбор товара с фильтром по категории и статусом наличия
+- `LegacyCounterpartyPicker` — выбор компании (контрагента) с ИНН
+- `LegacyDealLink` — ссылка на сделку с деталями (сумма, этап, контрагент)
+- `LegacyDealsList` — список ссылок на несколько сделок
+
+**Frontend API клиент:** `lib/api/legacy.ts` — все методы + `legacyUrls` для генерации URL
 
 ## WebSocket события
 

@@ -23,19 +23,19 @@ export class SlaEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'sla_instance_id', type: 'uuid' })
   slaInstanceId: string;
 
   @ManyToOne(() => SlaInstance, (instance) => instance.events, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'slaInstanceId' })
+  @JoinColumn({ name: 'sla_instance_id' })
   slaInstance: SlaInstance;
 
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ name: 'event_type', type: 'varchar', length: 50 })
   eventType: SlaEventType;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ name: 'event_data', type: 'jsonb', default: {} })
   eventData: Record<string, unknown>;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

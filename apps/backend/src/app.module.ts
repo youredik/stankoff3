@@ -21,13 +21,27 @@ import { SectionModule } from './modules/section/section.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { DmnModule } from './modules/dmn/dmn.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
+import { LegacyModule } from './modules/legacy/legacy.module';
+import { AiModule } from './modules/ai/ai.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { SeedService } from './seed.service';
+import { SeedServiceDepartment } from './seed-service-department';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
+import { Comment } from './modules/entity/comment.entity';
 import { Workspace } from './modules/workspace/workspace.entity';
 import { WorkspaceMember } from './modules/workspace/workspace-member.entity';
 import { Section } from './modules/section/section.entity';
 import { SectionMember } from './modules/section/section-member.entity';
+import { SlaDefinition } from './modules/sla/entities/sla-definition.entity';
+import { SlaInstance } from './modules/sla/entities/sla-instance.entity';
+import { SlaEvent } from './modules/sla/entities/sla-event.entity';
+import { DecisionTable } from './modules/dmn/entities/decision-table.entity';
+import { ProcessDefinition } from './modules/bpmn/entities/process-definition.entity';
+import { ProcessInstance } from './modules/bpmn/entities/process-instance.entity';
+import { ProcessTrigger } from './modules/bpmn/entities/process-trigger.entity';
+import { AutomationRule } from './modules/automation/automation-rule.entity';
+import { UserGroup } from './modules/bpmn/entities/user-group.entity';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -40,7 +54,14 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(typeOrmConfig),
-    TypeOrmModule.forFeature([User, WorkspaceEntity, Workspace, WorkspaceMember, Section, SectionMember]),
+    TypeOrmModule.forFeature([
+      User, WorkspaceEntity, Comment, Workspace, WorkspaceMember,
+      Section, SectionMember,
+      SlaDefinition, SlaInstance, SlaEvent,
+      DecisionTable,
+      ProcessDefinition, ProcessInstance, ProcessTrigger,
+      AutomationRule, UserGroup,
+    ]),
 
     WorkspaceModule,
     EntityModule,
@@ -59,9 +80,13 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     SlaModule,
     DmnModule,
     ConnectorsModule,
+    LegacyModule,
+    AiModule,
+    OnboardingModule,
   ],
   providers: [
     SeedService,
+    SeedServiceDepartment,
     // Глобальные guards - порядок важен: сначала JWT, потом Roles
     {
       provide: APP_GUARD,

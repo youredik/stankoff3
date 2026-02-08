@@ -19,63 +19,63 @@ export class SlaInstance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'sla_definition_id', type: 'uuid' })
   slaDefinitionId: string;
 
   @ManyToOne(() => SlaDefinition, (def) => def.instances, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'slaDefinitionId' })
+  @JoinColumn({ name: 'sla_definition_id' })
   slaDefinition: SlaDefinition;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'workspace_id', type: 'uuid' })
   workspaceId: string;
 
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'workspaceId' })
+  @JoinColumn({ name: 'workspace_id' })
   workspace: Workspace;
 
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ name: 'target_type', type: 'varchar', length: 50 })
   targetType: SlaTargetType;
 
-  @Column({ type: 'uuid' })
+  @Column({ name: 'target_id', type: 'uuid' })
   targetId: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'response_due_at', type: 'timestamptz', nullable: true })
   responseDueAt: Date | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'resolution_due_at', type: 'timestamptz', nullable: true })
   resolutionDueAt: Date | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'first_response_at', type: 'timestamptz', nullable: true })
   firstResponseAt: Date | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'resolved_at', type: 'timestamptz', nullable: true })
   resolvedAt: Date | null;
 
-  @Column({ type: 'varchar', length: 50, default: 'pending' })
+  @Column({ name: 'response_status', type: 'varchar', length: 50, default: 'pending' })
   responseStatus: SlaStatus;
 
-  @Column({ type: 'varchar', length: 50, default: 'pending' })
+  @Column({ name: 'resolution_status', type: 'varchar', length: 50, default: 'pending' })
   resolutionStatus: SlaStatus;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ name: 'is_paused', type: 'boolean', default: false })
   isPaused: boolean;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'paused_at', type: 'timestamptz', nullable: true })
   pausedAt: Date | null;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'total_paused_minutes', type: 'int', default: 0 })
   totalPausedMinutes: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'current_escalation_level', type: 'int', default: 0 })
   currentEscalationLevel: number;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'last_escalation_at', type: 'timestamptz', nullable: true })
   lastEscalationAt: Date | null;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
   @OneToMany(() => SlaEvent, (event) => event.slaInstance)

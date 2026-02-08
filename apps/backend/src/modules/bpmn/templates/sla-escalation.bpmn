@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_SlaEscalation" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="sla-escalation" name="Автоэскалация по SLA" isExecutable="true">
+
+    <!-- === START === -->
+    <bpmn:startEvent id="Start" name="SLA нарушение">
+      <bpmn:outgoing>Flow_ToLog</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- Логирование -->
+    <bpmn:serviceTask id="Task_LogEscalation" name="Зафиксировать нарушение SLA">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="log-activity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+          <zeebe:input source="= &quot;sla:escalation&quot;" target="action" />
+          <zeebe:input source="= &quot;Автоматическая эскалация по SLA. Уровень: &quot; + string(escalationLevel)" target="details" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToLog</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToLevelGw</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Определение уровня эскалации -->
+    <bpmn:exclusiveGateway id="Gateway_Level" name="Уровень эскалации">
+      <bpmn:incoming>Flow_ToLevelGw</bpmn:incoming>
+      <bpmn:outgoing>Flow_Warning</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Breach</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CriticalBreach</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- === Уровень 1: Предупреждение (80%) === -->
+    <bpmn:serviceTask id="Task_NotifyAssignee" name="Уведомить исполнителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= assigneeId" target="userId" />
+          <zeebe:input source="= &quot;⚠️ SLA предупреждение: заявка близка к нарушению сроков!&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Warning</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndWarning</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Warning" name="Предупреждение отправлено">
+      <bpmn:incoming>Flow_ToEndWarning</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- === Уровень 2: Нарушение (100%) === -->
+    <bpmn:serviceTask id="Task_NotifySupervisor" name="Уведомить руководителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= supervisorId" target="userId" />
+          <zeebe:input source="= &quot;🔴 SLA нарушен! Заявка не обработана в срок. Требуется вмешательство.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Breach</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifyAssigneeBreach</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifyAssigneeBreach" name="Уведомить исполнителя о нарушении">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= assigneeId" target="userId" />
+          <zeebe:input source="= &quot;🔴 SLA нарушен по вашей заявке! Руководитель уведомлён.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotifyAssigneeBreach</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndBreach</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Breach" name="Руководитель уведомлён">
+      <bpmn:incoming>Flow_ToEndBreach</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- === Уровень 3: Критическое нарушение (150%) === -->
+    <bpmn:serviceTask id="Task_NotifyDirector" name="Уведомить директора по сервису">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= directorId" target="userId" />
+          <zeebe:input source="= &quot;🚨 КРИТИЧЕСКОЕ нарушение SLA! Превышение сроков более 150%. Требуется немедленное вмешательство.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_CriticalBreach</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotifySupervisorCritical</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Task_NotifySupervisorCritical" name="Уведомить руководителя (критическое)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= supervisorId" target="userId" />
+          <zeebe:input source="= &quot;🚨 Критическое нарушение SLA! Директор уведомлён.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotifySupervisorCritical</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndCritical</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Critical" name="Директор уведомлён">
+      <bpmn:incoming>Flow_ToEndCritical</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- === SEQUENCE FLOWS === -->
+    <bpmn:sequenceFlow id="Flow_ToLog" sourceRef="Start" targetRef="Task_LogEscalation" />
+    <bpmn:sequenceFlow id="Flow_ToLevelGw" sourceRef="Task_LogEscalation" targetRef="Gateway_Level" />
+
+    <bpmn:sequenceFlow id="Flow_Warning" name="Предупреждение (80%)" sourceRef="Gateway_Level" targetRef="Task_NotifyAssignee">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= escalationLevel = "warning"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToEndWarning" sourceRef="Task_NotifyAssignee" targetRef="End_Warning" />
+
+    <bpmn:sequenceFlow id="Flow_Breach" name="Нарушение (100%)" sourceRef="Gateway_Level" targetRef="Task_NotifySupervisor">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= escalationLevel = "breach"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToNotifyAssigneeBreach" sourceRef="Task_NotifySupervisor" targetRef="Task_NotifyAssigneeBreach" />
+    <bpmn:sequenceFlow id="Flow_ToEndBreach" sourceRef="Task_NotifyAssigneeBreach" targetRef="End_Breach" />
+
+    <bpmn:sequenceFlow id="Flow_CriticalBreach" name="Критическое (150%)" sourceRef="Gateway_Level" targetRef="Task_NotifyDirector">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= escalationLevel = "critical"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToNotifySupervisorCritical" sourceRef="Task_NotifyDirector" targetRef="Task_NotifySupervisorCritical" />
+    <bpmn:sequenceFlow id="Flow_ToEndCritical" sourceRef="Task_NotifySupervisorCritical" targetRef="End_Critical" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="sla-escalation">
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start">
+        <dc:Bounds x="152" y="222" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

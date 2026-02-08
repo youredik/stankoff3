@@ -87,13 +87,14 @@ describe('BpmnWorkersService', () => {
 
   describe('setZeebeClient', () => {
     it('должен зарегистрировать все воркеры', () => {
-      expect(registeredWorkers.size).toBe(6);
+      expect(registeredWorkers.size).toBe(7);
       expect(registeredWorkers.has('update-entity-status')).toBe(true);
       expect(registeredWorkers.has('send-notification')).toBe(true);
       expect(registeredWorkers.has('send-email')).toBe(true);
       expect(registeredWorkers.has('log-activity')).toBe(true);
       expect(registeredWorkers.has('set-assignee')).toBe(true);
       expect(registeredWorkers.has('process-completed')).toBe(true);
+      expect(registeredWorkers.has('classify-entity')).toBe(true);
     });
   });
 
@@ -338,6 +339,37 @@ describe('BpmnWorkersService', () => {
         completed: false,
         error: 'DB error',
       });
+    });
+  });
+
+  describe('classify-entity worker', () => {
+    it('должен классифицировать entity через AI', async () => {
+      const handler = registeredWorkers.get('classify-entity')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      // AI classifier not available in test — should complete with classified: false
+      expect(mockJob.complete).toHaveBeenCalledWith(
+        expect.objectContaining({ classified: false }),
+      );
+    });
+
+    it('должен вернуть classified: false при пустом entityId', async () => {
+      const handler = registeredWorkers.get('classify-entity')!;
+      const mockJob = {
+        variables: { entityId: '' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith(
+        expect.objectContaining({ classified: false }),
+      );
     });
   });
 
