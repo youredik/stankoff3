@@ -1150,6 +1150,7 @@ legacy/
 | POST | /api/legacy/migration/validate | Проверка целостности |
 | GET | /api/legacy/migration/log | Записи migration log (status, limit, offset) |
 | POST | /api/legacy/migration/retry-failed | Повтор ошибочных записей |
+| POST | /api/legacy/migration/update-assignees | Ретроактивное обновление assignee (manager.id → User.id) |
 
 **API синхронизации:**
 | Метод | URL | Описание |
@@ -2771,21 +2772,26 @@ interface OnboardingStore {
 - **Маршрутизация техподдержки** — определяет L1/L2 и группу по приоритету и категории
 - **Оценка серьёзности рекламации** — определяет серьёзность и автоэскалацию по типу и сумме
 
-### Seed скрипт
+### Seed скрипты
 
-`SeedServiceDepartment` (seed-service-department.ts) создаёт:
-- 11 пользователей сервисного отдела
-- Секцию «Сервис»
-- 2 workspace'а (TP + REK) с полными конфигурациями
-- 5 user groups
-- 7 SLA определений + SLA instances
-- 2 DMN таблицы
-- 3 BPMN process definitions
-- 2 BPMN триггера (автозапуск при создании заявки)
-- 2 automation rules
-- 32 заявки ТП в разных статусах
-- 12 рекламаций в разных статусах
-- Комментарии, process instances
+**`SeedService`** (seed.service.ts) — базовый seed:
+- Admin-пользователь (admin@stankoff.ru)
+- Запускается только если нет пользователей
+
+**`SeedShowcase`** (seed-showcase.ts) — полные демо-данные для всех функций:
+- 20 пользователей (HR: 7, Финансы: 7, Коммерческий: 6)
+- 3 секции (HR, Финансы, Коммерческий)
+- 4 workspace'а (OTP, FIN, PO, KP) с полными конфигурациями полей
+- 4 BPMN process definitions из шаблонов + 4 триггера (ENTITY_CREATED)
+- 8 SLA определений (2 на workspace) + SLA instances
+- 4 DMN таблицы (FIRST, COLLECT, RULE_ORDER)
+- 6 automation rules
+- ~140 entities (35 per workspace) с реалистичными данными
+- ~80 комментариев
+- ~120 process instances + ~960 activity logs (для тепловых карт с bottleneck simulation)
+- 15 entity links (cross-workspace: RELATED, PARENT/CHILD, SPAWNED, BLOCKS/BLOCKED_BY, DUPLICATE)
+- Cleanup: удаляет все данные кроме Legacy workspace (prefix LEG)
+- Guard: проверяет существование секции "HR" и наличие пользователей
 
 ## Масштабирование
 

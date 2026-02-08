@@ -369,11 +369,11 @@ export class SeedShowcase implements OnModuleInit {
 
     const members = [
       { sectionId: hr.id, userId: users.hr[0].id, role: 'admin' as any },
-      { sectionId: hr.id, userId: users.hr[1].id, role: 'member' as any },
+      { sectionId: hr.id, userId: users.hr[1].id, role: 'viewer' as any },
       { sectionId: fin.id, userId: users.finance[0].id, role: 'admin' as any },
       { sectionId: fin.id, userId: users.finance[1].id, role: 'admin' as any },
       { sectionId: comm.id, userId: users.commercial[0].id, role: 'admin' as any },
-      { sectionId: comm.id, userId: users.commercial[1].id, role: 'member' as any },
+      { sectionId: comm.id, userId: users.commercial[1].id, role: 'viewer' as any },
     ];
     if (admin) {
       members.push(
