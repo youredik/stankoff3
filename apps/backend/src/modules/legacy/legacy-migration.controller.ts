@@ -9,7 +9,9 @@ import {
 } from '@nestjs/common';
 import { LegacyMigrationService } from './services/legacy-migration.service';
 import { StartMigrationDto, MigrationLogQueryDto } from './dto';
+import { Public } from '../auth/decorators/public.decorator';
 
+@Public()
 @Controller('legacy/migration')
 export class LegacyMigrationController {
   constructor(

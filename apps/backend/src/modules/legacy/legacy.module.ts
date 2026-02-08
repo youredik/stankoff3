@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { LegacyController } from './legacy.controller';
 import { LegacyImportController } from './legacy-import.controller';
 import { LegacyMigrationController } from './legacy-migration.controller';
+import { LegacySyncController } from './legacy-sync.controller';
 import { LegacyService } from './services/legacy.service';
 import { LegacyUrlService } from './services/legacy-url.service';
 import { LegacyMigrationService } from './services/legacy-migration.service';
@@ -31,7 +32,7 @@ import { AuthModule } from '../auth/auth.module';
     TypeOrmModule.forFeature([LegacyMigrationLog, User, Workspace]),
     forwardRef(() => AuthModule),
   ],
-  controllers: [LegacyController, LegacyImportController, LegacyMigrationController],
+  controllers: [LegacyController, LegacyImportController, LegacyMigrationController, LegacySyncController],
   providers: [
     {
       provide: LEGACY_DATA_SOURCE,

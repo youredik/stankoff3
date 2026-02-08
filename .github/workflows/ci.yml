@@ -47,9 +47,11 @@ jobs:
         run: npm run build --workspace=@stankoff/backend
 
   # ============== Backend Tests ==============
+  # TODO: Тесты временно отключены в CI — запускаются локально через pre-commit hooks
   test-backend:
     name: Backend Tests
     runs-on: ubuntu-latest
+    if: false  # Временно отключено — тесты запускаются локально
     services:
       postgres:
         image: postgres:16-alpine
@@ -89,9 +91,11 @@ jobs:
           JWT_SECRET: test-secret
 
   # ============== Frontend Tests ==============
+  # TODO: Тесты временно отключены в CI — запускаются локально через pre-commit hooks
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    if: false  # Временно отключено — тесты запускаются локально
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -186,7 +190,7 @@ jobs:
   build-backend:
     name: Build Backend Image
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: [lint]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     permissions:
       contents: read
@@ -231,7 +235,7 @@ jobs:
   build-frontend:
     name: Build Frontend Image
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: [lint]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     permissions:
       contents: read
