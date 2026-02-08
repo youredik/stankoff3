@@ -1,4 +1,6 @@
 import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ModuleRef } from '@nestjs/core';
 import { Camunda8 } from '@camunda8/sdk';
 import { EntityService } from '../entity/entity.service';
@@ -7,13 +9,17 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { EventsGateway } from '../websocket/events.gateway';
 import { AuditActionType } from '../audit-log/audit-log.entity';
 import { BpmnService } from './bpmn.service';
-import { ProcessInstanceStatus } from './entities/process-instance.entity';
+import { ProcessInstanceStatus, ProcessInstance } from './entities/process-instance.entity';
+import { ProcessActivityLog } from './entities/process-activity-log.entity';
 
 @Injectable()
 export class BpmnWorkersService implements OnModuleInit {
   private readonly logger = new Logger(BpmnWorkersService.name);
   private zeebeClient: ReturnType<Camunda8['getZeebeGrpcApiClient']> | null =
     null;
+
+  // Cache: processInstanceKey → { processInstanceId, processDefinitionId }
+  private instanceCache = new Map<string, { instanceId: string; definitionId: string }>();
 
   // Lazy-loaded services to avoid circular dependencies
   private entityService?: EntityService;
@@ -26,6 +32,10 @@ export class BpmnWorkersService implements OnModuleInit {
     private readonly moduleRef: ModuleRef,
     @Inject(forwardRef(() => BpmnService))
     private readonly bpmnService: BpmnService,
+    @InjectRepository(ProcessActivityLog)
+    private readonly activityLogRepository: Repository<ProcessActivityLog>,
+    @InjectRepository(ProcessInstance)
+    private readonly processInstanceRepository: Repository<ProcessInstance>,
   ) {}
 
   async onModuleInit() {
@@ -67,6 +77,56 @@ export class BpmnWorkersService implements OnModuleInit {
   }
 
   /**
+   * Log element execution for per-element heat map statistics.
+   * Silently catches errors — logging must never break the main worker flow.
+   */
+  async logElementExecution(
+    job: { processInstanceKey: string | number; elementId?: string; type?: string },
+    status: 'success' | 'failed',
+    startTime: number,
+  ): Promise<void> {
+    try {
+      const processInstanceKey = String(job.processInstanceKey);
+      const elementId = (job as any).elementId;
+      if (!elementId) return;
+
+      // Resolve processInstanceId and processDefinitionId (with cache)
+      let cached = this.instanceCache.get(processInstanceKey);
+      if (!cached) {
+        const instance = await this.processInstanceRepository.findOne({
+          where: { processInstanceKey },
+          select: ['id', 'processDefinitionId'],
+        });
+        if (!instance) return;
+        cached = { instanceId: instance.id, definitionId: instance.processDefinitionId };
+        this.instanceCache.set(processInstanceKey, cached);
+        // Keep cache bounded
+        if (this.instanceCache.size > 1000) {
+          const firstKey = this.instanceCache.keys().next().value;
+          if (firstKey) this.instanceCache.delete(firstKey);
+        }
+      }
+
+      const now = new Date();
+      const durationMs = Math.round(now.getTime() - startTime);
+
+      await this.activityLogRepository.save({
+        processInstanceId: cached.instanceId,
+        processDefinitionId: cached.definitionId,
+        elementId,
+        elementType: 'serviceTask',
+        status,
+        startedAt: new Date(startTime),
+        completedAt: now,
+        durationMs,
+        workerType: job.type || null,
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to log element execution: ${error.message}`);
+    }
+  }
+
+  /**
    * Called by BpmnService after Zeebe connection is established
    */
   setZeebeClient(client: ReturnType<Camunda8['getZeebeGrpcApiClient']>) {
@@ -101,6 +161,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'update-entity-status',
       taskHandler: async (job) => {
+        const startTime = Date.now();
         const { entityId, newStatus } = job.variables as {
           entityId: string;
           newStatus: string;
@@ -115,11 +176,13 @@ export class BpmnWorkersService implements OnModuleInit {
             await this.entityService.updateStatus(entityId, newStatus);
             this.logger.log(`Entity ${entityId} status updated to ${newStatus}`);
           }
+          await this.logElementExecution(job, 'success', startTime);
           return job.complete({
             statusUpdated: true,
             updatedAt: new Date().toISOString(),
           });
         } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
           this.logger.error(
             `Failed to update entity status: ${error.message}`,
             error.stack,
@@ -141,6 +204,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'send-notification',
       taskHandler: async (job) => {
+        const startTime = Date.now();
         const { userId, message, entityId, workspaceId } = job.variables as {
           userId: string;
           message: string;
@@ -154,15 +218,16 @@ export class BpmnWorkersService implements OnModuleInit {
 
         try {
           if (this.eventsGateway && userId && message) {
-            // Emit WebSocket event for real-time notification
             this.eventsGateway.emitEntityUpdated({
               id: entityId,
               workspaceId,
               notification: { userId, message },
             } as any);
           }
+          await this.logElementExecution(job, 'success', startTime);
           return job.complete({ notificationSent: true });
         } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
           this.logger.error(
             `Failed to send notification: ${error.message}`,
             error.stack,
@@ -181,6 +246,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'send-email',
       taskHandler: async (job) => {
+        const startTime = Date.now();
         const { to, subject, body, entityId: _entityId } = job.variables as {
           to: string;
           subject: string;
@@ -198,10 +264,13 @@ export class BpmnWorkersService implements OnModuleInit {
               text: body,
               html: body,
             });
+            await this.logElementExecution(job, 'success', startTime);
             return job.complete({ emailSent: sent });
           }
+          await this.logElementExecution(job, 'success', startTime);
           return job.complete({ emailSent: false, reason: 'EmailService not available' });
         } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
           this.logger.error(`Failed to send email: ${error.message}`, error.stack);
           return job.complete({ emailSent: false, error: error.message });
         }
@@ -217,6 +286,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'log-activity',
       taskHandler: async (job) => {
+        const startTime = Date.now();
         const { entityId, workspaceId, action, details, actorId } =
           job.variables as {
             entityId: string;
@@ -245,8 +315,10 @@ export class BpmnWorkersService implements OnModuleInit {
               entityId || null,
             );
           }
+          await this.logElementExecution(job, 'success', startTime);
           return job.complete({ logged: true });
         } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
           this.logger.error(
             `Failed to log activity: ${error.message}`,
             error.stack,
@@ -265,6 +337,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'set-assignee',
       taskHandler: async (job) => {
+        const startTime = Date.now();
         const { entityId, assigneeId } = job.variables as {
           entityId: string;
           assigneeId: string | null;
@@ -279,11 +352,13 @@ export class BpmnWorkersService implements OnModuleInit {
             await this.entityService.updateAssignee(entityId, assigneeId || null);
             this.logger.log(`Entity ${entityId} assignee set to ${assigneeId}`);
           }
+          await this.logElementExecution(job, 'success', startTime);
           return job.complete({
             assigneeSet: true,
             updatedAt: new Date().toISOString(),
           });
         } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
           this.logger.error(
             `Failed to set assignee: ${error.message}`,
             error.stack,
@@ -306,6 +381,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'classify-entity',
       taskHandler: async (job) => {
+        const startTime = Date.now();
         const { entityId } = job.variables as { entityId: string };
 
         this.logger.log(`[Worker] classify-entity: entity=${entityId}`);
@@ -317,6 +393,7 @@ export class BpmnWorkersService implements OnModuleInit {
             this.logger.log(
               `Entity ${entityId} classified: category=${classification?.category}, priority=${classification?.priority}`,
             );
+            await this.logElementExecution(job, 'success', startTime);
             return job.complete({
               classified: true,
               category: classification?.category || 'other',
@@ -324,20 +401,20 @@ export class BpmnWorkersService implements OnModuleInit {
               confidence: classification?.confidence || 0,
             });
           }
-          // AI not available — continue without classification
           this.logger.warn(
             'AiClassifierService not available, skipping classification',
           );
+          await this.logElementExecution(job, 'success', startTime);
           return job.complete({
             classified: false,
             reason: 'AI service not available',
           });
         } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
           this.logger.error(
             `Failed to classify entity: ${error.message}`,
             error.stack,
           );
-          // Don't fail the job — classification is optional
           return job.complete({
             classified: false,
             error: error.message,
@@ -356,6 +433,7 @@ export class BpmnWorkersService implements OnModuleInit {
     this.zeebeClient!.createWorker({
       taskType: 'process-completed',
       taskHandler: async (job) => {
+        const startTime = Date.now();
         const processInstanceKey = String(job.processInstanceKey);
 
         this.logger.log(
@@ -367,8 +445,10 @@ export class BpmnWorkersService implements OnModuleInit {
             processInstanceKey,
             ProcessInstanceStatus.COMPLETED,
           );
+          await this.logElementExecution(job, 'success', startTime);
           return job.complete({ completed: true });
         } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
           this.logger.error(
             `Failed to mark process completed: ${error.message}`,
             error.stack,

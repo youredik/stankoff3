@@ -1,8 +1,8 @@
 # План интеграции Camunda 8.8 + BPMN 2.0
 
 **Дата создания:** 2026-02-03
-**Обновлено:** 2026-02-03
-**Статус:** Планирование
+**Обновлено:** 2026-02-08
+**Статус:** Все фазы (1-6) реализованы
 **Оценка:** 3-4 недели (с официальным пакетом)
 
 ---
@@ -1300,65 +1300,84 @@ async getElementStatistics(processDefinitionKey: string): Promise<any[]> {
 
 ## 8. План внедрения (обновлённый)
 
-### Фаза 1: Локальный запуск и знакомство (2-3 дня)
+### Фаза 1: Локальный запуск и знакомство ✅ DONE
 
 | # | Задача | Статус |
 |---|--------|--------|
-| 1.1 | Запустить `docker-compose.yaml` локально | ⬜ |
-| 1.2 | Изучить Operate UI (http://localhost:8088) | ⬜ |
-| 1.3 | Запустить full версию с Web Modeler | ⬜ |
-| 1.4 | Создать тестовый BPMN процесс в Web Modeler | ⬜ |
-| 1.5 | Задеплоить и запустить процесс | ⬜ |
+| 1.1 | Запустить `docker-compose.yaml` локально | ✅ |
+| 1.2 | Изучить Operate UI (http://localhost:8088) | ✅ |
+| 1.3 | Запустить full версию с Web Modeler | ✅ |
+| 1.4 | Создать тестовый BPMN процесс в Web Modeler | ✅ |
+| 1.5 | Задеплоить и запустить процесс | ✅ |
 
-### Фаза 2: Backend интеграция (1 неделя)
-
-| # | Задача | Статус |
-|---|--------|--------|
-| 2.1 | Установить `@camunda8/sdk` в NestJS | ⬜ |
-| 2.2 | Создать BpmnModule (service, controller) | ⬜ |
-| 2.3 | Подключиться к Zeebe (localhost:26500) | ⬜ |
-| 2.4 | Реализовать workers для entities | ⬜ |
-| 2.5 | Интегрировать запуск процесса при создании entity | ⬜ |
-| 2.6 | Создать миграцию для process_instances | ⬜ |
-| 2.7 | Тестирование локально | ⬜ |
-
-### Фаза 3: Frontend интеграция (1 неделя)
+### Фаза 2: Backend интеграция ✅ DONE
 
 | # | Задача | Статус |
 |---|--------|--------|
-| 3.1 | Установить `bpmn-js` | ⬜ |
-| 3.2 | Создать BpmnViewer компонент | ⬜ |
-| 3.3 | Добавить вкладку "Процессы" в entity detail | ⬜ |
-| 3.4 | Показывать активные процессы для entity | ⬜ |
-| 3.5 | (Опционально) BpmnEditor для создания процессов | ⬜ |
+| 2.1 | Установить `@camunda8/sdk` в NestJS | ✅ |
+| 2.2 | Создать BpmnModule (service, controller) | ✅ |
+| 2.3 | Подключиться к Zeebe (localhost:26500) | ✅ |
+| 2.4 | Реализовать workers для entities | ✅ 7 workers |
+| 2.5 | Интегрировать запуск процесса при создании entity | ✅ через триггеры |
+| 2.6 | Создать миграции для BPMN таблиц | ✅ |
+| 2.7 | Тестирование локально | ✅ |
 
-### Фаза 4: Деплой на preprod (3-5 дней)
+**Реализовано сверх плана:**
+- Шаблоны BPMN процессов (`bpmn-templates.service.ts`)
+- Система триггеров (on_create, on_status_change, on_assign, webhook, scheduled)
+- User Tasks (inbox, claim/unclaim, complete, delegate)
+- Entity Links (связи между сущностями, spawn)
+- Статистика процессов
 
-| # | Задача | Статус |
-|---|--------|--------|
-| 4.1 | Проверить ресурсы сервера (RAM, Disk) | ⬜ |
-| 4.2 | Создать `docker-compose.camunda-preprod.yml` | ⬜ |
-| 4.3 | Добавить в nginx routing | ⬜ |
-| 4.4 | Задеплоить Camunda на preprod | ⬜ |
-| 4.5 | Настроить переменные окружения | ⬜ |
-| 4.6 | Проверить интеграцию backend ↔ Camunda | ⬜ |
-
-### Фаза 5: Heat Maps и Optimize (3-5 дней)
+### Фаза 3: Frontend интеграция ✅ DONE
 
 | # | Задача | Статус |
 |---|--------|--------|
-| 5.1 | Добавить Optimize в stack (если ресурсы позволяют) | ⬜ |
-| 5.2 | Настроить сбор метрик | ⬜ |
-| 5.3 | Создать дашборд с heat maps | ⬜ |
-| 5.4 | Интегрировать в frontend (iframe или API) | ⬜ |
+| 3.1 | Установить `bpmn-js` | ✅ |
+| 3.2 | Создать BpmnViewer компонент | ✅ |
+| 3.3 | Добавить вкладку "Процессы" в entity detail | ✅ |
+| 3.4 | Показывать активные процессы для entity | ✅ |
+| 3.5 | BpmnEditor для создания процессов | ✅ |
 
-### Фаза 6: Документация (2 дня)
+**Реализовано сверх плана:**
+- BPMN редактор с properties panel
+- Управление триггерами (UI)
+- Inbox для user tasks
+- Страница настроек процессов в workspace
+
+### Фаза 4: Деплой на preprod ✅ DONE
 
 | # | Задача | Статус |
 |---|--------|--------|
-| 6.1 | Обновить ARCHITECTURE.md | ⬜ |
-| 6.2 | Написать инструкцию по созданию процессов | ⬜ |
-| 6.3 | Добавить примеры BPMN процессов | ⬜ |
+| 4.1 | Проверить ресурсы сервера (RAM, Disk) | ✅ 4 CPU, 8 GB RAM |
+| 4.2 | Создать `docker-compose.camunda.yml` | ✅ |
+| 4.3 | Добавить в nginx routing | ✅ |
+| 4.4 | Задеплоить Zeebe на preprod | ✅ |
+| 4.5 | Настроить переменные окружения | ✅ |
+| 4.6 | Проверить интеграцию backend ↔ Zeebe | ✅ |
+
+**Примечание:** Используется lightweight конфигурация (только Zeebe, без Operate/Tasklist UI). Graceful degradation — если Zeebe недоступен, портал работает без BPMN.
+
+### Фаза 5: Heat Maps (Per-Element аналитика) ✅
+
+| # | Задача | Статус |
+|---|--------|--------|
+| 5.1 | Создать ProcessActivityLog entity + миграция | ✅ |
+| 5.2 | Добавить логирование в workers (7 handlers) | ✅ |
+| 5.3 | Реализовать getElementStats в ProcessMiningService | ✅ |
+| 5.4 | Создать endpoint GET /api/bpmn/mining/definitions/:id/element-stats | ✅ |
+| 5.5 | Обновить BpmnHeatMap (per-element overlays, цветовая шкала) | ✅ |
+| 5.6 | Обновить ProcessDetailView (загрузка element stats, боковая панель) | ✅ |
+
+> **Решение:** Вместо Camunda Optimize (требует ~3-4 GB RAM) реализована собственная per-element аналитика через ProcessActivityLog + агрегация данных из user_tasks. Экономия ресурсов сервера при полноценной визуализации.
+
+### Фаза 6: Документация ✅
+
+| # | Задача | Статус |
+|---|--------|--------|
+| 6.1 | Обновить ARCHITECTURE.md | ✅ |
+| 6.2 | Написать инструкцию по созданию процессов | ✅ docs/BPMN_USER_GUIDE.md |
+| 6.3 | Добавить примеры BPMN процессов | ✅ шаблоны в коде |
 
 **Общая оценка: 3-4 недели**
 
@@ -1443,26 +1462,35 @@ ssh youredik@51.250.117.178 "free -h && df -h"
 
 ---
 
-## 12. Следующие шаги
+## 12. Текущее состояние и следующие шаги
 
-### Немедленно (сегодня):
+### Реализовано ✅
 1. [x] Изучить официальный пакет Camunda 8.8
-2. [ ] Запустить локально: `cd camunda-8.8 && docker-compose up -d`
-3. [ ] Открыть Operate: http://localhost:8088 (demo/demo)
-4. [ ] Создать тестовый процесс
+2. [x] Запустить локально (Zeebe gRPC на 26500)
+3. [x] Backend интеграция (BpmnModule, Workers, Triggers, User Tasks, Entity Links)
+4. [x] Frontend интеграция (BpmnEditor, BpmnViewer, Inbox, настройки процессов)
+5. [x] Деплой на preprod (lightweight — только Zeebe)
+6. [x] 7 workers: update-entity-status, send-notification, send-email, log-activity, set-assignee, process-completed, classify-entity
+7. [x] Шаблоны BPMN процессов (hardcoded в bpmn-templates.service.ts)
 
-### На этой неделе:
-5. [ ] Проверить ресурсы сервера preprod
-6. [ ] Решить: Lightweight vs Full Stack
-7. [ ] Начать Backend интеграцию (BpmnModule)
+8. [x] Шаблоны для Сервиса: service-support-v2, claims-management, sla-escalation
+9. [x] Per-element heat map (собственная реализация вместо Optimize)
+10. [x] Инструкция для менеджеров (docs/BPMN_USER_GUIDE.md)
 
-### Вопросы для решения:
-- **Keycloak:** Использовать наш (`new.stankoff.ru`) или Camunda's?
-  - Рекомендация: начать с Basic Auth (demo/demo), позже интегрировать
-- **Web Modeler:** Нужен ли встроенный редактор или достаточно bpmn.js?
-  - Рекомендация: начать с Web Modeler от Camunda (готовое решение)
-- **Optimize (Heat Maps):** Добавлять сразу или позже?
-  - Рекомендация: добавить после стабилизации основного flow
+### Решённые вопросы:
+- **Keycloak:** Используется наш (`new.stankoff.ru`), realm `stankoff-preprod`
+- **Web Modeler:** Не используется, bpmn-js встроен во frontend
+- **Optimize (Heat Maps):** Заменён собственной реализацией (ProcessActivityLog + агрегация), экономия ~3-4 GB RAM
+
+### Архитектура Heat Map:
+- `ProcessActivityLog` entity — логирование выполнения каждого элемента из workers
+- `getElementStats()` в ProcessMiningService — агрегация из activity_logs + user_tasks
+- `BpmnHeatMap` — per-element overlays через bpmn-js (цветовая шкала + бейджи)
+
+### Следующие шаги (при необходимости):
+- [ ] Добавить Timer Events для автоэскалации
+- [ ] Интеграция с DMN для автоматических решений в процессах
+- [ ] Process Instance Migration при обновлении процесса
 
 ---
 
@@ -1487,5 +1515,6 @@ docker-compose down
 ---
 
 **Документ создан:** Claude Code
-**Версия:** 2.0 (обновлён с учётом Camunda 8.8)
+**Версия:** 3.0 (обновлён — фазы 1-4 реализованы)
+**Последнее обновление:** 2026-02-08
 **Артефакты:** `camunda-8.8/` в корне проекта

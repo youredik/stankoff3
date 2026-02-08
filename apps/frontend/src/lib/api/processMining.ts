@@ -23,6 +23,21 @@ export interface TimeAnalysis {
   trendLine: { date: string; instances: number; avgDuration: number }[];
 }
 
+export interface ElementStatItem {
+  elementId: string;
+  elementType: string;
+  executionCount: number;
+  successCount: number;
+  failedCount: number;
+  avgDurationMs: number | null;
+  minDurationMs: number | null;
+  maxDurationMs: number | null;
+}
+
+export interface ElementStats {
+  elements: ElementStatItem[];
+}
+
 export interface WorkspaceProcessStats {
   totalDefinitions: number;
   totalInstances: number;
@@ -67,6 +82,25 @@ export async function getTimeAnalysis(
   return apiClient
     .get<TimeAnalysis>(
       `/bpmn/mining/definitions/${definitionId}/time-analysis${query ? `?${query}` : ''}`
+    )
+    .then((r) => r.data);
+}
+
+/**
+ * Get per-element execution statistics for heat map
+ */
+export async function getElementStats(
+  definitionId: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<ElementStats> {
+  const params = new URLSearchParams();
+  if (startDate) params.set('startDate', startDate.toISOString());
+  if (endDate) params.set('endDate', endDate.toISOString());
+  const query = params.toString();
+  return apiClient
+    .get<ElementStats>(
+      `/bpmn/mining/definitions/${definitionId}/element-stats${query ? `?${query}` : ''}`
     )
     .then((r) => r.data);
 }

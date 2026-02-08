@@ -6,14 +6,31 @@ import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
 import type { ProcessDefinitionStatistics } from '@/types';
+import type { ElementStatItem } from '@/lib/api/processMining';
 
 interface BpmnHeatMapProps {
   xml: string;
   statistics?: ProcessDefinitionStatistics | null;
+  elementStats?: { elements: ElementStatItem[] } | null;
   className?: string;
 }
 
-// CSS for heat map overlays
+function getHeatColor(ratio: number): string {
+  // Green (0) → Yellow (0.5) → Red (1)
+  const r = Math.round(255 * Math.min(1, ratio * 2));
+  const g = Math.round(255 * Math.min(1, (1 - ratio) * 2));
+  return `rgb(${r}, ${g}, 0)`;
+}
+
+function formatDuration(ms: number | null): string {
+  if (ms === null) return '';
+  if (ms < 1000) return `${ms}мс`;
+  if (ms < 60000) return `${Math.round(ms / 1000)}с`;
+  if (ms < 3600000) return `${Math.round(ms / 60000)}м`;
+  return `${(ms / 3600000).toFixed(1)}ч`;
+}
+
+// CSS for fallback heat map markers (process-level stats)
 const heatMapStyles = `
   .bpmn-heat-active .djs-visual > :first-child {
     stroke: #3B82F6 !important;
@@ -27,27 +44,19 @@ const heatMapStyles = `
     stroke: #EF4444 !important;
     stroke-width: 3px !important;
   }
-  .bpmn-heat-high .djs-visual > :first-child {
-    fill: rgba(239, 68, 68, 0.2) !important;
-  }
-  .bpmn-heat-medium .djs-visual > :first-child {
-    fill: rgba(245, 158, 11, 0.2) !important;
-  }
-  .bpmn-heat-low .djs-visual > :first-child {
-    fill: rgba(16, 185, 129, 0.2) !important;
-  }
 `;
 
 export function BpmnHeatMap({
   xml,
   statistics,
+  elementStats,
   className = '',
 }: BpmnHeatMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<BpmnJS | null>(null);
   const [isReady, setIsReady] = useState(false);
 
-  // Inject heat map styles
+  // Inject fallback styles
   useEffect(() => {
     const styleId = 'bpmn-heatmap-styles';
     if (!document.getElementById(styleId)) {
@@ -65,26 +74,20 @@ export function BpmnHeatMap({
     const container = containerRef.current;
     let cancelled = false;
     let retryCount = 0;
-    const maxRetries = 30; // ~500ms max wait time
+    const maxRetries = 30;
 
     const initViewer = () => {
       if (cancelled) return;
 
-      // Wait for container to have dimensions before initializing bpmn-js
       if (!container.offsetWidth || !container.offsetHeight) {
         retryCount++;
         if (retryCount < maxRetries) {
           requestAnimationFrame(initViewer);
-        } else {
-          console.warn('BpmnHeatMap: container has no dimensions after max retries');
         }
         return;
       }
 
-      const viewer = new BpmnJS({
-        container: container,
-      });
-
+      const viewer = new BpmnJS({ container });
       viewerRef.current = viewer;
 
       viewer
@@ -103,7 +106,6 @@ export function BpmnHeatMap({
         });
     };
 
-    // Start initialization on next frame to ensure container is rendered
     requestAnimationFrame(initViewer);
 
     return () => {
@@ -116,52 +118,92 @@ export function BpmnHeatMap({
     };
   }, [xml]);
 
-  // Apply heat map colors based on statistics
+  // Apply per-element heat map overlays
   useEffect(() => {
-    if (!viewerRef.current || !isReady || !statistics) return;
+    if (!viewerRef.current || !isReady) return;
 
-    const canvas = viewerRef.current.get('canvas') as {
-      addMarker: (elementId: string, className: string) => void;
-      removeMarker: (elementId: string, className: string) => void;
+    const overlays = viewerRef.current.get('overlays') as {
+      add: (elementId: string, type: string, config: Record<string, unknown>) => void;
+      remove: (filter: { type: string }) => void;
     };
 
-    const elementRegistry = viewerRef.current.get('elementRegistry') as {
-      getAll: () => Array<{ id: string; type: string }>;
-    };
+    // Clear previous overlays
+    try {
+      overlays.remove({ type: 'heatmap-color' });
+      overlays.remove({ type: 'heatmap-badge' });
+    } catch {
+      // overlays may not exist yet
+    }
 
-    // Get all elements
-    const elements = elementRegistry.getAll();
+    if (elementStats && elementStats.elements.length > 0) {
+      // Per-element mode
+      const maxCount = Math.max(...elementStats.elements.map((e) => e.executionCount), 1);
 
-    // Simple visualization based on process statistics
-    // In a real implementation, we'd have per-element statistics
-    elements.forEach((element) => {
-      // Only process flow nodes (not connections)
-      if (
-        element.type.includes('Task') ||
-        element.type.includes('Gateway') ||
-        element.type.includes('Event')
-      ) {
-        // Show active processes
-        if (statistics.active > 0) {
-          // Highlight start events for active instances
-          if (element.type.includes('StartEvent')) {
-            canvas.addMarker(element.id, 'bpmn-heat-active');
-          }
-        }
+      for (const el of elementStats.elements) {
+        const ratio = el.executionCount / maxCount;
+        const color = getHeatColor(ratio);
+        const duration = formatDuration(el.avgDurationMs);
+        const successRate =
+          el.executionCount > 0
+            ? Math.round((el.successCount / el.executionCount) * 100)
+            : 100;
 
-        // Show incidents
-        if (statistics.incident > 0 && element.type.includes('Task')) {
-          // In real implementation, we'd know which tasks have incidents
-          canvas.addMarker(element.id, 'bpmn-heat-medium');
-        }
+        try {
+          // Color overlay
+          overlays.add(el.elementId, 'heatmap-color', {
+            position: { top: -4, left: -4 },
+            html: `<div style="
+              position:absolute; width:calc(100% + 8px); height:calc(100% + 8px);
+              background:${color}; opacity:0.25; border-radius:6px; pointer-events:none;
+            "></div>`,
+          });
 
-        // Show completed
-        if (statistics.completed > 0 && element.type.includes('EndEvent')) {
-          canvas.addMarker(element.id, 'bpmn-heat-completed');
+          // Badge with count + duration
+          const badgeText = duration
+            ? `${el.executionCount} | ${duration}`
+            : `${el.executionCount}`;
+          const badgeBg = successRate < 90 ? '#EF4444' : '#374151';
+
+          overlays.add(el.elementId, 'heatmap-badge', {
+            position: { bottom: -2, right: -2 },
+            html: `<div style="
+              background:${badgeBg}; color:white; padding:1px 5px;
+              border-radius:8px; font-size:10px; font-weight:600;
+              white-space:nowrap; line-height:16px; pointer-events:auto;
+            " title="Выполнений: ${el.executionCount}\nСреднее время: ${duration || '—'}\nУспех: ${successRate}%">${badgeText}</div>`,
+          });
+        } catch {
+          // Element may not be visible in diagram
         }
       }
-    });
-  }, [statistics, isReady]);
+    } else if (statistics) {
+      // Fallback: process-level markers
+      const canvas = viewerRef.current.get('canvas') as {
+        addMarker: (elementId: string, className: string) => void;
+      };
+      const elementRegistry = viewerRef.current.get('elementRegistry') as {
+        getAll: () => Array<{ id: string; type: string }>;
+      };
+
+      const elements = elementRegistry.getAll();
+      elements.forEach((element) => {
+        if (
+          element.type.includes('Task') ||
+          element.type.includes('Gateway') ||
+          element.type.includes('Event')
+        ) {
+          if (statistics.active > 0 && element.type.includes('StartEvent')) {
+            canvas.addMarker(element.id, 'bpmn-heat-active');
+          }
+          if (statistics.completed > 0 && element.type.includes('EndEvent')) {
+            canvas.addMarker(element.id, 'bpmn-heat-completed');
+          }
+        }
+      });
+    }
+  }, [elementStats, statistics, isReady]);
+
+  const hasElementData = elementStats && elementStats.elements.length > 0;
 
   return (
     <div className={`relative ${className}`}>
@@ -171,27 +213,48 @@ export function BpmnHeatMap({
       />
 
       {/* Legend */}
-      {statistics && (
+      {(hasElementData || statistics) && (
         <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 shadow-lg">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase">
             Легенда
           </p>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-4 h-4 rounded border-2 border-blue-500" />
-              <span className="text-gray-700 dark:text-gray-300">Активные ({statistics.active})</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-4 h-4 rounded border-2 border-green-500" />
-              <span className="text-gray-700 dark:text-gray-300">Завершены ({statistics.completed})</span>
-            </div>
-            {statistics.incident > 0 && (
+          {hasElementData ? (
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-sm">
-                <div className="w-4 h-4 rounded bg-yellow-200 dark:bg-yellow-900/50" />
-                <span className="text-gray-700 dark:text-gray-300">Требуют внимания ({statistics.incident})</span>
+                <div
+                  className="w-16 h-3 rounded"
+                  style={{
+                    background:
+                      'linear-gradient(to right, rgb(0,255,0), rgb(255,255,0), rgb(255,0,0))',
+                  }}
+                />
+                <span className="text-gray-700 dark:text-gray-300 text-xs">
+                  Частота выполнения
+                </span>
               </div>
-            )}
-          </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="w-3 h-3 rounded-full bg-gray-700" />
+                <span>Бейдж: кол-во | время</span>
+              </div>
+            </div>
+          ) : (
+            statistics && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="w-4 h-4 rounded border-2 border-blue-500" />
+                  <span className="text-gray-700 dark:text-gray-300">
+                    Активные ({statistics.active})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="w-4 h-4 rounded border-2 border-green-500" />
+                  <span className="text-gray-700 dark:text-gray-300">
+                    Завершены ({statistics.completed})
+                  </span>
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>

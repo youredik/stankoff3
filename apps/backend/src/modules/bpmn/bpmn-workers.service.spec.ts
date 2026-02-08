@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { ModuleRef } from '@nestjs/core';
 import { BpmnWorkersService } from './bpmn-workers.service';
 import { BpmnService } from './bpmn.service';
@@ -6,7 +7,8 @@ import { EntityService } from '../entity/entity.service';
 import { EmailService } from '../email/email.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { EventsGateway } from '../websocket/events.gateway';
-import { ProcessInstanceStatus } from './entities/process-instance.entity';
+import { ProcessInstance, ProcessInstanceStatus } from './entities/process-instance.entity';
+import { ProcessActivityLog } from './entities/process-activity-log.entity';
 
 // Тип для обработчика задач Zeebe
 type ZeebeJobHandler = (job: Record<string, unknown>) => Promise<void>;
@@ -20,6 +22,8 @@ describe('BpmnWorkersService', () => {
   let eventsGateway: any;
   let mockZeebeClient: any;
   let registeredWorkers: Map<string, ZeebeJobHandler>;
+  let mockActivityLogRepo: any;
+  let mockProcessInstanceRepo: any;
 
   beforeEach(async () => {
     registeredWorkers = new Map();
@@ -51,6 +55,17 @@ describe('BpmnWorkersService', () => {
       emitEntityUpdated: jest.fn(),
     };
 
+    mockActivityLogRepo = {
+      save: jest.fn().mockResolvedValue({}),
+    };
+
+    mockProcessInstanceRepo = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 'instance-uuid-1',
+        processDefinitionId: 'def-uuid-1',
+      }),
+    };
+
     const mockModuleRef = {
       get: jest.fn((type) => {
         if (type === EntityService) return mockEntityService;
@@ -66,6 +81,8 @@ describe('BpmnWorkersService', () => {
         BpmnWorkersService,
         { provide: ModuleRef, useValue: mockModuleRef },
         { provide: BpmnService, useValue: mockBpmnService },
+        { provide: getRepositoryToken(ProcessActivityLog), useValue: mockActivityLogRepo },
+        { provide: getRepositoryToken(ProcessInstance), useValue: mockProcessInstanceRepo },
       ],
     }).compile();
 
@@ -373,6 +390,187 @@ describe('BpmnWorkersService', () => {
     });
   });
 
+  describe('logElementExecution', () => {
+    it('должен создать запись в activity log', async () => {
+      const job = {
+        processInstanceKey: '12345',
+        elementId: 'Task_UpdateStatus',
+        type: 'update-entity-status',
+      };
+
+      await service.logElementExecution(job, 'success', Date.now() - 100);
+
+      expect(mockProcessInstanceRepo.findOne).toHaveBeenCalledWith({
+        where: { processInstanceKey: '12345' },
+        select: ['id', 'processDefinitionId'],
+      });
+      expect(mockActivityLogRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          processInstanceId: 'instance-uuid-1',
+          processDefinitionId: 'def-uuid-1',
+          elementId: 'Task_UpdateStatus',
+          elementType: 'serviceTask',
+          status: 'success',
+          workerType: 'update-entity-status',
+        }),
+      );
+    });
+
+    it('должен использовать кэш при повторном вызове для того же processInstanceKey', async () => {
+      const job = {
+        processInstanceKey: '12345',
+        elementId: 'Task_A',
+        type: 'log-activity',
+      };
+
+      await service.logElementExecution(job, 'success', Date.now());
+      await service.logElementExecution(
+        { ...job, elementId: 'Task_B' },
+        'success',
+        Date.now(),
+      );
+
+      // findOne вызывается только один раз (второй раз берётся из кэша)
+      expect(mockProcessInstanceRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(mockActivityLogRepo.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('должен пропустить логирование если elementId отсутствует', async () => {
+      const job = {
+        processInstanceKey: '12345',
+        // elementId отсутствует
+      };
+
+      await service.logElementExecution(job, 'success', Date.now());
+
+      expect(mockProcessInstanceRepo.findOne).not.toHaveBeenCalled();
+      expect(mockActivityLogRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('должен пропустить логирование если process instance не найден', async () => {
+      mockProcessInstanceRepo.findOne.mockResolvedValue(null);
+
+      const job = {
+        processInstanceKey: '99999',
+        elementId: 'Task_Unknown',
+        type: 'send-email',
+      };
+
+      await service.logElementExecution(job, 'success', Date.now());
+
+      expect(mockActivityLogRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('не должен ломать поток при ошибке сохранения', async () => {
+      mockActivityLogRepo.save.mockRejectedValue(new Error('DB write error'));
+
+      const job = {
+        processInstanceKey: '12345',
+        elementId: 'Task_Failing',
+        type: 'send-email',
+      };
+
+      // Не должен выбрасывать ошибку
+      await expect(
+        service.logElementExecution(job, 'success', Date.now()),
+      ).resolves.toBeUndefined();
+    });
+
+    it('должен записать статус failed при ошибке в worker', async () => {
+      const job = {
+        processInstanceKey: '12345',
+        elementId: 'Task_Error',
+        type: 'update-entity-status',
+      };
+
+      await service.logElementExecution(job, 'failed', Date.now() - 200);
+
+      expect(mockActivityLogRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'failed',
+          elementId: 'Task_Error',
+        }),
+      );
+    });
+  });
+
+  describe('workers вызывают logElementExecution', () => {
+    it('update-entity-status вызывает логирование при успехе', async () => {
+      const logSpy = jest.spyOn(service, 'logElementExecution').mockResolvedValue();
+      const handler = registeredWorkers.get('update-entity-status')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1', newStatus: 'in_progress' },
+        processInstanceKey: '12345',
+        elementId: 'Task_Update',
+        type: 'update-entity-status',
+        complete: jest.fn().mockReturnValue({}),
+        fail: jest.fn(),
+      };
+
+      await handler(mockJob);
+
+      expect(logSpy).toHaveBeenCalledWith(mockJob, 'success', expect.any(Number));
+      logSpy.mockRestore();
+    });
+
+    it('send-email вызывает логирование при ошибке', async () => {
+      emailService.send.mockRejectedValue(new Error('SMTP error'));
+      const logSpy = jest.spyOn(service, 'logElementExecution').mockResolvedValue();
+      const handler = registeredWorkers.get('send-email')!;
+      const mockJob = {
+        variables: { to: 'test@example.com', subject: 'Test', body: 'Body' },
+        processInstanceKey: '12345',
+        elementId: 'Task_Email',
+        type: 'send-email',
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(logSpy).toHaveBeenCalledWith(mockJob, 'failed', expect.any(Number));
+      logSpy.mockRestore();
+    });
+
+    it('process-completed вызывает логирование', async () => {
+      const logSpy = jest.spyOn(service, 'logElementExecution').mockResolvedValue();
+      const handler = registeredWorkers.get('process-completed')!;
+      const mockJob = {
+        processInstanceKey: 123456789,
+        elementId: 'EndEvent_1',
+        type: 'process-completed',
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(logSpy).toHaveBeenCalledWith(mockJob, 'success', expect.any(Number));
+      logSpy.mockRestore();
+    });
+
+    it('ошибка логирования не ломает worker', async () => {
+      // Мокаем save чтобы бросал ошибку — logElementExecution поймает её внутренним try/catch
+      mockActivityLogRepo.save.mockRejectedValue(new Error('DB write error'));
+      // Сбрасываем кэш чтобы findOne вызывался
+      (service as any).instanceCache.clear();
+
+      const handler = registeredWorkers.get('send-notification')!;
+      const mockJob = {
+        variables: { userId: 'user-1', message: 'Test' },
+        processInstanceKey: '12345',
+        elementId: 'Task_Notify',
+        type: 'send-notification',
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      // Worker должен завершиться успешно несмотря на ошибку логирования
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith({ notificationSent: true });
+      // Восстанавливаем
+      mockActivityLogRepo.save.mockResolvedValue({});
+    });
+  });
+
   describe('onModuleInit - service loading errors', () => {
     it('должен обработать отсутствие сервисов', async () => {
       const mockModuleRefWithErrors = {
@@ -386,6 +584,8 @@ describe('BpmnWorkersService', () => {
           BpmnWorkersService,
           { provide: ModuleRef, useValue: mockModuleRefWithErrors },
           { provide: BpmnService, useValue: { updateInstanceStatus: jest.fn() } },
+          { provide: getRepositoryToken(ProcessActivityLog), useValue: { save: jest.fn() } },
+          { provide: getRepositoryToken(ProcessInstance), useValue: { findOne: jest.fn() } },
         ],
       }).compile();
 
@@ -410,6 +610,8 @@ describe('BpmnWorkersService', () => {
             },
           },
           { provide: BpmnService, useValue: { updateInstanceStatus: jest.fn() } },
+          { provide: getRepositoryToken(ProcessActivityLog), useValue: { save: jest.fn() } },
+          { provide: getRepositoryToken(ProcessInstance), useValue: { findOne: jest.fn() } },
         ],
       }).compile();
 

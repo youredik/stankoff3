@@ -11,6 +11,7 @@ import { UserTask, UserTaskComment } from './entities/user-task.entity';
 import { EntityLink } from './entities/entity-link.entity';
 import { UserGroup } from './entities/user-group.entity';
 import { FormDefinition } from './entities/form-definition.entity';
+import { ProcessActivityLog } from './entities/process-activity-log.entity';
 import { TriggersService } from './triggers/triggers.service';
 import { CronTriggerScheduler } from './triggers/cron-trigger.scheduler';
 import { TriggersController, WebhookTriggersController } from './triggers/triggers.controller';
@@ -40,6 +41,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
       EntityLink,
       UserGroup,
       FormDefinition,
+      ProcessActivityLog,
     ]),
     // Import modules for workers (use forwardRef to avoid circular dependencies)
     forwardRef(() => EntityModule),

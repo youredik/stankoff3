@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
-import { ProcessMiningService, ProcessMiningStats, TimeAnalysis } from './process-mining.service';
+import { ProcessMiningService, ProcessMiningStats, TimeAnalysis, ElementStats } from './process-mining.service';
 
 @Controller('bpmn/mining')
 export class ProcessMiningController {
@@ -31,6 +31,20 @@ export class ProcessMiningController {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
     return this.miningService.getTimeAnalysis(definitionId, start, end);
+  }
+
+  /**
+   * Get per-element execution statistics for heat map
+   */
+  @Get('definitions/:id/element-stats')
+  async getElementStats(
+    @Param('id', ParseUUIDPipe) definitionId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ): Promise<ElementStats> {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return this.miningService.getElementStats(definitionId, start, end);
   }
 
   /**

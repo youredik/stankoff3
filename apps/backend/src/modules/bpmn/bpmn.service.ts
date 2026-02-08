@@ -87,7 +87,12 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
 
       this.zeebeClient = this.camunda.getZeebeGrpcApiClient();
 
-      const topology = await this.zeebeClient.topology();
+      const topology = await Promise.race([
+        this.zeebeClient.topology(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Zeebe connection timeout (10s)')), 10000),
+        ),
+      ]);
       this.isConnected = true;
       this.reconnectAttempts = 0;
 
@@ -150,7 +155,12 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const topology = await this.zeebeClient.topology();
+      const topology = await Promise.race([
+        this.zeebeClient.topology(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Zeebe health check timeout')), 5000),
+        ),
+      ]);
       return {
         connected: true,
         brokers: topology.brokers.length,

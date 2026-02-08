@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Edit, Upload, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Edit, Upload, BarChart3, Zap, Clock } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { ProcessStatisticsCard } from './ProcessStatisticsCard';
 import { bpmnApi } from '@/lib/api/bpmn';
+import { getElementStats, type ElementStats, type ElementStatItem } from '@/lib/api/processMining';
 import type { ProcessDefinition, ProcessDefinitionStatistics } from '@/types';
 
 // Dynamic imports for browser-only components
@@ -26,6 +27,14 @@ interface ProcessDetailViewProps {
   canDeploy?: boolean;
 }
 
+function formatDurationMs(ms: number | null): string {
+  if (ms === null) return '—';
+  if (ms < 1000) return `${ms}мс`;
+  if (ms < 60000) return `${Math.round(ms / 1000)}с`;
+  if (ms < 3600000) return `${Math.round(ms / 60000)}м`;
+  return `${(ms / 3600000).toFixed(1)}ч`;
+}
+
 export function ProcessDetailView({
   definition,
   onBack,
@@ -35,12 +44,14 @@ export function ProcessDetailView({
   canDeploy = true,
 }: ProcessDetailViewProps) {
   const [statistics, setStatistics] = useState<ProcessDefinitionStatistics | null>(null);
+  const [elementStatsData, setElementStatsData] = useState<ElementStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
-  // Load statistics
+  // Load statistics and element stats in parallel
   useEffect(() => {
     if (!definition.deployedKey) {
       setStatistics(null);
+      setElementStatsData(null);
       setIsLoadingStats(false);
       return;
     }
@@ -48,11 +59,14 @@ export function ProcessDetailView({
     const loadStats = async () => {
       setIsLoadingStats(true);
       try {
-        const stats = await bpmnApi.getDefinitionStatistics(definition.id);
+        const [stats, elStats] = await Promise.all([
+          bpmnApi.getDefinitionStatistics(definition.id).catch(() => null),
+          getElementStats(definition.id).catch(() => null),
+        ]);
         setStatistics(stats);
+        setElementStatsData(elStats);
       } catch (err) {
         console.error('Failed to load statistics:', err);
-        setStatistics(null);
       } finally {
         setIsLoadingStats(false);
       }
@@ -60,6 +74,16 @@ export function ProcessDetailView({
 
     loadStats();
   }, [definition.id, definition.deployedKey]);
+
+  // Top elements by execution count
+  const topByVolume = elementStatsData?.elements.slice(0, 5) ?? [];
+  // Top elements by duration (sorted separately)
+  const topByDuration = elementStatsData
+    ? [...elementStatsData.elements]
+        .filter((e) => e.avgDurationMs !== null)
+        .sort((a, b) => (b.avgDurationMs ?? 0) - (a.avgDurationMs ?? 0))
+        .slice(0, 5)
+    : [];
 
   return (
     <div className="flex flex-col h-full">
@@ -123,6 +147,7 @@ export function ProcessDetailView({
           <BpmnHeatMap
             xml={definition.bpmnXml}
             statistics={statistics}
+            elementStats={elementStatsData}
             className="h-full"
           />
         </div>
@@ -146,6 +171,54 @@ export function ProcessDetailView({
               <p className="text-gray-500 dark:text-gray-400 text-sm">
                 Разверните процесс, чтобы увидеть статистику
               </p>
+            </div>
+          )}
+
+          {/* Top elements by volume */}
+          {topByVolume.length > 0 && (
+            <div className="mt-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  Самые активные
+                </h4>
+              </div>
+              <div className="space-y-2">
+                {topByVolume.map((el) => (
+                  <div key={el.elementId} className="flex justify-between items-center text-sm">
+                    <span className="text-gray-700 dark:text-gray-300 truncate max-w-[160px]" title={el.elementId}>
+                      {el.elementId}
+                    </span>
+                    <span className="font-mono text-gray-900 dark:text-white">
+                      {el.executionCount}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top elements by duration */}
+          {topByDuration.length > 0 && (
+            <div className="mt-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Clock className="w-4 h-4 text-blue-500" />
+                <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  Самые долгие
+                </h4>
+              </div>
+              <div className="space-y-2">
+                {topByDuration.map((el) => (
+                  <div key={el.elementId} className="flex justify-between items-center text-sm">
+                    <span className="text-gray-700 dark:text-gray-300 truncate max-w-[160px]" title={el.elementId}>
+                      {el.elementId}
+                    </span>
+                    <span className="font-mono text-gray-900 dark:text-white">
+                      {formatDurationMs(el.avgDurationMs)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

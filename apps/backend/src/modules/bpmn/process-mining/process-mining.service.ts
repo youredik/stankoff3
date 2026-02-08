@@ -6,6 +6,8 @@ import {
   ProcessInstanceStatus,
 } from '../entities/process-instance.entity';
 import { ProcessDefinition } from '../entities/process-definition.entity';
+import { ProcessActivityLog } from '../entities/process-activity-log.entity';
+import { UserTask } from '../entities/user-task.entity';
 
 // Типы для Process Mining аналитики
 export interface ProcessMiningStats {
@@ -54,6 +56,21 @@ export interface TimeAnalysis {
   trendLine: { date: string; instances: number; avgDuration: number }[];
 }
 
+export interface ElementStatItem {
+  elementId: string;
+  elementType: string;
+  executionCount: number;
+  successCount: number;
+  failedCount: number;
+  avgDurationMs: number | null;
+  minDurationMs: number | null;
+  maxDurationMs: number | null;
+}
+
+export interface ElementStats {
+  elements: ElementStatItem[];
+}
+
 export interface SlaComplianceStats {
   totalWithSla: number;
   metOnTime: number;
@@ -72,6 +89,10 @@ export class ProcessMiningService {
     private instanceRepository: Repository<ProcessInstance>,
     @InjectRepository(ProcessDefinition)
     private definitionRepository: Repository<ProcessDefinition>,
+    @InjectRepository(ProcessActivityLog)
+    private activityLogRepository: Repository<ProcessActivityLog>,
+    @InjectRepository(UserTask)
+    private userTaskRepository: Repository<UserTask>,
   ) {}
 
   /**
@@ -281,19 +302,33 @@ export class ProcessMiningService {
       where: { workspaceId },
     });
 
+    if (definitions.length === 0) {
+      return {
+        totalDefinitions: 0,
+        totalInstances: 0,
+        avgCompletionRate: 0,
+        avgDurationMinutes: 0,
+        topProcessesByVolume: [],
+        topProcessesByDuration: [],
+        statusDistribution: [],
+      };
+    }
+
     const definitionIds = definitions.map((d) => d.id);
 
-    const instances = await this.instanceRepository
+    const qb = this.instanceRepository
       .createQueryBuilder('instance')
-      .where('instance.processDefinitionId IN (:...ids)', { ids: definitionIds.length > 0 ? definitionIds : [''] })
-      .andWhere(
-        startDate && endDate
-          ? 'instance.startedAt BETWEEN :start AND :end'
-          : '1=1',
-        { start: startDate, end: endDate },
-      )
-      .leftJoinAndSelect('instance.processDefinition', 'definition')
-      .getMany();
+      .where('instance.processDefinitionId IN (:...ids)', { ids: definitionIds })
+      .leftJoinAndSelect('instance.processDefinition', 'definition');
+
+    if (startDate && endDate) {
+      qb.andWhere('instance.startedAt BETWEEN :start AND :end', {
+        start: startDate,
+        end: endDate,
+      });
+    }
+
+    const instances = await qb.getMany();
 
     // Calculate stats
     const totalInstances = instances.length;
@@ -466,5 +501,130 @@ export class ProcessMiningService {
             : 0,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * Get per-element execution statistics for heat map visualization.
+   * Combines data from process_activity_logs (service tasks) and user_tasks.
+   */
+  async getElementStats(
+    definitionId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<ElementStats> {
+    // 1. Get service task stats from activity logs
+    const activityQb = this.activityLogRepository
+      .createQueryBuilder('log')
+      .select('log.elementId', 'elementId')
+      .addSelect('log.elementType', 'elementType')
+      .addSelect('COUNT(*)::int', 'executionCount')
+      .addSelect('COUNT(*) FILTER (WHERE log.status = \'success\')::int', 'successCount')
+      .addSelect('COUNT(*) FILTER (WHERE log.status = \'failed\')::int', 'failedCount')
+      .addSelect('AVG(log.durationMs)::int', 'avgDurationMs')
+      .addSelect('MIN(log.durationMs)::int', 'minDurationMs')
+      .addSelect('MAX(log.durationMs)::int', 'maxDurationMs')
+      .where('log.processDefinitionId = :definitionId', { definitionId })
+      .groupBy('log.elementId')
+      .addGroupBy('log.elementType');
+
+    if (startDate) {
+      activityQb.andWhere('log.startedAt >= :startDate', { startDate });
+    }
+    if (endDate) {
+      activityQb.andWhere('log.startedAt <= :endDate', { endDate });
+    }
+
+    const activityStats: ElementStatItem[] = await activityQb.getRawMany();
+
+    // 2. Get user task stats
+    // Find processInstanceIds for this definition
+    const instanceQb = this.instanceRepository
+      .createQueryBuilder('pi')
+      .select('pi.id')
+      .where('pi.processDefinitionId = :definitionId', { definitionId });
+
+    if (startDate) {
+      instanceQb.andWhere('pi.startedAt >= :startDate', { startDate });
+    }
+    if (endDate) {
+      instanceQb.andWhere('pi.startedAt <= :endDate', { endDate });
+    }
+
+    const userTaskQb = this.userTaskRepository
+      .createQueryBuilder('ut')
+      .select('ut.elementId', 'elementId')
+      .addSelect('\'userTask\'', 'elementType')
+      .addSelect('COUNT(*)::int', 'executionCount')
+      .addSelect('COUNT(*) FILTER (WHERE ut.status = \'completed\')::int', 'successCount')
+      .addSelect('COUNT(*) FILTER (WHERE ut.status IN (\'cancelled\', \'expired\'))::int', 'failedCount')
+      .addSelect(
+        'AVG(EXTRACT(EPOCH FROM (COALESCE(ut.completedAt, ut.updatedAt) - ut.createdAt)) * 1000)::int',
+        'avgDurationMs',
+      )
+      .addSelect(
+        'MIN(EXTRACT(EPOCH FROM (COALESCE(ut.completedAt, ut.updatedAt) - ut.createdAt)) * 1000)::int',
+        'minDurationMs',
+      )
+      .addSelect(
+        'MAX(EXTRACT(EPOCH FROM (COALESCE(ut.completedAt, ut.updatedAt) - ut.createdAt)) * 1000)::int',
+        'maxDurationMs',
+      )
+      .where(`ut.processInstanceId IN (${instanceQb.getQuery()})`)
+      .setParameters(instanceQb.getParameters())
+      .groupBy('ut.elementId');
+
+    const userTaskStats: ElementStatItem[] = await userTaskQb.getRawMany();
+
+    // 3. Merge results (activity logs + user tasks)
+    const elementMap = new Map<string, ElementStatItem>();
+
+    for (const stat of activityStats) {
+      elementMap.set(stat.elementId, {
+        elementId: stat.elementId,
+        elementType: stat.elementType,
+        executionCount: Number(stat.executionCount),
+        successCount: Number(stat.successCount),
+        failedCount: Number(stat.failedCount),
+        avgDurationMs: stat.avgDurationMs ? Number(stat.avgDurationMs) : null,
+        minDurationMs: stat.minDurationMs ? Number(stat.minDurationMs) : null,
+        maxDurationMs: stat.maxDurationMs ? Number(stat.maxDurationMs) : null,
+      });
+    }
+
+    for (const stat of userTaskStats) {
+      const existing = elementMap.get(stat.elementId);
+      if (existing) {
+        // Merge: add counts, recalculate averages
+        const totalCount = existing.executionCount + Number(stat.executionCount);
+        existing.avgDurationMs =
+          existing.avgDurationMs !== null && stat.avgDurationMs !== null
+            ? Math.round(
+                (existing.avgDurationMs * existing.executionCount +
+                  Number(stat.avgDurationMs) * Number(stat.executionCount)) /
+                  totalCount,
+              )
+            : existing.avgDurationMs ?? (stat.avgDurationMs ? Number(stat.avgDurationMs) : null);
+        existing.executionCount = totalCount;
+        existing.successCount += Number(stat.successCount);
+        existing.failedCount += Number(stat.failedCount);
+      } else {
+        elementMap.set(stat.elementId, {
+          elementId: stat.elementId,
+          elementType: 'userTask',
+          executionCount: Number(stat.executionCount),
+          successCount: Number(stat.successCount),
+          failedCount: Number(stat.failedCount),
+          avgDurationMs: stat.avgDurationMs ? Number(stat.avgDurationMs) : null,
+          minDurationMs: stat.minDurationMs ? Number(stat.minDurationMs) : null,
+          maxDurationMs: stat.maxDurationMs ? Number(stat.maxDurationMs) : null,
+        });
+      }
+    }
+
+    return {
+      elements: Array.from(elementMap.values()).sort(
+        (a, b) => b.executionCount - a.executionCount,
+      ),
+    };
   }
 }
