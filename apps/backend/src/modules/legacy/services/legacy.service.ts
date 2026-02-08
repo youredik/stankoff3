@@ -606,6 +606,106 @@ export class LegacyService implements OnModuleInit {
     });
   }
 
+  // ==================== MIGRATION HELPERS ====================
+
+  /**
+   * Получить все заявки батчем (для миграции)
+   * В отличие от getRequestsForIndexing, возвращает ВСЕ заявки (не только закрытые)
+   */
+  async getAllRequestsBatch(
+    offset: number,
+    limit: number,
+  ): Promise<LegacyRequest[]> {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
+    return this.requestRepository
+      .createQueryBuilder('request')
+      .orderBy('request.RID', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Общее количество всех заявок
+   */
+  async getRequestsCount(): Promise<number> {
+    if (!this.isAvailable()) {
+      return 0;
+    }
+
+    return this.requestRepository.count();
+  }
+
+  /**
+   * Batch-получение клиентов по массиву ID
+   */
+  async getCustomersByIds(
+    customerIds: number[],
+  ): Promise<Map<number, LegacyCustomer>> {
+    if (!this.isAvailable() || customerIds.length === 0) {
+      return new Map();
+    }
+
+    const customers = await this.customerRepository
+      .createQueryBuilder('customer')
+      .where('customer.customerID IN (:...customerIds)', { customerIds })
+      .getMany();
+
+    return new Map(customers.map((c) => [c.id, c]));
+  }
+
+  /**
+   * Получить новые/обновлённые заявки с указанной даты (для синхронизации)
+   */
+  async getNewRequestsSince(
+    since: Date,
+    limit: number = 500,
+  ): Promise<LegacyRequest[]> {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
+    return this.requestRepository
+      .createQueryBuilder('request')
+      .where('request.update_date > :since', { since })
+      .orderBy('request.update_date', 'ASC')
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Получить все записи менеджеров (для построения маппинга пользователей)
+   */
+  async getAllManagers(): Promise<LegacyManager[]> {
+    if (!this.isAvailable()) {
+      return [];
+    }
+
+    return this.managerRepository.find();
+  }
+
+  /**
+   * Получить новые ответы для заявок с указанной даты (для синхронизации)
+   */
+  async getNewAnswersSince(
+    since: Date,
+    requestIds: number[],
+  ): Promise<LegacyAnswer[]> {
+    if (!this.isAvailable() || requestIds.length === 0) {
+      return [];
+    }
+
+    return this.answerRepository
+      .createQueryBuilder('answer')
+      .where('answer.RID IN (:...requestIds)', { requestIds })
+      .andWhere('answer.add_date > :since', { since })
+      .orderBy('answer.add_date', 'ASC')
+      .getMany();
+  }
+
   // ==================== RICH DATA FOR AI ====================
 
   /**

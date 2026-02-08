@@ -844,7 +844,8 @@ bpmn/
 │   └── send-message.dto.ts
 └── entities/
     ├── process-definition.entity.ts
-    └── process-instance.entity.ts
+    ├── process-instance.entity.ts
+    └── process-activity-log.entity.ts  # Логирование выполнения элементов (heat map)
 ```
 
 ```typescript
@@ -874,6 +875,19 @@ interface ProcessInstance {
   endedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface ProcessActivityLog {
+  id: string;
+  processInstanceId: string;  // FK → ProcessInstance
+  processDefinitionId: string; // FK → ProcessDefinition (быстрая агрегация)
+  elementId: string;          // BPMN element ID (Task_UpdateStatus и т.д.)
+  elementType: string;        // serviceTask, userTask, etc.
+  status: 'success' | 'failed';
+  startedAt: Date;
+  completedAt?: Date;
+  durationMs?: number;
+  workerType?: string;        // Task type из Zeebe
 }
 ```
 
@@ -1073,25 +1087,31 @@ interface RuleCondition {
 | GET | /api/dmn/evaluations/target/:type/:id | Вычисления для цели |
 
 **LegacyModule**
-READ-ONLY интеграция со старой CRM (MariaDB). Подробная документация: [LEGACY_INTEGRATION.md](./LEGACY_INTEGRATION.md)
+Интеграция со старой CRM (MariaDB): read-only доступ, миграция данных, синхронизация. Подробная документация: [LEGACY_INTEGRATION.md](./LEGACY_INTEGRATION.md)
 
 ```
 legacy/
-├── legacy.module.ts              # Отдельный DataSource для MySQL
-├── legacy.controller.ts          # REST API для чтения legacy данных
-├── legacy-import.controller.ts   # ⭐ REST API для импорта в Keycloak
-├── legacy-database.config.ts     # Конфигурация MySQL
-├── entities/                     # TypeORM entities для legacy таблиц
-│   ├── legacy-customer.entity.ts   # SS_customers (286K записей)
-│   ├── legacy-product.entity.ts    # SS_products (27K записей)
-│   ├── legacy-category.entity.ts   # SS_categories (657 активных)
-│   ├── legacy-counterparty.entity.ts # counterparty (27K записей)
-│   ├── legacy-manager.entity.ts    # ⭐ manager (141 сотрудников)
-│   └── legacy-department.entity.ts # ⭐ department (13 отделов)
+├── legacy.module.ts                    # Отдельный DataSource для MySQL
+├── legacy.controller.ts                # REST API для чтения legacy данных
+├── legacy-import.controller.ts         # REST API для импорта в Keycloak
+├── legacy-migration.controller.ts      # ⭐ REST API миграции данных
+├── legacy-database.config.ts           # Конфигурация MySQL
+├── entities/                           # TypeORM entities для legacy таблиц
+│   ├── legacy-customer.entity.ts       # SS_customers (286K записей)
+│   ├── legacy-product.entity.ts        # SS_products (27K записей)
+│   ├── legacy-category.entity.ts       # SS_categories (657 активных)
+│   ├── legacy-counterparty.entity.ts   # counterparty (27K записей)
+│   ├── legacy-manager.entity.ts        # manager (141 сотрудников)
+│   ├── legacy-department.entity.ts     # department (13 отделов)
+│   └── legacy-migration-log.entity.ts  # ⭐ Лог миграции (PostgreSQL!)
 ├── dto/
-│   └── legacy-employee.dto.ts      # ⭐ DTO для сотрудников
+│   ├── legacy-employee.dto.ts          # DTO для сотрудников
+│   └── legacy-migration.dto.ts         # ⭐ DTO для миграции
 └── services/
-    └── legacy.service.ts         # Graceful degradation при недоступности БД
+    ├── legacy.service.ts               # Read-only + batch методы
+    ├── legacy-url.service.ts           # Генерация URL legacy CRM
+    ├── legacy-migration.service.ts     # ⭐ Сервис миграции данных
+    └── legacy-sync.service.ts          # ⭐ Cron-синхронизация (каждые 5 мин)
 ```
 
 **API эндпоинты Legacy:**
@@ -1118,6 +1138,26 @@ legacy/
 | POST | /api/legacy/import/employees | Импорт сотрудников (dryRun, skipExisting) |
 | POST | /api/legacy/import/employees/test | Тест импорта одного сотрудника |
 | POST | /api/legacy/import/employees/export-credentials | Импорт + CSV с паролями |
+
+**API миграции данных:**
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | /api/legacy/migration/status | Готовность + прогресс миграции |
+| GET | /api/legacy/migration/preview | Превью (количества, маппинг) |
+| POST | /api/legacy/migration/start | Запуск миграции (batchSize, maxRequests, dryRun) |
+| POST | /api/legacy/migration/stop | Graceful остановка |
+| GET | /api/legacy/migration/progress | Текущий прогресс (JSON) |
+| POST | /api/legacy/migration/validate | Проверка целостности |
+| GET | /api/legacy/migration/log | Записи migration log (status, limit, offset) |
+| POST | /api/legacy/migration/retry-failed | Повтор ошибочных записей |
+
+**API синхронизации:**
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | /api/legacy/sync/status | Статус синхронизации |
+| POST | /api/legacy/sync/enable | Включить cron-синхронизацию |
+| POST | /api/legacy/sync/disable | Выключить cron-синхронизацию |
+| POST | /api/legacy/sync/run-now | Запустить синхронизацию вручную |
 
 **Frontend компоненты Legacy:**
 
@@ -1364,9 +1404,10 @@ geocoding/
 | GET | /api/bpmn/templates/category/:category | Шаблоны по категории |
 | GET | /api/bpmn/templates/categories | Список категорий с количеством |
 | GET | /api/bpmn/templates/search?q=:query | Поиск шаблонов по названию/тегам |
-| GET | /api/bpmn/mining/process/:definitionId | Process Mining статистика процесса |
-| GET | /api/bpmn/mining/process/:definitionId/time | Анализ времени (дни недели, часы) |
-| GET | /api/bpmn/mining/workspace/:workspaceId | Статистика всех процессов workspace |
+| GET | /api/bpmn/mining/definitions/:id/stats | Process Mining статистика процесса |
+| GET | /api/bpmn/mining/definitions/:id/time-analysis | Анализ времени (дни недели, часы) |
+| GET | /api/bpmn/mining/definitions/:id/element-stats | Per-element статистика для heat map |
+| GET | /api/bpmn/mining/workspaces/:workspaceId/stats | Статистика всех процессов workspace |
 | GET | /api/entities/recommendations/assignees/:entityId | ML-рекомендации исполнителей |
 | POST | /api/entities/recommendations/priority | Рекомендация приоритета |
 | POST | /api/entities/recommendations/response-time | Оценка времени ответа |
@@ -2121,7 +2162,7 @@ GitHub Actions workflow (`.github/workflows/ci.yml`):
 
 ### Описание
 
-Process Mining модуль предоставляет статистическую аналитику выполнения бизнес-процессов. Работает на базе исторических данных из ProcessInstance без внешних ML-зависимостей.
+Process Mining модуль предоставляет статистическую аналитику выполнения бизнес-процессов. Работает на базе данных из ProcessInstance и ProcessActivityLog без внешних зависимостей (Camunda Optimize не используется).
 
 ### Структура сервиса
 
@@ -2168,8 +2209,27 @@ interface WorkspaceStats {
 }
 ```
 
+**ElementStats (per-element статистика для heat map)**
+```typescript
+interface ElementStats {
+  elements: {
+    elementId: string;           // BPMN element ID
+    elementType: string;         // serviceTask, userTask, etc.
+    executionCount: number;      // Количество выполнений
+    successCount: number;        // Успешных
+    failedCount: number;         // С ошибкой
+    avgDurationMs: number | null; // Среднее время (мс)
+    minDurationMs: number | null;
+    maxDurationMs: number | null;
+  }[];
+}
+```
+
+> Данные агрегируются из двух источников: `process_activity_logs` (service tasks, записываемые workers) и `user_tasks` (user tasks).
+
 ### Применение
 
+- Per-element heat map: визуализация загрузки каждого элемента BPMN процесса
 - Выявление узких мест в процессах
 - Анализ пиковой нагрузки (часы, дни недели)
 - Мониторинг эффективности (completion rate)

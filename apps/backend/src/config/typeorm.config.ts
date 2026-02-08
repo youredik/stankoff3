@@ -1,4 +1,9 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { join } from 'path';
+import * as dotenv from 'dotenv';
+
+// Загружаем .env до чтения process.env (ConfigModule загружается позже)
+dotenv.config({ path: join(__dirname, '../../../../.env') });
 
 // Паттерны для entities основной БД (PostgreSQL)
 // ВАЖНО: legacy entities исключены - они используют отдельный MySQL DataSource
@@ -9,7 +14,7 @@ const entityPatterns = [
   __dirname + '/../modules/automation/*.entity{.ts,.js}',
   __dirname + '/../modules/bpmn/**/*.entity{.ts,.js}',
   __dirname + '/../modules/connectors/*.entity{.ts,.js}',
-  __dirname + '/../modules/dmn/*.entity{.ts,.js}',
+  __dirname + '/../modules/dmn/**/*.entity{.ts,.js}',
   __dirname + '/../modules/email/*.entity{.ts,.js}',
   __dirname + '/../modules/entity/*.entity{.ts,.js}',
   __dirname + '/../modules/health/*.entity{.ts,.js}',
@@ -19,7 +24,10 @@ const entityPatterns = [
   __dirname + '/../modules/sla/**/*.entity{.ts,.js}',
   __dirname + '/../modules/user/*.entity{.ts,.js}',
   __dirname + '/../modules/websocket/*.entity{.ts,.js}',
+  __dirname + '/../modules/onboarding/**/*.entity{.ts,.js}',
   __dirname + '/../modules/workspace/*.entity{.ts,.js}',
+  // Только migration-log (PostgreSQL), остальные legacy entities на MySQL DataSource
+  __dirname + '/../modules/legacy/entities/legacy-migration-log.entity{.ts,.js}',
 ];
 
 export const typeOrmConfig: TypeOrmModuleOptions = {

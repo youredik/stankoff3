@@ -8,3 +8,4 @@ export * from './legacy-request.entity';
 export * from './legacy-answer.entity';
 export * from './legacy-manager.entity';
 export * from './legacy-department.entity';
+export * from './legacy-migration-log.entity';

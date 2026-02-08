@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:18.1-alpine
+    image: pgvector/pgvector:pg17
     container_name: stankoff-postgres
     restart: unless-stopped
     environment:
@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: stankoff_secret_2026
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

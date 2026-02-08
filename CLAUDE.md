@@ -432,6 +432,12 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/bpmn/instances` — запустить процесс
 - `GET /api/bpmn/statistics/definition/:id` — статистика по процессу
 
+**BPMN Process Mining:**
+- `GET /api/bpmn/mining/definitions/:id/stats` — Process Mining статистика
+- `GET /api/bpmn/mining/definitions/:id/time-analysis` — анализ по времени
+- `GET /api/bpmn/mining/definitions/:id/element-stats` — per-element статистика (heat map)
+- `GET /api/bpmn/mining/workspaces/:workspaceId/stats` — статистика workspace
+
 **BPMN Триггеры:**
 - `GET /api/bpmn/triggers?workspaceId=...` — список триггеров
 - `POST /api/bpmn/triggers` — создать триггер
@@ -505,7 +511,7 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 **OG Preview:**
 - `GET /api/og-preview?url=https://...` — получить OG meta-теги страницы (title, description, image, siteName)
 
-**Legacy CRM (Read-Only интеграция с MariaDB):**
+**Legacy CRM (интеграция с MariaDB):**
 - `GET /api/legacy/health` — статус подключения к legacy БД
 - `GET /api/legacy/customers/search?q=текст&limit=10&employeesOnly=false` — поиск клиентов
 - `GET /api/legacy/customers/:id` — получить клиента по ID
@@ -516,6 +522,22 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `GET /api/legacy/counterparties/:id` — получить контрагента по ID
 - `GET /api/legacy/deals?counterpartyId=123&employeeUserId=456` — сделки
 - `GET /api/legacy/deals/:id` — получить сделку по ID
+
+**Legacy Migration (миграция данных из legacy CRM):**
+- `GET /api/legacy/migration/status` — готовность + прогресс миграции
+- `GET /api/legacy/migration/preview` — превью (количества, маппинг сотрудников)
+- `POST /api/legacy/migration/start` — запуск миграции (batchSize, maxRequests, dryRun)
+- `POST /api/legacy/migration/stop` — graceful остановка
+- `GET /api/legacy/migration/progress` — текущий прогресс (JSON)
+- `POST /api/legacy/migration/validate` — проверка целостности после миграции
+- `GET /api/legacy/migration/log?status=failed&limit=20` — записи migration log
+- `POST /api/legacy/migration/retry-failed` — повтор ошибочных записей
+
+**Legacy Sync (синхронизация новых данных):**
+- `GET /api/legacy/sync/status` — статус синхронизации
+- `POST /api/legacy/sync/enable` — включить cron-синхронизацию (каждые 5 мин)
+- `POST /api/legacy/sync/disable` — выключить cron-синхронизацию
+- `POST /api/legacy/sync/run-now` — запустить синхронизацию вручную
 
 **Frontend компоненты Legacy (`components/legacy/`):**
 - `LegacyCustomerPicker` — выбор клиента с поиском и ссылкой на Legacy CRM

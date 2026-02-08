@@ -1,28 +1,37 @@
 import { Module, Logger, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LegacyController } from './legacy.controller';
 import { LegacyImportController } from './legacy-import.controller';
+import { LegacyMigrationController } from './legacy-migration.controller';
 import { LegacyService } from './services/legacy.service';
 import { LegacyUrlService } from './services/legacy-url.service';
+import { LegacyMigrationService } from './services/legacy-migration.service';
+import { LegacySyncService } from './services/legacy-sync.service';
 import { LEGACY_DATA_SOURCE, legacyDatabaseConfig } from './legacy-database.config';
+import { LegacyMigrationLog } from './entities/legacy-migration-log.entity';
+import { User } from '../user/user.entity';
+import { Workspace } from '../workspace/workspace.entity';
 import { AuthModule } from '../auth/auth.module';
 
 /**
  * Модуль интеграции с Legacy CRM (MariaDB/MySQL)
  *
- * Предоставляет READ-ONLY доступ к данным старой системы:
- * - Клиенты (SS_customers)
- * - Товары (SS_products) и категории (SS_categories)
- * - Контрагенты (counterparty)
- * - Сделки (deal)
- * - Обращения (QD_requests)
+ * Предоставляет:
+ * - READ-ONLY доступ к данным старой системы
+ * - Миграция данных из legacy в PostgreSQL
+ * - Синхронизация новых данных (cron)
  *
  * Модуль gracefully деградирует если legacy БД недоступна.
  */
 @Module({
-  imports: [ConfigModule, forwardRef(() => AuthModule)],
-  controllers: [LegacyController, LegacyImportController],
+  imports: [
+    ConfigModule,
+    TypeOrmModule.forFeature([LegacyMigrationLog, User, Workspace]),
+    forwardRef(() => AuthModule),
+  ],
+  controllers: [LegacyController, LegacyImportController, LegacyMigrationController],
   providers: [
     {
       provide: LEGACY_DATA_SOURCE,
@@ -76,6 +85,8 @@ import { AuthModule } from '../auth/auth.module';
     },
     LegacyService,
     LegacyUrlService,
+    LegacyMigrationService,
+    LegacySyncService,
   ],
   exports: [LegacyService, LegacyUrlService, LEGACY_DATA_SOURCE],
 })
