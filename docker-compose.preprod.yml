@@ -152,9 +152,9 @@ services:
         condition: any
         delay: 5s
 
-  # PostgreSQL Database
+  # PostgreSQL Database (with pgvector for AI/RAG)
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       - POSTGRES_DB=${DATABASE_NAME:-stankoff_preprod}
       - POSTGRES_USER=${DATABASE_USER:-postgres}
