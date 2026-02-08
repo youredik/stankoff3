@@ -106,6 +106,29 @@ services:
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
       # Camunda / Zeebe
       - ZEEBE_ADDRESS=${ZEEBE_ADDRESS:-camunda:26500}
+      # Legacy Database (MariaDB - Read-Only)
+      - LEGACY_DB_HOST=${LEGACY_DB_HOST:-}
+      - LEGACY_DB_PORT=${LEGACY_DB_PORT:-3306}
+      - LEGACY_DB_USER=${LEGACY_DB_USER:-}
+      - LEGACY_DB_PASSWORD=${LEGACY_DB_PASSWORD:-}
+      - LEGACY_DB_NAME=${LEGACY_DB_NAME:-stankoff}
+      # AI
+      - AI_ENABLED=${AI_ENABLED:-false}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-large}
+      # Email
+      - SMTP_ENABLED=${SMTP_ENABLED:-false}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Stankoff Portal}
+      # Keycloak Admin
+      - KEYCLOAK_ADMIN_USERNAME=${KEYCLOAK_ADMIN_USERNAME:-}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-}
       # TypeORM
       - TYPEORM_SYNC=${TYPEORM_SYNC:-false}
     volumes:
