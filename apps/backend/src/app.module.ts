@@ -26,7 +26,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { GeocodingModule } from './modules/geocoding/geocoding.module';
 import { SeedService } from './seed.service';
-import { SeedServiceDepartment } from './seed-service-department';
+import { SeedShowcase } from './seed-showcase';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
 import { Comment } from './modules/entity/comment.entity';
@@ -43,6 +43,8 @@ import { ProcessInstance } from './modules/bpmn/entities/process-instance.entity
 import { ProcessTrigger } from './modules/bpmn/entities/process-trigger.entity';
 import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
+import { EntityLink } from './modules/bpmn/entities/entity-link.entity';
+import { ProcessActivityLog } from './modules/bpmn/entities/process-activity-log.entity';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -62,6 +64,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
       DecisionTable,
       ProcessDefinition, ProcessInstance, ProcessTrigger,
       AutomationRule, UserGroup,
+      EntityLink, ProcessActivityLog,
     ]),
 
     WorkspaceModule,
@@ -88,7 +91,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
   ],
   providers: [
     SeedService,
-    SeedServiceDepartment,
+    SeedShowcase,
     // Глобальные guards - порядок важен: сначала JWT, потом Roles
     {
       provide: APP_GUARD,
