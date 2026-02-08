@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+.git
+.github
+docs
+.env*
+*.log
+*.spec.ts
+*.test.ts
+__tests__
+.turbo
+.cache
+logs
+.DS_Store
