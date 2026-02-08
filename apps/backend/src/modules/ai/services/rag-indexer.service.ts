@@ -208,7 +208,7 @@ export class RagIndexerService {
             customerId: request.customerId,
             managerId: request.managerId,
             createdAt: request.createdAt?.toISOString(),
-            closedAt: request.closedAt?.toISOString(),
+            closedAt: request.isClosed ? (request.updatedAt || request.createdAt)?.toISOString() : null,
             chunkIndex: i,
             totalChunks: chunks.length,
             answersCount: answers.length,
@@ -322,44 +322,45 @@ export class RagIndexerService {
     request: LegacyRequest,
     answers: LegacyAnswer[],
   ): {
-    priority: string;
-    priorityLevel: number;
     requestType?: string;
     resolutionTimeHours?: number;
     resolutionTimeDays?: number;
     firstResponseTimeHours?: number;
     responseCount: number;
-    internalResponseCount: number;
+    clientResponseCount: number;
   } {
     const result: {
-      priority: string;
-      priorityLevel: number;
       requestType?: string;
       resolutionTimeHours?: number;
       resolutionTimeDays?: number;
       firstResponseTimeHours?: number;
       responseCount: number;
-      internalResponseCount: number;
+      clientResponseCount: number;
     } = {
-      priority: request.priorityLabel,
-      priorityLevel: request.priority,
       requestType: request.type || undefined,
       responseCount: answers.length,
-      internalResponseCount: answers.filter(a => a.isInternal === 1).length,
+      clientResponseCount: answers.filter(a => a.isClient === 1).length,
     };
 
-    // Расчёт времени решения
-    if (request.createdAt && request.closedAt) {
-      const diffMs = request.closedAt.getTime() - request.createdAt.getTime();
+    // Расчёт времени решения (используем updatedAt как приблизительную дату закрытия)
+    const closedAt = request.isClosed ? (request.updatedAt || request.createdAt) : null;
+    if (request.createdAt && closedAt) {
+      const diffMs = closedAt.getTime() - request.createdAt.getTime();
       result.resolutionTimeHours = Math.round(diffMs / (1000 * 60 * 60));
       result.resolutionTimeDays = Math.round(diffMs / (1000 * 60 * 60 * 24) * 10) / 10;
     }
 
-    // Время первого ответа
-    const firstResponse = answers.find(a => !a.isInternal || a.isInternal !== 1);
-    if (request.createdAt && firstResponse?.createdAt) {
-      const diffMs = firstResponse.createdAt.getTime() - request.createdAt.getTime();
-      result.firstResponseTimeHours = Math.round(diffMs / (1000 * 60 * 60) * 10) / 10;
+    // Время первого ответа (используем firstReactionTime из legacy или ответы)
+    if (request.firstReactionTime) {
+      // firstReactionTime хранится в секундах в legacy БД
+      result.firstResponseTimeHours = Math.round(request.firstReactionTime / 3600 * 10) / 10;
+    } else {
+      // Fallback: ищем первый ответ не от клиента
+      const firstResponse = answers.find(a => a.isClient !== 1);
+      if (request.createdAt && firstResponse?.createdAt) {
+        const diffMs = firstResponse.createdAt.getTime() - request.createdAt.getTime();
+        result.firstResponseTimeHours = Math.round(diffMs / (1000 * 60 * 60) * 10) / 10;
+      }
     }
 
     return result;
@@ -410,12 +411,8 @@ export class RagIndexerService {
       const specialistIds = new Set<number>();
 
       for (const answer of answers) {
-        // Если это не ответ клиента
-        if (answer.customerId && answer.customerId !== clientId) {
-          specialistIds.add(answer.customerId);
-        }
-        // Внутренние ответы обычно от специалистов
-        if (answer.isInternal === 1 && answer.customerId) {
+        // Если это не ответ клиента (isClient === 0 означает ответ специалиста)
+        if (answer.customerId && (answer.customerId !== clientId || answer.isClient !== 1)) {
           specialistIds.add(answer.customerId);
         }
       }
@@ -537,24 +534,19 @@ export class RagIndexerService {
       parts.push(`Тема: ${request.subject}`);
     }
 
-    // Текст заявки
-    if (request.body) {
-      parts.push(`\nОбращение клиента:\n${this.cleanHtml(request.body)}`);
-    }
-
     // Ответы (диалог)
     if (answers.length > 0) {
       parts.push('\n--- Переписка ---');
 
       for (const answer of answers) {
-        if (answer.answer && answer.answer.trim()) {
-          const sender = answer.customerId ? 'Клиент' : 'Специалист';
+        if (answer.text && answer.text.trim()) {
+          const sender = answer.isClient === 1 ? 'Клиент' : 'Специалист';
           const date = answer.createdAt
             ? answer.createdAt.toLocaleDateString('ru-RU')
             : '';
 
           parts.push(`\n[${sender}${date ? ` от ${date}` : ''}]:`);
-          parts.push(this.cleanHtml(answer.answer));
+          parts.push(this.cleanHtml(answer.text));
         }
       }
     }

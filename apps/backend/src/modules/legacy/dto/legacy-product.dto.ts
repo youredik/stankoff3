@@ -14,7 +14,6 @@ export class LegacyProductDto {
   supplierId: number | null;
   productCode: string | null;
   factoryName: string | null;
-  briefDescription: string | null;
   isInStock: boolean;
   inStock: number;
 
@@ -29,7 +28,6 @@ export class LegacyProductDto {
     dto.supplierId = entity.supplierId;
     dto.productCode = entity.productCode;
     dto.factoryName = entity.factoryName;
-    dto.briefDescription = entity.briefDescription;
     dto.isInStock = entity.isInStock;
     dto.inStock = entity.inStock;
     return dto;

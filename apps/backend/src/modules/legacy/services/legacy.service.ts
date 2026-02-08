@@ -868,9 +868,7 @@ export class LegacyService implements OnModuleInit {
 
     const queryBuilder = this.requestRepository
       .createQueryBuilder('request')
-      .where('request.closed = :closed', { closed: 1 }) // 1 = закрытая заявка
-      .andWhere('request.body IS NOT NULL')
-      .andWhere("request.body != ''");
+      .where('request.closed = :closed', { closed: 1 }); // 1 = закрытая заявка
 
     if (modifiedAfter) {
       queryBuilder.andWhere('request.add_date > :modifiedAfter', { modifiedAfter });
@@ -896,8 +894,6 @@ export class LegacyService implements OnModuleInit {
     return this.requestRepository
       .createQueryBuilder('request')
       .where('request.closed = :closed', { closed: 1 })
-      .andWhere('request.body IS NOT NULL')
-      .andWhere("request.body != ''")
       .getCount();
   }
 
@@ -1066,7 +1062,7 @@ export class LegacyService implements OnModuleInit {
         sum: Number(deal.sum),
         stageName: deal.dealStageId ? stageMap.get(deal.dealStageId)?.name : undefined,
         createdAt: deal.createdAt,
-        closedAt: deal.closedAt,
+        closedAt: deal.closedAt ?? undefined,
         isClosed: deal.isClosed,
       }));
     } catch {

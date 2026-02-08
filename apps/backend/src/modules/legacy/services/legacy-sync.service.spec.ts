@@ -33,14 +33,10 @@ describe('LegacySyncService', () => {
     req.customerId = overrides.customerId ?? 1;
     req.managerId = overrides.managerId ?? 2;
     req.subject = overrides.subject ?? 'Тестовая заявка';
-    req.body = overrides.body ?? 'Описание';
     req.type = overrides.type ?? 'support';
     req.closed = overrides.closed ?? 0;
-    req.statusId = overrides.statusId ?? 1;
     req.createdAt = overrides.createdAt ?? new Date('2024-01-01');
     req.updatedAt = overrides.updatedAt ?? new Date('2024-01-02');
-    req.closedAt = overrides.closedAt ?? null as any;
-    req.priority = overrides.priority ?? 0;
     return req;
   };
 
@@ -77,7 +73,6 @@ describe('LegacySyncService', () => {
         commentsCreated: 0,
       }),
       mapStatus: jest.fn().mockReturnValue('new'),
-      mapPriority: jest.fn().mockReturnValue('low'),
       cleanHtml: jest.fn((html: string) => html),
       buildUserMapping: jest.fn().mockResolvedValue({
         employeeMap: new Map(),
@@ -245,12 +240,11 @@ describe('LegacySyncService', () => {
       );
     });
 
-    it('должен обновить существующие заявки (статус и приоритет)', async () => {
+    it('должен обновить существующие заявки (статус)', async () => {
       const request = createLegacyRequest({
         id: 100,
         closed: 1,
-        closedAt: new Date('2024-06-01'),
-        priority: 2,
+        updatedAt: new Date('2024-06-01'),
       });
       const log = createMigrationLog({
         legacyRequestId: 100,
@@ -263,7 +257,6 @@ describe('LegacySyncService', () => {
       );
 
       migrationService.mapStatus.mockReturnValue('closed');
-      migrationService.mapPriority.mockReturnValue('high');
 
       const result = await service.runSync();
 
@@ -271,7 +264,7 @@ describe('LegacySyncService', () => {
       expect(result.newRequests).toBe(0);
       expect(dataSource.query).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE "entities"'),
-        ['closed', 'high', request.closedAt, 'entity-uuid-100'],
+        ['closed', request.updatedAt, 'entity-uuid-100'],
       );
     });
 
@@ -496,7 +489,7 @@ describe('LegacySyncService', () => {
       await service.runSync();
 
       // Теперь делаем вторую — с существующей заявкой
-      const request = createLegacyRequest({ id: 100, statusId: 2 });
+      const request = createLegacyRequest({ id: 100 });
       const log = createMigrationLog({
         legacyRequestId: 100,
         entityId: 'entity-uuid-100',
@@ -511,10 +504,9 @@ describe('LegacySyncService', () => {
         id: 500,
         requestId: 100,
         customerId: 10,
-        answer: '<p>Ответ от сотрудника</p>',
+        text: '<p>Ответ от сотрудника</p>',
+        isClient: 0,
         createdAt: new Date('2024-06-15'),
-        isHidden: 0,
-        isInternal: 0,
       };
       legacyService.getNewAnswersSince.mockResolvedValue([mockAnswer as any]);
 
@@ -576,10 +568,9 @@ describe('LegacySyncService', () => {
         id: 501,
         requestId: 100,
         customerId: 10,
-        answer: '   ',
+        text: '   ',
+        isClient: 0,
         createdAt: new Date(),
-        isHidden: 0,
-        isInternal: 0,
       };
       legacyService.getNewAnswersSince.mockResolvedValue([emptyAnswer as any]);
 
@@ -620,10 +611,9 @@ describe('LegacySyncService', () => {
         id: 502,
         requestId: 100,
         customerId: 10,
-        answer: 'Уже существующий ответ',
+        text: 'Уже существующий ответ',
+        isClient: 0,
         createdAt: new Date('2024-06-15'),
-        isHidden: 0,
-        isInternal: 0,
       };
       legacyService.getNewAnswersSince.mockResolvedValue([answer as any]);
 

@@ -37,9 +37,6 @@ export class LegacyProduct {
   @Column({ type: 'tinyint', default: 1 })
   enabled: number;
 
-  @Column({ name: 'brief_description', type: 'text', nullable: true })
-  briefDescription: string;
-
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 

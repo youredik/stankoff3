@@ -13,8 +13,14 @@ export class LegacyDealStage {
   @Column({ name: 'funnel_id', type: 'int', default: 1 })
   funnelId: number;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  alias: string;
+
   @Column({ type: 'varchar', length: 255 })
-  name: string;
+  title: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  completion: string;
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   color: string;
@@ -22,23 +28,12 @@ export class LegacyDealStage {
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 
-  @Column({ name: 'is_final', type: 'tinyint', default: 0 })
-  isFinal: number;
-
-  @Column({ name: 'is_success', type: 'tinyint', default: 0 })
-  isSuccess: number;
+  // --- Backward-compatible alias for existing code ---
 
   /**
-   * Является ли этап финальным
+   * Alias: title (для обратной совместимости, раньше было name)
    */
-  get isFinalStage(): boolean {
-    return this.isFinal === 1;
-  }
-
-  /**
-   * Является ли этап успешным (выигранная сделка)
-   */
-  get isSuccessStage(): boolean {
-    return this.isSuccess === 1;
+  get name(): string {
+    return this.title;
   }
 }

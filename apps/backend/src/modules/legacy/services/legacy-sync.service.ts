@@ -192,16 +192,14 @@ export class LegacySyncService {
   ): Promise<void> {
     // 1. Обновляем статус entity
     const newStatus = this.migrationService.mapStatus(request);
-    const newPriority = this.migrationService.mapPriority(request.priority);
 
     await this.dataSource.query(
       `UPDATE "entities" SET
         "status" = $1,
-        "priority" = $2,
-        "resolvedAt" = $3,
+        "resolvedAt" = $2,
         "updatedAt" = NOW()
-      WHERE "id" = $4`,
-      [newStatus, newPriority, request.closedAt || null, log.entityId],
+      WHERE "id" = $3`,
+      [newStatus, request.closed === 1 ? (request.updatedAt || request.createdAt) : null, log.entityId],
     );
 
     // 2. Проверяем новые ответы (ответы позже последней синхронизации)
@@ -212,7 +210,7 @@ export class LegacySyncService {
       );
 
       for (const answer of newAnswers) {
-        if (!answer.answer || answer.answer.trim().length === 0) continue;
+        if (!answer.text || answer.text.trim().length === 0) continue;
 
         // Проверяем, не был ли уже добавлен этот комментарий (по времени)
         const existing = await this.dataSource.query(
@@ -239,7 +237,7 @@ export class LegacySyncService {
             uuidv4(),
             log.entityId,
             authorId,
-            this.migrationService.cleanHtml(answer.answer),
+            this.migrationService.cleanHtml(answer.text),
             JSON.stringify([]),
             JSON.stringify([]),
             answer.createdAt,

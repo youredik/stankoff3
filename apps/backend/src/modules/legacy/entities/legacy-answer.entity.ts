@@ -15,39 +15,22 @@ export class LegacyAnswer {
   @Column({ name: 'RID', type: 'int' })
   requestId: number;
 
-  @Column({ name: 'customerID', type: 'int' })
+  @Column({ name: 'UID', type: 'int' })
   customerId: number;
 
+  @Column({ name: 'is_client', type: 'tinyint', default: 0 })
+  isClient: number;
+
   @Column({ type: 'text', nullable: true })
-  answer: string;
+  text: string;
 
   @Column({ name: 'add_date', type: 'datetime', nullable: true })
   createdAt: Date;
-
-  @Column({ name: 'is_hidden', type: 'tinyint', default: 0 })
-  isHidden: number;
-
-  @Column({ name: 'is_internal', type: 'tinyint', default: 0 })
-  isInternal: number;
-
-  /**
-   * Является ли ответ скрытым от клиента
-   */
-  get hidden(): boolean {
-    return this.isHidden === 1;
-  }
-
-  /**
-   * Является ли ответ внутренним (только для сотрудников)
-   */
-  get internal(): boolean {
-    return this.isInternal === 1;
-  }
 
   /**
    * Длина текста ответа
    */
   get contentLength(): number {
-    return this.answer?.length || 0;
+    return this.text?.length || 0;
   }
 }

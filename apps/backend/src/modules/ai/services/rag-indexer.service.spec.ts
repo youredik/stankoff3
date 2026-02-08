@@ -12,15 +12,15 @@ describe('RagIndexerService', () => {
   const mockRequest = {
     id: 1,
     subject: 'Тестовая тема заявки',
-    body: 'Текст обращения клиента по поводу неисправности оборудования',
     customerId: 100,
     managerId: 50,
     closed: 1, // закрытая
-    priority: 2,
-    priorityLabel: 'high',
     type: 'technical',
     createdAt: new Date('2024-01-15T09:00:00'),
-    closedAt: new Date('2024-01-16T15:00:00'),
+    updatedAt: new Date('2024-01-16T15:00:00'),
+    answerDate: new Date('2024-01-15T11:00:00'),
+    firstReactionTime: null,
+    get isClosed() { return this.closed === 1; },
   } as unknown as LegacyRequest;
 
   const mockAnswers: LegacyAnswer[] = [
@@ -28,21 +28,24 @@ describe('RagIndexerService', () => {
       id: 1,
       requestId: 1,
       customerId: 100,
-      answer: 'Первый ответ от клиента',
+      isClient: 1,
+      text: 'Первый ответ от клиента',
       createdAt: new Date('2024-01-15T10:00:00'),
     } as LegacyAnswer,
     {
       id: 2,
       requestId: 1,
       customerId: null as unknown as number,
-      answer: 'Ответ специалиста с решением проблемы',
+      isClient: 0,
+      text: 'Ответ специалиста с решением проблемы',
       createdAt: new Date('2024-01-15T11:00:00'),
     } as LegacyAnswer,
     {
       id: 3,
       requestId: 1,
       customerId: 100,
-      answer: 'Спасибо, проблема решена!',
+      isClient: 1,
+      text: 'Спасибо, проблема решена!',
       createdAt: new Date('2024-01-15T12:00:00'),
     } as LegacyAnswer,
   ];
@@ -162,7 +165,6 @@ describe('RagIndexerService', () => {
     it('должен вернуть 0 для слишком короткого текста', async () => {
       const shortRequest = {
         ...mockRequest,
-        body: 'Короткий текст',
         subject: '',
       } as unknown as LegacyRequest;
 
@@ -193,7 +195,7 @@ describe('RagIndexerService', () => {
     it('должен обработать заявку без ответов', async () => {
       const requestWithLongText = {
         ...mockRequest,
-        body: 'Достаточно длинный текст заявки для индексации. '.repeat(10),
+        subject: 'Достаточно длинный текст заявки для индексации. '.repeat(10),
       } as unknown as LegacyRequest;
 
       const chunksCreated = await service.indexRequest(requestWithLongText, []);
@@ -258,7 +260,7 @@ describe('RagIndexerService', () => {
       const batchMap = new Map();
       batchMap.set(1, { request: mockRequest, answers: mockAnswers });
       batchMap.set(2, {
-        request: { ...mockRequest, id: 2, request: 'Вторая заявка '.repeat(20) },
+        request: { ...mockRequest, id: 2, subject: 'Вторая заявка '.repeat(20) },
         answers: [],
       });
       legacyService.getRequestsWithAnswersBatch.mockResolvedValue(batchMap);
@@ -321,12 +323,18 @@ describe('RagIndexerService', () => {
 
   describe('text processing', () => {
     it('должен очистить HTML теги', async () => {
-      const requestWithHtml = {
-        ...mockRequest,
-        body: '<p>Текст <b>с HTML</b> тегами</p> '.repeat(20),
-      } as unknown as LegacyRequest;
+      const htmlAnswers: LegacyAnswer[] = [
+        {
+          id: 1,
+          requestId: 1,
+          customerId: 100,
+          isClient: 1,
+          text: '<p>Текст <b>с HTML</b> тегами</p> '.repeat(20),
+          createdAt: new Date('2024-01-15T10:00:00'),
+        } as LegacyAnswer,
+      ];
 
-      await service.indexRequest(requestWithHtml, []);
+      await service.indexRequest(mockRequest, htmlAnswers);
 
       expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -337,12 +345,18 @@ describe('RagIndexerService', () => {
 
     it('должен правильно разбить длинный текст на чанки', async () => {
       // Создаём очень длинный текст (> 2000 символов)
-      const longRequest = {
-        ...mockRequest,
-        body: 'Это очень длинный текст заявки. '.repeat(200),
-      } as unknown as LegacyRequest;
+      const longAnswers: LegacyAnswer[] = [
+        {
+          id: 1,
+          requestId: 1,
+          customerId: 100,
+          isClient: 1,
+          text: 'Это очень длинный текст заявки. '.repeat(200),
+          createdAt: new Date('2024-01-15T10:00:00'),
+        } as LegacyAnswer,
+      ];
 
-      await service.indexRequest(longRequest, []);
+      await service.indexRequest(mockRequest, longAnswers);
 
       // Должно быть создано несколько чанков
       const calls = knowledgeBase.addChunk.mock.calls;
@@ -435,10 +449,9 @@ describe('RagIndexerService', () => {
       expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
-            priority: 'high',
-            priorityLevel: 2,
             requestType: 'technical',
             responseCount: 3,
+            clientResponseCount: 2,
           }),
         }),
       );
@@ -464,9 +477,9 @@ describe('RagIndexerService', () => {
           id: 1,
           requestId: 1,
           customerId: null as unknown as number, // ответ специалиста
-          answer: 'Первый ответ специалиста',
+          text: 'Первый ответ специалиста',
           createdAt: new Date('2024-01-15T11:00:00'), // через 2 часа после создания
-          isInternal: 0,
+          isClient: 0,
         } as LegacyAnswer,
       ];
 
@@ -481,29 +494,30 @@ describe('RagIndexerService', () => {
       );
     });
 
-    it('должен подсчитать внутренние ответы', async () => {
-      const answersWithInternal = [
-        { id: 1, requestId: 1, answer: 'Внешний', isInternal: 0 } as LegacyAnswer,
-        { id: 2, requestId: 1, answer: 'Внутренний 1', isInternal: 1 } as LegacyAnswer,
-        { id: 3, requestId: 1, answer: 'Внутренний 2', isInternal: 1 } as LegacyAnswer,
+    it('должен подсчитать ответы клиента', async () => {
+      const answersWithClient = [
+        { id: 1, requestId: 1, text: 'От специалиста', isClient: 0 } as LegacyAnswer,
+        { id: 2, requestId: 1, text: 'От клиента 1', isClient: 1 } as LegacyAnswer,
+        { id: 3, requestId: 1, text: 'От клиента 2', isClient: 1 } as LegacyAnswer,
       ];
 
-      await service.indexRequest(mockRequest, answersWithInternal);
+      await service.indexRequest(mockRequest, answersWithClient);
 
       expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
             responseCount: 3,
-            internalResponseCount: 2,
+            clientResponseCount: 2,
           }),
         }),
       );
     });
 
-    it('должен обработать заявку без даты закрытия', async () => {
+    it('должен обработать открытую заявку (без закрытия)', async () => {
       const openRequest = {
         ...mockRequest,
-        closedAt: undefined,
+        closed: 0,
+        get isClosed() { return false; },
       } as unknown as LegacyRequest;
 
       await service.indexRequest(openRequest, mockAnswers);

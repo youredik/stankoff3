@@ -58,13 +58,7 @@ interface BatchResult {
   commentsCreated: number;
 }
 
-// Маппинг статусов legacy → new system
-const STATUS_MAP: Record<number, string> = {
-  1: 'new',
-  2: 'in_progress',
-  3: 'waiting',
-  4: 'resolved',
-};
+// Legacy таблица QD_requests не имеет status_id — только closed (0/1)
 
 const LEGACY_WORKSPACE_PREFIX = 'LEG';
 const LEGACY_SYSTEM_EMAIL = 'legacy-system@stankoff.ru';
@@ -472,7 +466,7 @@ export class LegacyMigrationService {
 
           const data = this.buildEntityData(request, customer);
           const status = this.mapStatus(request);
-          const priority = this.mapPriority(request.priority);
+          const priority = 'low'; // Legacy не имеет поля priority
 
           // INSERT entity
           await queryRunner.query(
@@ -496,7 +490,7 @@ export class LegacyMigrationService {
               0,
               request.updatedAt || request.createdAt,
               null,
-              request.closedAt || null,
+              request.closed === 1 ? (request.updatedAt || request.createdAt) : null,
               request.createdAt,
               request.updatedAt || request.createdAt,
             ],
@@ -509,7 +503,7 @@ export class LegacyMigrationService {
           let firstResponseAt: Date | null = null;
 
           for (const answer of answers) {
-            if (!answer.answer || answer.answer.trim().length === 0) continue;
+            if (!answer.text || answer.text.trim().length === 0) continue;
 
             const authorId = this.resolveAuthor(answer.customerId);
             const isEmployee = this.userMapping!.employeeMap.has(
@@ -529,7 +523,7 @@ export class LegacyMigrationService {
                 commentId,
                 entityId,
                 authorId,
-                this.cleanHtml(answer.answer),
+                this.cleanHtml(answer.text),
                 JSON.stringify([]),
                 JSON.stringify([]),
                 answer.createdAt,
@@ -702,17 +696,8 @@ export class LegacyMigrationService {
   }
 
   mapStatus(request: LegacyRequest): string {
-    if (request.closed === 1) return 'closed';
-    return STATUS_MAP[request.statusId] || 'new';
-  }
-
-  mapPriority(legacyPriority: number): string {
-    switch (legacyPriority) {
-      case 3: return 'critical';
-      case 2: return 'high';
-      case 1: return 'medium';
-      default: return 'low';
-    }
+    // Legacy таблица QD_requests имеет только поле closed (0/1)
+    return request.closed === 1 ? 'closed' : 'new';
   }
 
   private resolveAssignee(managerId: number | null): string | null {
@@ -737,9 +722,7 @@ export class LegacyMigrationService {
   ): Record<string, any> {
     const data: Record<string, any> = {
       legacyRequestId: request.id,
-      legacyStatusId: request.statusId,
       requestType: request.type || null,
-      legacyBody: request.body || null,
       legacyUrl: `https://www.stankoff.ru/crm/request/${request.id}`,
     };
 

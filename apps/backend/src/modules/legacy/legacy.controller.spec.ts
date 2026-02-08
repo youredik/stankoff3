@@ -157,7 +157,6 @@ describe('LegacyController', () => {
         supplierId: 1,
         productCode: 'XYZ-001',
         factoryName: 'Завод №1',
-        briefDescription: 'Описание станка',
         isInStock: true,
         inStock: 5,
       };
@@ -268,12 +267,12 @@ describe('LegacyController', () => {
         stageName: 'Переговоры',
         stageColor: '#FF0000',
         funnelId: 1,
-        comment: 'Комментарий',
+        status: null,
+        completion: null,
         isClosed: false,
         createdAt: new Date(),
         updatedAt: null,
         closedAt: null,
-        expectedCloseDate: null,
       };
       mockLegacyService.getDealById.mockResolvedValue(mockDeal);
 

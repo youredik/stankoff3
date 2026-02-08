@@ -17,12 +17,12 @@ export class LegacyDealDto {
   stageName?: string;
   stageColor?: string;
   funnelId: number;
-  comment: string | null;
+  status: string | null;
+  completion: string | null;
   isClosed: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
   closedAt: Date | null;
-  expectedCloseDate: Date | null;
 
   static fromEntity(
     entity: LegacyDeal,
@@ -41,12 +41,12 @@ export class LegacyDealDto {
     dto.stageName = stage?.name;
     dto.stageColor = stage?.color;
     dto.funnelId = entity.funnelId;
-    dto.comment = entity.comment;
+    dto.status = entity.status;
+    dto.completion = entity.completion;
     dto.isClosed = entity.isClosed;
     dto.createdAt = entity.createdAt;
     dto.updatedAt = entity.updatedAt;
     dto.closedAt = entity.closedAt;
-    dto.expectedCloseDate = entity.expectedCloseDate;
     return dto;
   }
 }

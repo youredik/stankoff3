@@ -125,66 +125,13 @@ describe('LegacyMigrationService', () => {
 
   describe('mapStatus', () => {
     it('должен вернуть "closed" если closed === 1', () => {
-      const request = { closed: 1, statusId: 2 } as LegacyRequest;
+      const request = { closed: 1 } as LegacyRequest;
       expect(service.mapStatus(request)).toBe('closed');
     });
 
-    it('должен вернуть "new" для statusId === 1', () => {
-      const request = { closed: 0, statusId: 1 } as LegacyRequest;
+    it('должен вернуть "new" если closed === 0', () => {
+      const request = { closed: 0 } as LegacyRequest;
       expect(service.mapStatus(request)).toBe('new');
-    });
-
-    it('должен вернуть "in_progress" для statusId === 2', () => {
-      const request = { closed: 0, statusId: 2 } as LegacyRequest;
-      expect(service.mapStatus(request)).toBe('in_progress');
-    });
-
-    it('должен вернуть "waiting" для statusId === 3', () => {
-      const request = { closed: 0, statusId: 3 } as LegacyRequest;
-      expect(service.mapStatus(request)).toBe('waiting');
-    });
-
-    it('должен вернуть "resolved" для statusId === 4', () => {
-      const request = { closed: 0, statusId: 4 } as LegacyRequest;
-      expect(service.mapStatus(request)).toBe('resolved');
-    });
-
-    it('должен вернуть "new" для неизвестного statusId', () => {
-      const request = { closed: 0, statusId: 99 } as LegacyRequest;
-      expect(service.mapStatus(request)).toBe('new');
-    });
-
-    it('должен приоритетно проверять closed перед statusId', () => {
-      const request = { closed: 1, statusId: 1 } as LegacyRequest;
-      expect(service.mapStatus(request)).toBe('closed');
-    });
-  });
-
-  // ==================== mapPriority ====================
-
-  describe('mapPriority', () => {
-    it('должен вернуть "low" для priority === 0', () => {
-      expect(service.mapPriority(0)).toBe('low');
-    });
-
-    it('должен вернуть "medium" для priority === 1', () => {
-      expect(service.mapPriority(1)).toBe('medium');
-    });
-
-    it('должен вернуть "high" для priority === 2', () => {
-      expect(service.mapPriority(2)).toBe('high');
-    });
-
-    it('должен вернуть "critical" для priority === 3', () => {
-      expect(service.mapPriority(3)).toBe('critical');
-    });
-
-    it('должен вернуть "low" для отрицательного значения', () => {
-      expect(service.mapPriority(-1)).toBe('low');
-    });
-
-    it('должен вернуть "low" для значения больше 3', () => {
-      expect(service.mapPriority(10)).toBe('low');
     });
   });
 
@@ -628,8 +575,6 @@ describe('LegacyMigrationService', () => {
           customerId: 100,
           subject: 'Тест',
           closed: 0,
-          statusId: 1,
-          priority: 0,
           createdAt: new Date(),
         },
         {
@@ -637,8 +582,6 @@ describe('LegacyMigrationService', () => {
           customerId: 200,
           subject: 'Тест 2',
           closed: 0,
-          statusId: 2,
-          priority: 1,
           createdAt: new Date(),
         },
       ];
@@ -664,15 +607,11 @@ describe('LegacyMigrationService', () => {
           id: 10,
           customerId: 100,
           subject: 'Новая заявка',
-          body: 'Описание',
           closed: 0,
-          statusId: 2,
-          priority: 1,
           type: 'support',
           managerId: 0,
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-02'),
-          closedAt: null as unknown as Date,
         },
       ];
 
@@ -688,7 +627,8 @@ describe('LegacyMigrationService', () => {
             id: 1,
             requestId: 10,
             customerId: 500,
-            answer: '<p>Ответ</p>',
+            isClient: 0,
+            text: '<p>Ответ</p>',
             createdAt: new Date('2024-01-01T10:00:00'),
           } as LegacyAnswer,
         ],
@@ -725,11 +665,8 @@ describe('LegacyMigrationService', () => {
           customerId: 100,
           subject: 'Хорошая',
           closed: 0,
-          statusId: 1,
-          priority: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
-          closedAt: null as unknown as Date,
           managerId: 0,
         },
         {
@@ -737,11 +674,8 @@ describe('LegacyMigrationService', () => {
           customerId: 200,
           subject: 'Проблемная',
           closed: 0,
-          statusId: 1,
-          priority: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
-          closedAt: null as unknown as Date,
           managerId: 0,
         },
       ];
@@ -822,8 +756,6 @@ describe('LegacyMigrationService', () => {
             id: 99,
             customerId: 1,
             closed: 0,
-            statusId: 1,
-            priority: 0,
             createdAt: new Date(),
           } as LegacyRequest,
         ]),

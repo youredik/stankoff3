@@ -376,7 +376,7 @@ describe('LegacyService', () => {
       const mockDeal: Partial<LegacyDeal> = {
         id: 1,
         counterpartyId: 5,
-        sum: 100000,
+        amount: 100000,
         dealStageId: 2,
       };
 
@@ -397,24 +397,24 @@ describe('LegacyService', () => {
 
   describe('getDealById', () => {
     it('должен вернуть сделку с этапом и контрагентом', async () => {
-      const mockDeal: Partial<LegacyDeal> = {
+      const mockDeal = Object.assign(new LegacyDeal(), {
         id: 1,
         counterpartyId: 5,
         dealStageId: 2,
-        sum: 100000,
-      };
-      const mockStage: Partial<LegacyDealStage> = {
+        amount: 100000,
+      });
+      const mockStage = Object.assign(new LegacyDealStage(), {
         id: 2,
-        name: 'Переговоры',
+        title: 'Переговоры',
         color: '#FF0000',
-      };
+      });
       const mockCounterparty: Partial<LegacyCounterparty> = {
         id: 5,
         name: 'ООО "Клиент"',
       };
 
-      mockDealRepository.findOne.mockResolvedValue(mockDeal as LegacyDeal);
-      mockDealStageRepository.findOne.mockResolvedValue(mockStage as LegacyDealStage);
+      mockDealRepository.findOne.mockResolvedValue(mockDeal);
+      mockDealStageRepository.findOne.mockResolvedValue(mockStage);
       mockCounterpartyRepository.findOne.mockResolvedValue(mockCounterparty as LegacyCounterparty);
 
       const result = await service.getDealById(1);
@@ -471,8 +471,8 @@ describe('LegacyService', () => {
 
     it('должен вернуть закрытые заявки для индексации', async () => {
       const mockRequests: Partial<LegacyRequest>[] = [
-        { id: 1, closed: 1, body: 'Текст заявки 1', customerId: 100 },
-        { id: 2, closed: 1, body: 'Текст заявки 2', customerId: 101 },
+        { id: 1, closed: 1, customerId: 100 },
+        { id: 2, closed: 1, customerId: 101 },
       ];
 
       const queryBuilder = createMockQueryBuilder();
@@ -556,8 +556,8 @@ describe('LegacyService', () => {
 
     it('должен вернуть ответы для заявки', async () => {
       const mockAnswers: Partial<LegacyAnswer>[] = [
-        { id: 1, requestId: 1, answer: 'Ответ 1', customerId: 100 },
-        { id: 2, requestId: 1, answer: 'Ответ 2', customerId: null as unknown as number },
+        { id: 1, requestId: 1, text: 'Ответ 1', customerId: 100, isClient: 0 },
+        { id: 2, requestId: 1, text: 'Ответ 2', customerId: null as unknown as number, isClient: 1 },
       ];
 
       mockAnswerRepository.find.mockResolvedValue(mockAnswers as LegacyAnswer[]);
@@ -580,7 +580,7 @@ describe('LegacyService', () => {
         subject: 'Тестовая заявка',
       };
       const mockAnswers: Partial<LegacyAnswer>[] = [
-        { id: 1, requestId: 1, answer: 'Ответ' },
+        { id: 1, requestId: 1, text: 'Ответ', isClient: 0 },
       ];
       const mockCustomer: Partial<LegacyCustomer> = {
         id: 100,
@@ -639,9 +639,9 @@ describe('LegacyService', () => {
         { id: 2, subject: 'Заявка 2' },
       ];
       const mockAnswers: Partial<LegacyAnswer>[] = [
-        { id: 1, requestId: 1, answer: 'Ответ 1.1' },
-        { id: 2, requestId: 1, answer: 'Ответ 1.2' },
-        { id: 3, requestId: 2, answer: 'Ответ 2.1' },
+        { id: 1, requestId: 1, text: 'Ответ 1.1', isClient: 0 },
+        { id: 2, requestId: 1, text: 'Ответ 1.2', isClient: 0 },
+        { id: 3, requestId: 2, text: 'Ответ 2.1', isClient: 1 },
       ];
 
       const requestQb = {
@@ -726,38 +726,36 @@ describe('LegacyService', () => {
     });
 
     it('должен вернуть сделки по контрагенту с этапами', async () => {
-      const mockDeals: Partial<LegacyDeal>[] = [
-        {
+      const mockDeals: LegacyDeal[] = [
+        Object.assign(new LegacyDeal(), {
           id: 500,
-          name: 'Поставка оборудования',
-          sum: 1500000,
+          title: 'Поставка оборудования',
+          amount: 1500000,
           dealStageId: 3,
           counterpartyId: 200,
           createdAt: new Date('2024-01-15'),
-          closedAt: new Date('2024-02-15'),
-          isClosed: true,
-        },
-        {
+          completionAt: new Date('2024-02-15'),
+        }),
+        Object.assign(new LegacyDeal(), {
           id: 501,
-          name: 'Сервисное обслуживание',
-          sum: 250000,
+          title: 'Сервисное обслуживание',
+          amount: 250000,
           dealStageId: 2,
           counterpartyId: 200,
           createdAt: new Date('2024-03-01'),
-          closedAt: null as unknown as Date,
-          isClosed: false,
-        },
+          completionAt: null as unknown as Date,
+        }),
       ];
 
-      const mockStages: Partial<LegacyDealStage>[] = [
-        { id: 2, name: 'Переговоры' },
-        { id: 3, name: 'Закрыта успешно' },
+      const mockStages: LegacyDealStage[] = [
+        Object.assign(new LegacyDealStage(), { id: 2, title: 'Переговоры' }),
+        Object.assign(new LegacyDealStage(), { id: 3, title: 'Закрыта успешно' }),
       ];
 
       const queryBuilder = createMockQueryBuilder();
       (queryBuilder.getMany as jest.Mock).mockResolvedValue(mockDeals);
       (mockDealRepository.createQueryBuilder as jest.Mock).mockReturnValue(queryBuilder);
-      mockDealStageRepository.find.mockResolvedValue(mockStages as LegacyDealStage[]);
+      mockDealStageRepository.find.mockResolvedValue(mockStages);
 
       const result = await service.getDealsByCounterpartyId(200);
 
