@@ -21,6 +21,7 @@ import {
   FilterPanel,
   createEmptyFilters,
   applyFilters,
+  isFilterActive,
   type FilterState,
 } from './FilterPanel';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -96,8 +97,8 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     if (filters.assigneeIds.length > 0) count++;
     if (filters.priorities.length > 0) count++;
     if (filters.dateFrom || filters.dateTo) count++;
-    for (const values of Object.values(filters.customFilters)) {
-      if (values.length > 0) count++;
+    for (const value of Object.values(filters.customFilters)) {
+      if (isFilterActive(value)) count++;
     }
     return count;
   }, [filters]);
