@@ -658,6 +658,20 @@ export class LegacyService implements OnModuleInit {
   }
 
   /**
+   * Получить заявки по массиву ID
+   */
+  async getRequestsByIds(ids: number[]): Promise<LegacyRequest[]> {
+    if (!this.isAvailable() || ids.length === 0) {
+      return [];
+    }
+
+    return this.requestRepository
+      .createQueryBuilder('request')
+      .where('request.RID IN (:...ids)', { ids })
+      .getMany();
+  }
+
+  /**
    * Получить новые/обновлённые заявки с указанной даты (для синхронизации)
    */
   async getNewRequestsSince(

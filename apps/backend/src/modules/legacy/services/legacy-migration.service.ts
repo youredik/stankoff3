@@ -47,6 +47,7 @@ export interface ValidationResult {
 
 interface UserMapping {
   employeeMap: Map<number, string>; // legacyCustomerId → User.id (UUID)
+  managerMap: Map<number, string>; // legacy manager.id → User.id (UUID)
   systemUserId: string;
   unmappedCount: number;
 }
@@ -622,7 +623,16 @@ export class LegacyMigrationService {
       }
     }
 
-    // 5. "Legacy System" пользователь
+    // 5. Маппинг manager.id → User.id (для assignee)
+    const managerMap = new Map<number, string>();
+    for (const manager of allManagers) {
+      const userId = employeeMap.get(manager.userId);
+      if (userId) {
+        managerMap.set(manager.id, userId);
+      }
+    }
+
+    // 6. "Legacy System" пользователь
     let systemUser = await this.userRepository.findOne({
       where: { email: LEGACY_SYSTEM_EMAIL },
     });
@@ -641,7 +651,7 @@ export class LegacyMigrationService {
       this.logger.log(`Создан системный пользователь: ${LEGACY_SYSTEM_EMAIL}`);
     }
 
-    return { employeeMap, systemUserId: systemUser.id, unmappedCount };
+    return { employeeMap, managerMap, systemUserId: systemUser.id, unmappedCount };
   }
 
   async ensureLegacyWorkspace(): Promise<Workspace> {
@@ -702,10 +712,7 @@ export class LegacyMigrationService {
 
   private resolveAssignee(managerId: number | null): string | null {
     if (!managerId || !this.userMapping) return null;
-    // managerId в legacy — это manager.id, но employeeMap использует customerId
-    // Для простоты: пока возвращаем null, если нет прямого маппинга
-    // TODO: добавить маппинг manager.id → manager.userId → employeeMap
-    return null;
+    return this.userMapping.managerMap.get(managerId) || null;
   }
 
   private resolveAuthor(legacyCustomerId: number): string {
@@ -740,6 +747,51 @@ export class LegacyMigrationService {
     }
 
     return data;
+  }
+
+  async updateAssignees(): Promise<{ updated: number; total: number }> {
+    const mapping = await this.buildUserMapping();
+
+    if (mapping.managerMap.size === 0) {
+      return { updated: 0, total: 0 };
+    }
+
+    // Получаем все мигрированные entities с managerId в data
+    const logs = await this.dataSource.query(
+      `SELECT lml."entityId", lml."legacyRequestId"
+       FROM "legacy_migration_log" lml
+       WHERE lml."status" = 'completed'`,
+    );
+
+    let updated = 0;
+    const batchSize = 500;
+
+    for (let i = 0; i < logs.length; i += batchSize) {
+      const batch = logs.slice(i, i + batchSize);
+      const requestIds = batch.map((l: { legacyRequestId: number }) => l.legacyRequestId);
+
+      // Читаем managerId из legacy
+      const requests = await this.legacyService.getRequestsByIds(requestIds);
+      const requestMap = new Map(requests.map((r) => [r.id, r]));
+
+      for (const log of batch) {
+        const request = requestMap.get(log.legacyRequestId);
+        if (!request?.managerId) continue;
+
+        const assigneeId = mapping.managerMap.get(request.managerId);
+        if (!assigneeId) continue;
+
+        await this.dataSource.query(
+          `UPDATE "entities" SET "assigneeId" = $1, "updatedAt" = NOW()
+           WHERE "id" = $2 AND "assigneeId" IS NULL`,
+          [assigneeId, log.entityId],
+        );
+        updated++;
+      }
+    }
+
+    this.logger.log(`Assignees обновлены: ${updated} из ${logs.length}`);
+    return { updated, total: logs.length };
   }
 
   cleanHtml(html: string): string {

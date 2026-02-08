@@ -61,4 +61,10 @@ export class LegacyMigrationController {
   async retryFailed() {
     return this.migrationService.retryFailed();
   }
+
+  @Post('update-assignees')
+  @HttpCode(HttpStatus.OK)
+  async updateAssignees() {
+    return this.migrationService.updateAssignees();
+  }
 }

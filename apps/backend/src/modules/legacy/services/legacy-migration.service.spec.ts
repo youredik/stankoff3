@@ -94,6 +94,7 @@ describe('LegacyMigrationService', () => {
         averageAnswersPerRequest: 0,
       }),
       getNewRequestsSince: jest.fn().mockResolvedValue([]),
+      getRequestsByIds: jest.fn().mockResolvedValue([]),
       getRequestWithAnswers: jest.fn().mockResolvedValue({
         request: null,
         answers: [],
@@ -246,6 +247,9 @@ describe('LegacyMigrationService', () => {
       expect(mapping.employeeMap.size).toBe(2);
       expect(mapping.employeeMap.get(100)).toBe('user-1-uuid');
       expect(mapping.employeeMap.get(200)).toBe('user-2-uuid');
+      expect(mapping.managerMap.size).toBe(2);
+      expect(mapping.managerMap.get(1)).toBe('user-1-uuid');
+      expect(mapping.managerMap.get(2)).toBe('user-2-uuid');
       expect(mapping.unmappedCount).toBe(0);
       expect(mapping.systemUserId).toBe('system-uuid');
     });
@@ -283,6 +287,9 @@ describe('LegacyMigrationService', () => {
       const mapping = await service.buildUserMapping();
 
       expect(mapping.employeeMap.size).toBe(1);
+      expect(mapping.managerMap.size).toBe(1);
+      expect(mapping.managerMap.get(1)).toBe('user-1-uuid');
+      expect(mapping.managerMap.has(2)).toBe(false);
       expect(mapping.unmappedCount).toBe(1);
     });
 
@@ -330,6 +337,63 @@ describe('LegacyMigrationService', () => {
 
       expect(mapping.unmappedCount).toBe(1);
       expect(mapping.employeeMap.size).toBe(0);
+      expect(mapping.managerMap.size).toBe(0);
+    });
+  });
+
+  // ==================== updateAssignees ====================
+
+  describe('updateAssignees', () => {
+    it('должен обновить assignee для мигрированных entities', async () => {
+      // Мок buildUserMapping
+      const managers: Partial<LegacyManager>[] = [
+        { id: 1, userId: 100 },
+      ];
+      legacyService.getAllManagers.mockResolvedValue(managers as LegacyManager[]);
+
+      const customersMap = new Map<number, LegacyCustomer>();
+      customersMap.set(100, { id: 100, email: 'ivan@test.ru' } as LegacyCustomer);
+      legacyService.getCustomersByIds.mockResolvedValue(customersMap);
+
+      userRepository.find.mockResolvedValue([
+        { id: 'user-1-uuid', email: 'ivan@test.ru' },
+      ] as User[]);
+      userRepository.findOne.mockResolvedValue({
+        id: 'system-uuid',
+        email: 'legacy-system@stankoff.ru',
+      } as User);
+
+      // migration logs
+      mockDataSource.query
+        .mockResolvedValueOnce([
+          { entityId: 'ent-1', legacyRequestId: 101 },
+          { entityId: 'ent-2', legacyRequestId: 102 },
+        ]) // SELECT legacy_migration_log
+        .mockResolvedValueOnce(undefined); // UPDATE entities
+
+      legacyService.getRequestsByIds = jest.fn().mockResolvedValue([
+        { id: 101, managerId: 1 } as LegacyRequest,
+        { id: 102, managerId: null } as unknown as LegacyRequest,
+      ]);
+
+      const result = await service.updateAssignees();
+
+      expect(result.total).toBe(2);
+      expect(result.updated).toBe(1);
+    });
+
+    it('должен вернуть 0 если managerMap пуст', async () => {
+      legacyService.getAllManagers.mockResolvedValue([]);
+      legacyService.getCustomersByIds.mockResolvedValue(new Map());
+      userRepository.find.mockResolvedValue([]);
+      userRepository.findOne.mockResolvedValue({
+        id: 'system-uuid',
+        email: 'legacy-system@stankoff.ru',
+      } as User);
+
+      const result = await service.updateAssignees();
+
+      expect(result).toEqual({ updated: 0, total: 0 });
     });
   });
 

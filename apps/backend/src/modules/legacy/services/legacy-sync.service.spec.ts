@@ -523,6 +523,7 @@ describe('LegacySyncService', () => {
 
       migrationService.buildUserMapping.mockResolvedValue({
         employeeMap: new Map([[10, 'user-uuid-10']]),
+        managerMap: new Map(),
         systemUserId: 'system-uuid',
         unmappedCount: 0,
       });

@@ -56,6 +56,7 @@ describe('LegacyMigrationController', () => {
       validateMigration: jest.fn().mockResolvedValue(mockValidation),
       getMigrationLog: jest.fn().mockResolvedValue({ items: [], total: 0 }),
       retryFailed: jest.fn().mockResolvedValue({ message: 'Ретрай завершён', retried: 5 }),
+      updateAssignees: jest.fn().mockResolvedValue({ updated: 150, total: 1000 }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -270,6 +271,25 @@ describe('LegacyMigrationController', () => {
 
       expect(result.retried).toBe(0);
       expect(result.message).toBe('Нет ошибочных записей');
+    });
+  });
+
+  describe('updateAssignees (POST /update-assignees)', () => {
+    it('должен делегировать обновление assignees сервису', async () => {
+      const result = await controller.updateAssignees();
+
+      expect(migrationService.updateAssignees).toHaveBeenCalled();
+      expect(result).toEqual({ updated: 150, total: 1000 });
+    });
+
+    it('должен пробросить ошибку если Legacy БД недоступна', async () => {
+      migrationService.updateAssignees.mockRejectedValueOnce(
+        new Error('Legacy БД недоступна'),
+      );
+
+      await expect(controller.updateAssignees()).rejects.toThrow(
+        'Legacy БД недоступна',
+      );
     });
   });
 });
