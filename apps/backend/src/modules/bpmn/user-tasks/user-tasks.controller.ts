@@ -9,15 +9,33 @@ import {
   Request,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { IsOptional, IsString, IsNumberString } from 'class-validator';
 import { UserTasksService, TaskFilter } from './user-tasks.service';
 import { UserTaskStatus } from '../entities/user-task.entity';
 
 class TaskFilterDto {
+  @IsOptional()
+  @IsString()
   workspaceId?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsString()
   assigneeId?: string;
+
+  @IsOptional()
+  @IsString()
   processInstanceId?: string;
+
+  @IsOptional()
+  @IsString()
   entityId?: string;
+
+  @IsOptional()
+  @IsNumberString()
   limit?: number;
 }
 
