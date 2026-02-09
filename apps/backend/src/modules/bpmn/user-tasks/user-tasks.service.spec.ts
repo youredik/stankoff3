@@ -25,6 +25,7 @@ describe('UserTasksService', () => {
     workspaceId: 'ws-1',
     workspace: null as any,
     entityId: 'entity-1',
+    entity: null,
     jobKey: 'job-key-1',
     elementId: 'Activity_1',
     elementName: 'Approve Request',

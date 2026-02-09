@@ -9,6 +9,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Workspace } from '../../workspace/workspace.entity';
+import { WorkspaceEntity } from '../../entity/entity.entity';
 import { User } from '../../user/user.entity';
 import { ProcessInstance } from './process-instance.entity';
 
@@ -56,6 +57,10 @@ export class UserTask {
 
   @Column({ type: 'uuid', nullable: true })
   entityId: string | null;
+
+  @ManyToOne(() => WorkspaceEntity, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'entityId' })
+  entity: WorkspaceEntity | null;
 
   // Zeebe job key - needed to complete the job
   @Column({ type: 'varchar', length: 255, unique: true })
