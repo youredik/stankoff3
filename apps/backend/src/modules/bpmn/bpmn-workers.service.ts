@@ -15,6 +15,7 @@ import { UserTasksWorker } from './user-tasks/user-tasks.worker';
 import { CreateEntityWorker } from './entity-links/create-entity.worker';
 import { IncidentService } from './incidents/incident.service';
 import { AiAssistantService } from '../ai/services/ai-assistant.service';
+import { ClassifierService } from '../ai/services/classifier.service';
 
 @Injectable()
 export class BpmnWorkersService implements OnModuleInit {
@@ -76,7 +77,7 @@ export class BpmnWorkersService implements OnModuleInit {
 
     try {
       // Dynamically resolve AI classifier (may not be available)
-      this.aiClassifierService = this.moduleRef.get('AiClassifierService', {
+      this.aiClassifierService = this.moduleRef.get(ClassifierService, {
         strict: false,
       });
     } catch {
@@ -84,7 +85,7 @@ export class BpmnWorkersService implements OnModuleInit {
     }
 
     try {
-      this.aiAssistantService = this.moduleRef.get('AiAssistantService', { strict: false });
+      this.aiAssistantService = this.moduleRef.get(AiAssistantService, { strict: false });
     } catch {
       this.logger.warn('AiAssistantService not available for workers');
     }

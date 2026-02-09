@@ -113,7 +113,14 @@ services:
       - LEGACY_DB_PASSWORD=${LEGACY_DB_PASSWORD:-}
       - LEGACY_DB_NAME=${LEGACY_DB_NAME:-stankoff}
       # AI
-      - AI_ENABLED=${AI_ENABLED:-false}
+      - AI_LLM_PRIORITY=${AI_LLM_PRIORITY:-groq,ollama,openai}
+      - AI_EMBEDDING_PRIORITY=${AI_EMBEDDING_PRIORITY:-ollama,openai}
+      - AI_EMBEDDING_DIMENSION=${AI_EMBEDDING_DIMENSION:-768}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-70b-versatile}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:14b}
+      - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-large}
@@ -210,6 +217,30 @@ services:
         condition: any
         delay: 10s
 
+  # Ollama (local AI inference for embeddings)
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - stankoff-preprod-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+      restart_policy:
+        condition: any
+        delay: 10s
+
 volumes:
   # IMPORTANT: Use external volume to preserve data across Swarm redeployments
   # The volume was originally created by Docker Compose with this name
@@ -229,6 +260,8 @@ volumes:
     name: stankoff-portal_certbot-www
   # Camunda data
   camunda-data:
+  # Ollama models data
+  ollama-data:
 
 networks:
   stankoff-preprod-network:
