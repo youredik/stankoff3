@@ -478,8 +478,15 @@ export class UserTasksService {
       return;
     }
 
+    // Only validate JSON Schema format (type: 'object' with properties)
+    // form-js format (type: 'default' with components) is validated client-side
+    const schema = form.schema as Record<string, any>;
+    if (schema.type !== 'object' || !schema.properties) {
+      return;
+    }
+
     // Basic validation against JSON Schema required fields
-    const required = form.schema.required || [];
+    const required = schema.required || [];
     for (const field of required) {
       if (data[field] === undefined || data[field] === null || data[field] === '') {
         throw new BadRequestException(`Field "${field}" is required`);
@@ -487,7 +494,7 @@ export class UserTasksService {
     }
 
     // Type validation
-    for (const [fieldName, fieldSchema] of Object.entries(form.schema.properties)) {
+    for (const [fieldName, fieldSchema] of Object.entries(schema.properties) as [string, any][]) {
       const value = data[fieldName];
       if (value === undefined || value === null) continue;
 

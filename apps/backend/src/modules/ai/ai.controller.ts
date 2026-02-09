@@ -131,7 +131,15 @@ export class AiController {
   async getClassification(
     @Param('entityId') entityId: string,
   ): Promise<AiClassification | null> {
-    return this.classifierService.getClassification(entityId);
+    try {
+      return await this.classifierService.getClassification(entityId);
+    } catch (error) {
+      this.logger.error(`Ошибка получения классификации для ${entityId}: ${error}`);
+      throw new HttpException(
+        'Ошибка получения классификации',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**

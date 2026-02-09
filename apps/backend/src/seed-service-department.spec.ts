@@ -18,6 +18,7 @@ import { ProcessInstance } from './modules/bpmn/entities/process-instance.entity
 import { ProcessTrigger } from './modules/bpmn/entities/process-trigger.entity';
 import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
+import { FormDefinition } from './modules/bpmn/entities/form-definition.entity';
 
 // Helper to create mock repository
 function createMockRepository() {
@@ -52,6 +53,7 @@ describe('SeedServiceDepartment', () => {
   let triggerRepo: ReturnType<typeof createMockRepository>;
   let automationRepo: ReturnType<typeof createMockRepository>;
   let userGroupRepo: ReturnType<typeof createMockRepository>;
+  let formDefRepo: ReturnType<typeof createMockRepository>;
 
   beforeEach(async () => {
     userRepo = createMockRepository();
@@ -70,6 +72,7 @@ describe('SeedServiceDepartment', () => {
     triggerRepo = createMockRepository();
     automationRepo = createMockRepository();
     userGroupRepo = createMockRepository();
+    formDefRepo = createMockRepository();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -90,6 +93,7 @@ describe('SeedServiceDepartment', () => {
         { provide: getRepositoryToken(ProcessTrigger), useValue: triggerRepo },
         { provide: getRepositoryToken(AutomationRule), useValue: automationRepo },
         { provide: getRepositoryToken(UserGroup), useValue: userGroupRepo },
+        { provide: getRepositoryToken(FormDefinition), useValue: formDefRepo },
         { provide: DataSource, useValue: {} },
       ],
     }).compile();

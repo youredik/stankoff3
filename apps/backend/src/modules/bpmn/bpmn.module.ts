@@ -23,6 +23,8 @@ import { EntityLinksController } from './entity-links/entity-links.controller';
 import { CreateEntityWorker } from './entity-links/create-entity.worker';
 import { ProcessMiningService } from './process-mining/process-mining.service';
 import { ProcessMiningController } from './process-mining/process-mining.controller';
+import { FormDefinitionsService } from './forms/form-definitions.service';
+import { FormDefinitionsController } from './forms/form-definitions.controller';
 import { EntityModule } from '../entity/entity.module';
 import { EmailModule } from '../email/email.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
@@ -57,6 +59,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
     UserTasksController,
     EntityLinksController,
     ProcessMiningController,
+    FormDefinitionsController,
   ],
   providers: [
     BpmnService,
@@ -69,6 +72,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
     EntityLinksService,
     CreateEntityWorker,
     ProcessMiningService,
+    FormDefinitionsService,
   ],
   exports: [
     BpmnService,
@@ -81,6 +85,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
     EntityLinksService,
     CreateEntityWorker,
     ProcessMiningService,
+    FormDefinitionsService,
   ],
 })
 export class BpmnModule {}

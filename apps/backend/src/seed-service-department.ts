@@ -26,6 +26,7 @@ import { ProcessInstance, ProcessInstanceStatus } from './modules/bpmn/entities/
 import { ProcessTrigger, TriggerType } from './modules/bpmn/entities/process-trigger.entity';
 import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
+import { FormDefinition } from './modules/bpmn/entities/form-definition.entity';
 
 // ──────────────────────────────────────────────────────
 // Helper: random item from array
@@ -67,6 +68,7 @@ export class SeedServiceDepartment implements OnModuleInit {
     @InjectRepository(ProcessTrigger) private triggerRepo: Repository<ProcessTrigger>,
     @InjectRepository(AutomationRule) private automationRepo: Repository<AutomationRule>,
     @InjectRepository(UserGroup) private userGroupRepo: Repository<UserGroup>,
+    @InjectRepository(FormDefinition) private formDefRepo: Repository<FormDefinition>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -153,6 +155,11 @@ export class SeedServiceDepartment implements OnModuleInit {
     // 8. DMN TABLES
     // ═══════════════════════════════════════
     await this.createDmnTables(tpWorkspace, rekWorkspace, users.kozlov);
+
+    // ═══════════════════════════════════════
+    // 8.5 FORM DEFINITIONS
+    // ═══════════════════════════════════════
+    await this.createFormDefinitions(tpWorkspace, rekWorkspace, users.kozlov);
 
     // ═══════════════════════════════════════
     // 9. BPMN PROCESS DEFINITIONS
@@ -802,6 +809,132 @@ export class SeedServiceDepartment implements OnModuleInit {
       isActive: true,
       createdById: creator.id,
     });
+  }
+
+  // ────────────────────────────────────────────────
+  // FORM DEFINITIONS
+  // ────────────────────────────────────────────────
+  private async createFormDefinitions(tp: Workspace, rek: Workspace, creator: User) {
+    // 1. Форма согласования (для ТП)
+    await this.formDefRepo.save({
+      workspaceId: tp.id,
+      key: 'approval-form',
+      name: 'Форма согласования',
+      description: 'Используется для согласования заявок на обслуживание',
+      schema: {
+        type: 'default',
+        components: [
+          {
+            type: 'radio',
+            key: 'decision',
+            label: 'Решение',
+            values: [
+              { label: 'Согласовано', value: 'approved' },
+              { label: 'Отклонено', value: 'rejected' },
+              { label: 'На доработку', value: 'revision' },
+            ],
+            validate: { required: true },
+          },
+          {
+            type: 'textarea',
+            key: 'comment',
+            label: 'Комментарий',
+            validate: { required: true },
+          },
+        ],
+      },
+      version: 1,
+      isActive: true,
+      createdById: creator.id,
+    });
+
+    // 2. Обратная связь клиента (для Рекламаций)
+    await this.formDefRepo.save({
+      workspaceId: rek.id,
+      key: 'customer-feedback',
+      name: 'Обратная связь клиента',
+      description: 'Форма для сбора отзывов клиентов по рекламациям',
+      schema: {
+        type: 'default',
+        components: [
+          {
+            type: 'number',
+            key: 'rating',
+            label: 'Оценка (1-5)',
+            validate: { required: true, min: 1, max: 5 },
+          },
+          {
+            type: 'textarea',
+            key: 'comment',
+            label: 'Комментарий',
+          },
+          {
+            type: 'select',
+            key: 'contactPreference',
+            label: 'Предпочтительный способ связи',
+            values: [
+              { label: 'Email', value: 'email' },
+              { label: 'Телефон', value: 'phone' },
+              { label: 'Telegram', value: 'telegram' },
+            ],
+          },
+        ],
+      },
+      version: 1,
+      isActive: true,
+      createdById: creator.id,
+    });
+
+    // 3. Форма эскалации (глобальная — workspaceId: null)
+    await this.formDefRepo.save({
+      workspaceId: null,
+      key: 'escalation-form',
+      name: 'Форма эскалации',
+      description: 'Глобальная форма для эскалации задач и заявок',
+      schema: {
+        type: 'default',
+        components: [
+          {
+            type: 'select',
+            key: 'reason',
+            label: 'Причина эскалации',
+            values: [
+              { label: 'Превышение SLA', value: 'sla_breach' },
+              { label: 'Сложность задачи', value: 'complexity' },
+              { label: 'Недостаток ресурсов', value: 'resources' },
+              { label: 'Другое', value: 'other' },
+            ],
+            validate: { required: true },
+          },
+          {
+            type: 'select',
+            key: 'priority',
+            label: 'Приоритет',
+            values: [
+              { label: 'Высокий', value: 'high' },
+              { label: 'Критический', value: 'critical' },
+            ],
+            validate: { required: true },
+          },
+          {
+            type: 'checkbox',
+            key: 'urgent',
+            label: 'Срочная эскалация',
+          },
+          {
+            type: 'textarea',
+            key: 'details',
+            label: 'Детали',
+            validate: { required: true },
+          },
+        ],
+      },
+      version: 1,
+      isActive: true,
+      createdById: creator.id,
+    });
+
+    this.logger.log('  ✓ 3 form definitions created (2 workspace + 1 global)');
   }
 
   // ────────────────────────────────────────────────

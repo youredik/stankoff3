@@ -45,6 +45,7 @@ import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
 import { EntityLink } from './modules/bpmn/entities/entity-link.entity';
 import { ProcessActivityLog } from './modules/bpmn/entities/process-activity-log.entity';
+import { FormDefinition } from './modules/bpmn/entities/form-definition.entity';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -65,6 +66,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
       ProcessDefinition, ProcessInstance, ProcessTrigger,
       AutomationRule, UserGroup,
       EntityLink, ProcessActivityLog,
+      FormDefinition,
     ]),
 
     WorkspaceModule,

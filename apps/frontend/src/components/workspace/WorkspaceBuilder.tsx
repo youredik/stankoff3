@@ -16,7 +16,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus, Save, ArrowLeft, Loader2, Pencil, Users, Settings2, Zap, Clock, Table2 } from 'lucide-react';
+import { Plus, Save, ArrowLeft, Loader2, Pencil, Users, Settings2, Zap, Clock, Table2, FileText } from 'lucide-react';
 import { SectionCard } from './SectionCard';
 import { FieldCard } from './FieldCard';
 import { FieldPalette, FIELD_TYPES } from './FieldPalette';
@@ -25,13 +25,14 @@ import { WorkspaceMembers } from './WorkspaceMembers';
 import { AutomationRules } from './AutomationRules';
 import { SlaSettings } from '@/components/sla/SlaSettings';
 import { DmnSettings } from '@/components/dmn/DmnSettings';
+import { FormDefinitionsSettings } from '@/components/forms/FormDefinitionsSettings';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import type { Field, FieldType, Workspace } from '@/types';
 
-type TabType = 'structure' | 'members' | 'automation' | 'sla' | 'dmn';
+type TabType = 'structure' | 'members' | 'automation' | 'sla' | 'dmn' | 'forms';
 
 // Популярные эмодзи для рабочих мест
 const WORKSPACE_ICONS = ['📋', '📁', '🔧', '💼', '📊', '🎯', '📝', '⚙️', '🛠️', '📦', '🚀', '💡', '🔬', '📐', '🎨', '📈'];
@@ -461,6 +462,19 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 <span>Таблицы решений</span>
               </button>
             )}
+            {isGlobalAdmin && (
+              <button
+                onClick={() => setActiveTab('forms')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'forms'
+                    ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Формы</span>
+              </button>
+            )}
           </div>
 
           {/* Settings Bar - Section & Menu Visibility */}
@@ -536,6 +550,10 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
           ) : activeTab === 'dmn' ? (
             <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
               <DmnSettings workspaceId={workspaceId} />
+            </div>
+          ) : activeTab === 'forms' ? (
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950">
+              <FormDefinitionsSettings workspaceId={workspaceId} />
             </div>
           ) : null}
         </div>

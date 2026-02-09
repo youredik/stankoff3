@@ -11,7 +11,8 @@ import {
 import { Workspace } from '../../workspace/workspace.entity';
 import { User } from '../../user/user.entity';
 
-export interface FormSchema {
+// JSON Schema format (for DynamicForm / server-side validation)
+export interface JsonFormSchema {
   $id?: string;
   type: 'object';
   title?: string;
@@ -19,6 +20,16 @@ export interface FormSchema {
   required?: string[];
   properties: Record<string, FormFieldSchema>;
 }
+
+// Camunda form-js format (for FormEditor / FormViewer)
+export interface FormJsSchema {
+  type: 'default';
+  components: Record<string, any>[];
+  [key: string]: any;
+}
+
+// Union — stored as JSONB, supports both formats
+export type FormSchema = JsonFormSchema | FormJsSchema | Record<string, any>;
 
 export interface FormFieldSchema {
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
