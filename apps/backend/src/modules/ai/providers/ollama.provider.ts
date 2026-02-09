@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   BaseLlmProvider,
@@ -43,7 +43,7 @@ interface OllamaEmbeddingResponse {
  * Запуск: ollama serve
  */
 @Injectable()
-export class OllamaProvider extends BaseLlmProvider implements OnModuleInit {
+export class OllamaProvider extends BaseLlmProvider {
   private readonly logger = new Logger(OllamaProvider.name);
   private readonly baseUrl: string;
   private readonly model: string;
@@ -65,18 +65,14 @@ export class OllamaProvider extends BaseLlmProvider implements OnModuleInit {
     );
   }
 
-  async onModuleInit(): Promise<void> {
-    await this.checkAvailability();
-  }
-
   get isConfigured(): boolean {
     return this.isAvailable;
   }
 
   /**
-   * Проверяет доступность Ollama
+   * Проверяет доступность Ollama (вызывается из AiProviderRegistry.onModuleInit)
    */
-  private async checkAvailability(): Promise<void> {
+  async checkAvailability(): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',

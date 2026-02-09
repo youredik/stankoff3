@@ -66,6 +66,8 @@ export class AiProviderRegistry implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
+    // Ollama проверяет доступность асинхронно — ждём перед логированием
+    await this.ollamaProvider.checkAvailability();
     this.logStatus();
   }
 
