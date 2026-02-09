@@ -21,7 +21,7 @@ interface ActivityPanelProps {
 }
 
 // Маппинг технических названий полей на человекочитаемые
-const FIELD_LABELS: Record<string, string> = {
+export const FIELD_LABELS: Record<string, string> = {
   title: 'Название',
   status: 'Статус',
   priority: 'Приоритет',
@@ -32,7 +32,7 @@ const FIELD_LABELS: Record<string, string> = {
   customId: 'Номер',
 };
 
-const ACTION_CONFIG: Record<
+export const ACTION_CONFIG: Record<
   AuditActionType,
   { icon: React.ElementType; label: string; color: string }
 > = {
@@ -48,7 +48,7 @@ const ACTION_CONFIG: Record<
   'file:deleted': { icon: FileText, label: 'Файл удалён', color: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700' },
 };
 
-function formatDate(dateString: string): string {
+export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -69,13 +69,13 @@ function formatDate(dateString: string): string {
   });
 }
 
-function getActorName(actor: AuditLog['actor']): string {
+export function getActorName(actor: AuditLog['actor']): string {
   if (!actor) return 'Система';
   const name = `${actor.firstName || ''} ${actor.lastName || ''}`.trim();
   return name || actor.email;
 }
 
-function getStatusLabel(statusId: string, statusOptions?: FieldOption[]): string {
+export function getStatusLabel(statusId: string, statusOptions?: FieldOption[]): string {
   if (statusOptions) {
     const option = statusOptions.find(o => o.id === statusId);
     if (option) return option.label;
@@ -83,11 +83,11 @@ function getStatusLabel(statusId: string, statusOptions?: FieldOption[]): string
   return statusId;
 }
 
-function getFieldLabel(fieldName: string): string {
+export function getFieldLabel(fieldName: string): string {
   return FIELD_LABELS[fieldName] || fieldName;
 }
 
-function renderChanges(log: AuditLog, statusOptions?: FieldOption[]): React.ReactNode {
+export function renderChanges(log: AuditLog, statusOptions?: FieldOption[]): React.ReactNode {
   const { details, action } = log;
 
   if (action === 'entity:status:changed' && details.oldValues && details.newValues) {

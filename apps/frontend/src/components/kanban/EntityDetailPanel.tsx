@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
-import { X, MessageSquare, Clock, Paperclip, History, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play, Sparkles } from 'lucide-react';
+import { X, MessageSquare, Clock, Paperclip, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -9,7 +9,7 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { CommentEditor } from '@/components/entity/CommentEditor';
 import { LinkedEntities } from '@/components/entity/LinkedEntities';
-import { ActivityPanel } from '@/components/entity/ActivityPanel';
+import { EntityTimeline } from '@/components/entity/timeline';
 import { AiAssistantTab } from '@/components/entity/AiAssistantTab';
 import { AiClassificationPanel } from '@/components/ai/AiClassificationPanel';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
@@ -176,7 +176,7 @@ export function EntityDetailPanel() {
   const canAssign = user?.role === 'admin' || user?.role === 'manager' || canEditEntity;
 
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'comments' | 'history' | 'ai'>('comments');
+  const [activeTab, setActiveTab] = useState<'activity' | 'ai'>('activity');
   const [showStartProcess, setShowStartProcess] = useState(false);
   const [processInstances, setProcessInstances] = useState<ProcessInstance[]>([]);
   const [loadingProcesses, setLoadingProcesses] = useState(false);
@@ -409,27 +409,16 @@ export function EntityDetailPanel() {
               {/* Tabs */}
               <div className="flex items-center gap-4 px-6 pt-4 border-b border-gray-200 dark:border-gray-700">
                 <button
-                  onClick={() => setActiveTab('comments')}
+                  onClick={() => setActiveTab('activity')}
                   className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
-                    activeTab === 'comments'
+                    activeTab === 'activity'
                       ? 'border-primary-500 text-primary-400'
                       : 'border-transparent text-gray-500 hover:text-gray-300'
                   }`}
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span className="text-sm font-medium">Комментарии</span>
+                  <span className="text-sm font-medium">Активность</span>
                   <span className="text-xs text-gray-500">({comments.length})</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('history')}
-                  className={`flex items-center gap-2 pb-3 border-b-2 transition-colors ${
-                    activeTab === 'history'
-                      ? 'border-primary-500 text-primary-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  <History className="w-4 h-4" />
-                  <span className="text-sm font-medium">История</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('ai')}
@@ -446,65 +435,14 @@ export function EntityDetailPanel() {
 
               {/* Tab content */}
               <div className="flex-1 overflow-y-auto p-6">
-                {/* Comments Tab */}
-                {activeTab === 'comments' && (
-                  <div>
-                    {comments.length === 0 && (
-                      <p className="text-sm text-gray-500 italic">
-                        Пока нет комментариев
-                      </p>
-                    )}
-
-                    <div className="space-y-5">
-                      {comments.map((comment) => (
-                        <div key={comment.id} className="flex gap-3">
-                          <div className="w-8 h-8 bg-primary-500 rounded flex-shrink-0 flex items-center justify-center">
-                            <span className="text-white text-xs font-semibold">
-                              {comment.author.firstName[0]}
-                              {comment.author.lastName[0]}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                                {comment.author.firstName}{' '}
-                                {comment.author.lastName}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {format(
-                                  new Date(comment.createdAt),
-                                  'dd.MM HH:mm',
-                                  { locale: ru }
-                                )}
-                              </span>
-                            </div>
-                            <div
-                              className="text-sm text-gray-700 dark:text-gray-300 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-400 [&_a]:underline [&_.mention]:text-primary-400 [&_.mention]:bg-primary-100 dark:[&_.mention]:bg-primary-900/30 [&_.mention]:rounded [&_.mention]:px-0.5"
-                              dangerouslySetInnerHTML={{ __html: comment.content }}
-                            />
-                            {/* Attachments */}
-                            {comment.attachments && comment.attachments.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {comment.attachments.map((attachment) => (
-                                  <AttachmentPreview
-                                    key={attachment.id}
-                                    attachment={attachment}
-                                    allAttachments={allEntityAttachments}
-                                    showThumbnail={true}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* History Tab */}
-                {activeTab === 'history' && (
-                  <ActivityPanel entityId={selectedEntity.id} statusOptions={statuses} />
+                {/* Activity Timeline */}
+                {activeTab === 'activity' && (
+                  <EntityTimeline
+                    entityId={selectedEntity.id}
+                    comments={comments}
+                    statusOptions={statuses}
+                    allAttachments={allEntityAttachments}
+                  />
                 )}
 
                 {/* AI Assistant Tab */}

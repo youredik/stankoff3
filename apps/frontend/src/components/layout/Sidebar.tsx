@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Plus,
   Users,
@@ -19,12 +19,14 @@ import {
   ChevronDown,
   ChevronRight,
   FolderPlus,
+  Inbox,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
 import { workspacesApi } from '@/lib/api/workspaces';
+import { useTaskStore } from '@/store/useTaskStore';
 import { ImportModal } from '@/components/workspace/ImportModal';
 import { SectionMembersModal } from '@/components/section/SectionMembersModal';
 import type { Workspace, MenuSection } from '@/types';
@@ -86,11 +88,13 @@ function groupWorkspacesBySections(
 
 export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace, duplicateWorkspace, archiveWorkspace } =
     useWorkspaceStore();
   const { sections, fetchSections, createSection, deleteSection, updateSection, collapsedSections, toggleSectionCollapsed } =
     useSectionStore();
   const { user, logout } = useAuthStore();
+  const { inboxCount, fetchInboxCount } = useTaskStore();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [sectionMenuOpen, setSectionMenuOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -131,6 +135,12 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     fetchWorkspaces();
     fetchSections();
   }, [fetchWorkspaces, fetchSections]);
+
+  useEffect(() => {
+    fetchInboxCount();
+    const interval = setInterval(fetchInboxCount, 60000);
+    return () => clearInterval(interval);
+  }, [fetchInboxCount]);
 
   const handleCreateWorkspace = async (sectionId?: string) => {
     setCreating(true);
@@ -600,6 +610,31 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
               </button>
             </div>
           )}
+
+          {/* Входящие задачи */}
+          <div className="mb-4">
+            <button
+              onClick={() => {
+                router.push('/tasks');
+                close();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer ${
+                pathname === '/tasks'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+              }`}
+            >
+              <div className="relative">
+                <Inbox className="w-5 h-5" />
+                {inboxCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary-500 text-white text-[10px] font-semibold flex items-center justify-center rounded-full px-1">
+                    {inboxCount > 9 ? '9+' : inboxCount}
+                  </span>
+                )}
+              </div>
+              <span className="font-medium">Входящие задачи</span>
+            </button>
+          </div>
 
           {/* Workspaces */}
           <div className="space-y-1">
