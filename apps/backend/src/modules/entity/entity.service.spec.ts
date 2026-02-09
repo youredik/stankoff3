@@ -608,6 +608,7 @@ describe('EntityService', () => {
   describe('findColumnPage', () => {
     it('должен вернуть страницу entities для конкретного статуса', async () => {
       const mockQb = {
+        addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -633,6 +634,7 @@ describe('EntityService', () => {
 
     it('должен вернуть hasMore=false когда все загружены', async () => {
       const mockQb = {
+        addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -656,6 +658,7 @@ describe('EntityService', () => {
 
     it('должен применять offset и limit', async () => {
       const mockQb = {
+        addSelect: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
