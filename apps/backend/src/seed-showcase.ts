@@ -18,12 +18,11 @@ import type { SlaStatus } from './modules/sla/entities/sla-instance.entity';
 import { DecisionTable } from './modules/dmn/entities/decision-table.entity';
 import type { HitPolicy } from './modules/dmn/entities/decision-table.entity';
 import { ProcessDefinition } from './modules/bpmn/entities/process-definition.entity';
-import { ProcessInstance, ProcessInstanceStatus } from './modules/bpmn/entities/process-instance.entity';
 import { ProcessTrigger, TriggerType } from './modules/bpmn/entities/process-trigger.entity';
-import { ProcessActivityLog } from './modules/bpmn/entities/process-activity-log.entity';
 import { EntityLink, EntityLinkType } from './modules/bpmn/entities/entity-link.entity';
 import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
+import { BpmnService } from './modules/bpmn/bpmn.service';
 
 // ──── Helpers ────
 
@@ -46,150 +45,6 @@ function hoursAgo(h: number): Date {
 function rnd(min: number, max: number): number {
   return min + Math.floor(Math.random() * (max - min));
 }
-
-// ──── BPMN Path Definitions (for activity log generation) ────
-
-interface BpmnEl {
-  id: string;
-  type: string;
-  isBottleneck?: boolean;
-}
-
-const PATHS = {
-  vacation: {
-    approve: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_NotifyManager', type: 'serviceTask' },
-      { id: 'Task_ManagerApproval', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Decision', type: 'exclusiveGateway' },
-      { id: 'Task_Approve', type: 'serviceTask' },
-      { id: 'Task_NotifyHR', type: 'serviceTask' },
-      { id: 'Task_NotifyEmployee', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-    reject: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_NotifyManager', type: 'serviceTask' },
-      { id: 'Task_ManagerApproval', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Decision', type: 'exclusiveGateway' },
-      { id: 'Task_Reject', type: 'serviceTask' },
-      { id: 'Task_NotifyEmployee', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-  },
-  expense: {
-    approveNormal: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_CheckBudget', type: 'serviceTask' },
-      { id: 'Gateway_BudgetCheck', type: 'exclusiveGateway' },
-      { id: 'Gateway_AmountCheck', type: 'exclusiveGateway' },
-      { id: 'Task_ManagerApproval', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Decision', type: 'exclusiveGateway' },
-      { id: 'Task_Approve', type: 'serviceTask' },
-      { id: 'Task_ReserveBudget', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-    approveDirector: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_CheckBudget', type: 'serviceTask' },
-      { id: 'Gateway_BudgetCheck', type: 'exclusiveGateway' },
-      { id: 'Gateway_AmountCheck', type: 'exclusiveGateway' },
-      { id: 'Task_DirectorApproval', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Decision', type: 'exclusiveGateway' },
-      { id: 'Task_Approve', type: 'serviceTask' },
-      { id: 'Task_ReserveBudget', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-    rejectBudget: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_CheckBudget', type: 'serviceTask' },
-      { id: 'Gateway_BudgetCheck', type: 'exclusiveGateway' },
-      { id: 'Task_Reject', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-    rejectDecision: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_CheckBudget', type: 'serviceTask' },
-      { id: 'Gateway_BudgetCheck', type: 'exclusiveGateway' },
-      { id: 'Gateway_AmountCheck', type: 'exclusiveGateway' },
-      { id: 'Task_ManagerApproval', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Decision', type: 'exclusiveGateway' },
-      { id: 'Task_Reject', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-  },
-  purchase: {
-    full: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetNew', type: 'serviceTask' },
-      { id: 'Task_Review', type: 'userTask' },
-      { id: 'Task_CheckBudget', type: 'serviceTask' },
-      { id: 'Gateway_Budget', type: 'exclusiveGateway' },
-      { id: 'Task_ManagerApproval', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Approved', type: 'exclusiveGateway' },
-      { id: 'Task_SetApproved', type: 'serviceTask' },
-      { id: 'Task_SelectSupplier', type: 'userTask', isBottleneck: true },
-      { id: 'Task_CreatePO', type: 'userTask' },
-      { id: 'Task_SetOrdered', type: 'serviceTask' },
-      { id: 'Task_ReceiveGoods', type: 'userTask', isBottleneck: true },
-      { id: 'Task_Complete', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-    rejectBudget: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetNew', type: 'serviceTask' },
-      { id: 'Task_Review', type: 'userTask' },
-      { id: 'Task_CheckBudget', type: 'serviceTask' },
-      { id: 'Gateway_Budget', type: 'exclusiveGateway' },
-      { id: 'Task_Reject', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-    rejectManager: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetNew', type: 'serviceTask' },
-      { id: 'Task_Review', type: 'userTask' },
-      { id: 'Task_CheckBudget', type: 'serviceTask' },
-      { id: 'Gateway_Budget', type: 'exclusiveGateway' },
-      { id: 'Task_ManagerApproval', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Approved', type: 'exclusiveGateway' },
-      { id: 'Task_Reject', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-  },
-  simple: {
-    approve: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_Review', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Decision', type: 'exclusiveGateway' },
-      { id: 'Task_Approve', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-    reject: [
-      { id: 'StartEvent_1', type: 'startEvent' },
-      { id: 'Task_SetPending', type: 'serviceTask' },
-      { id: 'Task_Review', type: 'userTask', isBottleneck: true },
-      { id: 'Gateway_Decision', type: 'exclusiveGateway' },
-      { id: 'Task_Reject', type: 'serviceTask' },
-      { id: 'Task_Notify', type: 'serviceTask' },
-      { id: 'EndEvent_1', type: 'endEvent' },
-    ] as BpmnEl[],
-  },
-};
 
 // ──── Types ────
 
@@ -217,12 +72,11 @@ export class SeedShowcase implements OnModuleInit {
     @InjectRepository(SlaInstance) private slaInstRepo: Repository<SlaInstance>,
     @InjectRepository(DecisionTable) private dmnRepo: Repository<DecisionTable>,
     @InjectRepository(ProcessDefinition) private procDefRepo: Repository<ProcessDefinition>,
-    @InjectRepository(ProcessInstance) private procInstRepo: Repository<ProcessInstance>,
     @InjectRepository(ProcessTrigger) private triggerRepo: Repository<ProcessTrigger>,
-    @InjectRepository(ProcessActivityLog) private actLogRepo: Repository<ProcessActivityLog>,
     @InjectRepository(EntityLink) private linkRepo: Repository<EntityLink>,
     @InjectRepository(AutomationRule) private automationRepo: Repository<AutomationRule>,
     @InjectRepository(UserGroup) private groupRepo: Repository<UserGroup>,
+    private readonly bpmnService: BpmnService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -238,22 +92,30 @@ export class SeedShowcase implements OnModuleInit {
       return;
     }
 
-    this.logger.log('Cleaning up non-legacy data and seeding showcase...');
+    this.logger.log('Waiting for Zeebe connection...');
+    await this.bpmnService.waitForConnection(30000);
+
+    this.logger.log('Zeebe connected. Cleaning up and seeding showcase...');
     await this.cleanup();
     await this.seed();
     this.logger.log('Showcase seed completed');
   }
 
-  // Удаляет все данные кроме legacy-миграции (workspace LEG)
   private async cleanup() {
-    this.logger.log('Cleanup: removing non-legacy data...');
+    this.logger.log('Cleanup: removing ALL data...');
 
-    // 1. BPMN / SLA / DMN / Automation (все записи — legacy миграция их не создаёт)
+    // 1. BPMN (user_tasks перед process_instances из-за FK)
+    try { await this.dataSource.query(`DELETE FROM "user_task_comments"`); } catch { /* table may not exist */ }
+    try { await this.dataSource.query(`DELETE FROM "user_tasks"`); } catch { /* table may not exist */ }
     await this.dataSource.query(`DELETE FROM "entity_links"`);
     await this.dataSource.query(`DELETE FROM "process_activity_logs"`);
     await this.dataSource.query(`DELETE FROM "process_instances"`);
+    try { await this.dataSource.query(`DELETE FROM "trigger_executions"`); } catch { /* table may not exist */ }
     await this.dataSource.query(`DELETE FROM "process_triggers"`);
+    try { await this.dataSource.query(`DELETE FROM "form_definitions"`); } catch { /* table may not exist */ }
     await this.dataSource.query(`DELETE FROM "process_definitions"`);
+
+    // 2. SLA / DMN / Automation
     await this.dataSource.query(`DELETE FROM "sla_events"`);
     await this.dataSource.query(`DELETE FROM "sla_instances"`);
     await this.dataSource.query(`DELETE FROM "sla_definitions"`);
@@ -263,38 +125,24 @@ export class SeedShowcase implements OnModuleInit {
     await this.dataSource.query(`DELETE FROM "user_group_members"`);
     await this.dataSource.query(`DELETE FROM "user_groups"`);
 
-    // 2. Comments + Entities не из LEG workspace
-    await this.dataSource.query(`
-      DELETE FROM "comments" WHERE "entityId" IN (
-        SELECT e.id FROM "entities" e
-        JOIN "workspaces" w ON e."workspaceId" = w.id
-        WHERE w."prefix" != 'LEG'
-      )
-    `);
-    await this.dataSource.query(`
-      DELETE FROM "entities" WHERE "workspaceId" IN (
-        SELECT id FROM "workspaces" WHERE "prefix" != 'LEG'
-      )
-    `);
+    // 3. Comments + Entities (все)
+    await this.dataSource.query(`DELETE FROM "comments"`);
+    await this.dataSource.query(`DELETE FROM "entities"`);
 
-    // 3. Workspace members не из LEG
-    await this.dataSource.query(`
-      DELETE FROM "workspace_members" WHERE "workspaceId" IN (
-        SELECT id FROM "workspaces" WHERE "prefix" != 'LEG'
-      )
-    `);
+    // 4. Workspace members (все)
+    await this.dataSource.query(`DELETE FROM "workspace_members"`);
 
-    // 4. Non-legacy workspaces
-    await this.dataSource.query(`DELETE FROM "workspaces" WHERE "prefix" != 'LEG'`);
+    // 5. Workspaces (все)
+    await this.dataSource.query(`DELETE FROM "workspaces"`);
 
-    // 5. Sections
+    // 6. Sections
     await this.dataSource.query(`DELETE FROM "section_members"`);
     await this.dataSource.query(`DELETE FROM "sections"`);
 
-    // 6. Seed-пользователи (оставляем admin и legacy-system)
+    // 7. Пользователи (оставляем только admin)
     await this.dataSource.query(`
       DELETE FROM "users"
-      WHERE "email" NOT IN ('admin@stankoff.ru', 'legacy-system@stankoff.ru')
+      WHERE "email" NOT IN ('admin@stankoff.ru')
     `);
 
     this.logger.log('Cleanup: done');
@@ -317,11 +165,11 @@ export class SeedShowcase implements OnModuleInit {
     const entities = await this.createAllEntities(ws, users);
     await this.createComments(entities, users);
     await this.createSlaInstances(ws, entities, slaDefs);
-    await this.createProcessInstancesWithLogs(ws, entities, procDefs, users);
+    await this.startRealProcesses(ws, entities, procDefs, users);
     await this.createEntityLinks(entities, users.hr[0]);
 
     const total = entities.otp.length + entities.fin.length + entities.po.length + entities.kp.length;
-    this.logger.log(`✅ Showcase: 20 users, 3 sections, 4 workspaces, ${total} entities, activity logs for heat maps`);
+    this.logger.log(`Showcase: 20 users, 3 sections, 4 workspaces, ${total} entities, real BPMN processes`);
   }
 
   // ──── USERS (20) ────
@@ -574,6 +422,13 @@ export class SeedShowcase implements OnModuleInit {
       { workspaceId: ws.po.id, name: 'Процесс закупки', description: 'Полный цикл: проверка → согласование → выбор поставщика → заказ → приёмка', processId: 'purchase-order', bpmnXml: read('purchase-order.bpmn'), version: 1, isActive: true, isDefault: true, createdById: users.finance[0].id },
       { workspaceId: ws.kp.id, name: 'Согласование КП', description: 'Простое согласование коммерческого предложения', processId: 'simple-approval', bpmnXml: read('simple-approval.bpmn'), version: 1, isActive: true, isDefault: true, createdById: users.commercial[0].id },
     ]);
+
+    // Деплой в Zeebe
+    for (const def of defs) {
+      await this.bpmnService.deployDefinition(def.id);
+      this.logger.log(`  Deployed: ${def.processId}`);
+    }
+
     return { vacation: defs[0], expense: defs[1], purchase: defs[2], simple: defs[3] };
   }
 
@@ -987,107 +842,64 @@ export class SeedShowcase implements OnModuleInit {
     if (instances.length > 0) await this.slaInstRepo.save(instances);
   }
 
-  // ──── PROCESS INSTANCES + ACTIVITY LOGS (~120 + ~960) ────
+  // ──── REAL ZEEBE PROCESSES ────
 
-  private async createProcessInstancesWithLogs(
+  private async startRealProcesses(
     ws: Workspaces, entities: EntitiesByWs,
     pd: { vacation: ProcessDefinition; expense: ProcessDefinition; purchase: ProcessDefinition; simple: ProcessDefinition },
     users: UsersByDept,
   ) {
-    let keyCounter = 4503599627370496; // Zeebe-style keys
-    const allLogs: Partial<ProcessActivityLog>[] = [];
+    const batchSize = 10;
+    const delayMs = 200;
 
-    const processWs = async (
-      wsId: string, ents: WorkspaceEntity[], def: ProcessDefinition,
-      completedStatuses: string[], rejectedStatuses: string[],
-      getApprovePath: () => BpmnEl[], getRejectPath: () => BpmnEl[],
+    const startForWorkspace = async (
+      ents: WorkspaceEntity[],
+      def: ProcessDefinition,
       startedById: string,
-    ) => {
-      const instances: Partial<ProcessInstance>[] = [];
-
-      for (const e of ents) {
-        const isCompleted = completedStatuses.includes(e.status);
-        const isRejected = rejectedStatuses.includes(e.status);
-        const isTerminated = false; // no terminated in showcase
-
-        const inst = await this.procInstRepo.save({
-          workspaceId: wsId, entityId: e.id, processDefinitionId: def.id,
-          processDefinitionKey: `${keyCounter++}`, processInstanceKey: `${keyCounter++}`,
-          businessKey: e.customId,
-          status: isCompleted || isRejected
-            ? ProcessInstanceStatus.COMPLETED
-            : ProcessInstanceStatus.ACTIVE,
-          variables: { entityId: e.id, workspaceId: wsId, title: e.title },
-          startedById, startedAt: e.createdAt,
-          completedAt: (isCompleted || isRejected) ? (e.resolvedAt || undefined) : undefined,
-        });
-
-        // Generate activity logs
-        if (isCompleted) {
-          // Full approve path
-          allLogs.push(...this.generateLogs(inst.id, def.id, getApprovePath(), e.createdAt));
-        } else if (isRejected) {
-          // Full reject path
-          allLogs.push(...this.generateLogs(inst.id, def.id, getRejectPath(), e.createdAt));
-        } else {
-          // Active — partial path (stop at random point)
-          const fullPath = getApprovePath();
-          const stopAt = Math.min(rnd(2, fullPath.length - 2), fullPath.length - 1);
-          const partialPath = fullPath.slice(0, stopAt);
-          const logs = this.generateLogs(inst.id, def.id, partialPath, e.createdAt);
-          // Mark last element as active (no completedAt)
-          if (logs.length > 0) {
-            const last = logs[logs.length - 1];
-            last.status = 'active';
-            last.completedAt = null;
-            last.durationMs = null;
-          }
-          allLogs.push(...logs);
+      variableMapper: (e: WorkspaceEntity) => Record<string, any>,
+    ): Promise<number> => {
+      let count = 0;
+      for (let i = 0; i < ents.length; i += batchSize) {
+        const batch = ents.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (e) => {
+            try {
+              await this.bpmnService.startProcess(def.id, variableMapper(e), {
+                entityId: e.id,
+                businessKey: e.customId,
+                startedById,
+              });
+              count++;
+            } catch (err) {
+              this.logger.warn(`Failed to start process for ${e.customId}: ${err.message}`);
+            }
+          }),
+        );
+        if (i + batchSize < ents.length) {
+          await new Promise((r) => setTimeout(r, delayMs));
         }
-
-        instances.push(inst);
       }
-      return instances;
+      return count;
     };
 
-    // OTP
-    await processWs(ws.otp.id, entities.otp, pd.vacation,
-      ['completed'], ['rejected'],
-      () => PATHS.vacation.approve, () => PATHS.vacation.reject,
-      users.hr[0].id,
+    const otpCount = await startForWorkspace(
+      entities.otp, pd.vacation, users.hr[0].id,
+      (e) => ({ entityId: e.id, title: e.title }),
+    );
+    const finCount = await startForWorkspace(
+      entities.fin, pd.expense, users.finance[0].id,
+      (e) => ({ entityId: e.id, title: e.title, amount: (e.data as any)?.amount }),
+    );
+    const poCount = await startForWorkspace(
+      entities.po, pd.purchase, users.finance[0].id,
+      (e) => ({ entityId: e.id, title: e.title, total_amount: (e.data as any)?.total_amount }),
+    );
+    const kpCount = await startForWorkspace(
+      entities.kp, pd.simple, users.commercial[0].id,
+      (e) => ({ entityId: e.id, title: e.title, deal_amount: (e.data as any)?.deal_amount }),
     );
 
-    // FIN — mix approve paths (70% normal, 30% director)
-    await processWs(ws.fin.id, entities.fin, pd.expense,
-      ['paid'], ['rejected'],
-      () => Math.random() < 0.7 ? PATHS.expense.approveNormal : PATHS.expense.approveDirector,
-      () => Math.random() < 0.5 ? PATHS.expense.rejectBudget : PATHS.expense.rejectDecision,
-      users.finance[0].id,
-    );
-
-    // PO
-    await processWs(ws.po.id, entities.po, pd.purchase,
-      ['completed'], ['rejected'],
-      () => PATHS.purchase.full,
-      () => Math.random() < 0.5 ? PATHS.purchase.rejectBudget : PATHS.purchase.rejectManager,
-      users.finance[0].id,
-    );
-
-    // KP
-    await processWs(ws.kp.id, entities.kp, pd.simple,
-      ['won'], ['lost', 'rejected'],
-      () => PATHS.simple.approve, () => PATHS.simple.reject,
-      users.commercial[0].id,
-    );
-
-    // Batch save activity logs
-    if (allLogs.length > 0) {
-      const batchSize = 200;
-      for (let i = 0; i < allLogs.length; i += batchSize) {
-        await this.actLogRepo.save(allLogs.slice(i, i + batchSize));
-      }
-      this.logger.log(`   - ${allLogs.length} activity log entries for heat maps`);
-    }
+    this.logger.log(`  Started ${otpCount + finCount + poCount + kpCount} real Zeebe processes`);
   }
 
   // ──── ENTITY LINKS (15) ────
@@ -1130,36 +942,4 @@ export class SeedShowcase implements OnModuleInit {
     if (validLinks.length > 0) await this.linkRepo.save(validLinks);
   }
 
-  // ──── Activity log helpers ────
-
-  private generateLogs(
-    instId: string, defId: string, elements: BpmnEl[], startTime: Date,
-  ): Partial<ProcessActivityLog>[] {
-    const logs: Partial<ProcessActivityLog>[] = [];
-    let t = new Date(startTime);
-    for (const el of elements) {
-      const dur = this.elDuration(el);
-      const st = new Date(t);
-      const ct = new Date(t.getTime() + dur);
-      const failed = el.type === 'serviceTask' && Math.random() < 0.03;
-      logs.push({
-        processInstanceId: instId, processDefinitionId: defId,
-        elementId: el.id, elementType: el.type,
-        status: failed ? 'failed' : 'success',
-        startedAt: st, completedAt: ct, durationMs: dur,
-      });
-      t = ct;
-    }
-    return logs;
-  }
-
-  private elDuration(el: BpmnEl): number {
-    switch (el.type) {
-      case 'startEvent': case 'endEvent': return rnd(50, 150);
-      case 'exclusiveGateway': return rnd(20, 100);
-      case 'serviceTask': return rnd(200, 2000);
-      case 'userTask': return el.isBottleneck ? rnd(1800000, 14400000) : rnd(300000, 7200000);
-      default: return rnd(100, 500);
-    }
-  }
 }

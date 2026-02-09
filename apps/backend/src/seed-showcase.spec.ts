@@ -13,12 +13,11 @@ import { SlaDefinition } from './modules/sla/entities/sla-definition.entity';
 import { SlaInstance } from './modules/sla/entities/sla-instance.entity';
 import { DecisionTable } from './modules/dmn/entities/decision-table.entity';
 import { ProcessDefinition } from './modules/bpmn/entities/process-definition.entity';
-import { ProcessInstance } from './modules/bpmn/entities/process-instance.entity';
 import { ProcessTrigger } from './modules/bpmn/entities/process-trigger.entity';
-import { ProcessActivityLog } from './modules/bpmn/entities/process-activity-log.entity';
 import { EntityLink } from './modules/bpmn/entities/entity-link.entity';
 import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
+import { BpmnService } from './modules/bpmn/bpmn.service';
 
 function createMockRepository() {
   return {
@@ -47,13 +46,17 @@ describe('SeedShowcase', () => {
   let slaInstRepo: ReturnType<typeof createMockRepository>;
   let dmnTableRepo: ReturnType<typeof createMockRepository>;
   let processDefRepo: ReturnType<typeof createMockRepository>;
-  let processInstRepo: ReturnType<typeof createMockRepository>;
   let triggerRepo: ReturnType<typeof createMockRepository>;
-  let actLogRepo: ReturnType<typeof createMockRepository>;
   let linkRepo: ReturnType<typeof createMockRepository>;
   let automationRepo: ReturnType<typeof createMockRepository>;
   let userGroupRepo: ReturnType<typeof createMockRepository>;
   let mockDataSource: { query: jest.Mock };
+  let mockBpmnService: {
+    waitForConnection: jest.Mock;
+    deployDefinition: jest.Mock;
+    startProcess: jest.Mock;
+    isZeebeConnected: jest.Mock;
+  };
 
   beforeEach(async () => {
     userRepo = createMockRepository();
@@ -67,13 +70,26 @@ describe('SeedShowcase', () => {
     slaInstRepo = createMockRepository();
     dmnTableRepo = createMockRepository();
     processDefRepo = createMockRepository();
-    processInstRepo = createMockRepository();
     triggerRepo = createMockRepository();
-    actLogRepo = createMockRepository();
     linkRepo = createMockRepository();
     automationRepo = createMockRepository();
     userGroupRepo = createMockRepository();
     mockDataSource = { query: jest.fn().mockResolvedValue([]) };
+    mockBpmnService = {
+      waitForConnection: jest.fn().mockResolvedValue(undefined),
+      deployDefinition: jest.fn().mockResolvedValue({
+        id: 'pd-0',
+        deployedKey: '2251799813685249',
+        version: 1,
+        deployedAt: new Date(),
+      }),
+      startProcess: jest.fn().mockResolvedValue({
+        id: 'pi-0',
+        processInstanceKey: '4503599627370496',
+        status: 'ACTIVE',
+      }),
+      isZeebeConnected: jest.fn().mockReturnValue(true),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -89,12 +105,11 @@ describe('SeedShowcase', () => {
         { provide: getRepositoryToken(SlaInstance), useValue: slaInstRepo },
         { provide: getRepositoryToken(DecisionTable), useValue: dmnTableRepo },
         { provide: getRepositoryToken(ProcessDefinition), useValue: processDefRepo },
-        { provide: getRepositoryToken(ProcessInstance), useValue: processInstRepo },
         { provide: getRepositoryToken(ProcessTrigger), useValue: triggerRepo },
-        { provide: getRepositoryToken(ProcessActivityLog), useValue: actLogRepo },
         { provide: getRepositoryToken(EntityLink), useValue: linkRepo },
         { provide: getRepositoryToken(AutomationRule), useValue: automationRepo },
         { provide: getRepositoryToken(UserGroup), useValue: userGroupRepo },
+        { provide: BpmnService, useValue: mockBpmnService },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -113,9 +128,9 @@ describe('SeedShowcase', () => {
 
       await service.onModuleInit();
 
-      // Не должен вызывать cleanup (query) или создавать пользователей
       expect(mockDataSource.query).not.toHaveBeenCalled();
       expect(userRepo.save).not.toHaveBeenCalled();
+      expect(mockBpmnService.waitForConnection).not.toHaveBeenCalled();
     });
 
     it('должен пропустить если нет пользователей (base seed не запущен)', async () => {
@@ -125,6 +140,29 @@ describe('SeedShowcase', () => {
       await service.onModuleInit();
 
       expect(mockDataSource.query).not.toHaveBeenCalled();
+      expect(sectionRepo.save).not.toHaveBeenCalled();
+      expect(mockBpmnService.waitForConnection).not.toHaveBeenCalled();
+    });
+
+    it('должен ожидать Zeebe подключения перед seed', async () => {
+      sectionRepo.findOne.mockResolvedValue(null);
+      userRepo.count.mockResolvedValue(4);
+      userRepo.findOne.mockResolvedValue({ id: 'admin-id', email: 'admin@stankoff.ru' });
+      setupSeedMocks();
+
+      await service.onModuleInit();
+
+      expect(mockBpmnService.waitForConnection).toHaveBeenCalledWith(30000);
+    });
+
+    it('должен падать если Zeebe не подключён', async () => {
+      sectionRepo.findOne.mockResolvedValue(null);
+      userRepo.count.mockResolvedValue(4);
+      mockBpmnService.waitForConnection.mockRejectedValue(
+        new Error('Zeebe connection not established within 30000ms'),
+      );
+
+      await expect(service.onModuleInit()).rejects.toThrow('Zeebe connection not established');
       expect(sectionRepo.save).not.toHaveBeenCalled();
     });
 
@@ -136,14 +174,11 @@ describe('SeedShowcase', () => {
 
       await service.onModuleInit();
 
-      // Cleanup должен был вызвать DELETE запросы
       expect(mockDataSource.query).toHaveBeenCalled();
       const deleteQueries = mockDataSource.query.mock.calls.filter(
         (c: any) => typeof c[0] === 'string' && c[0].includes('DELETE'),
       );
       expect(deleteQueries.length).toBeGreaterThan(0);
-
-      // Seed должен создать секции
       expect(sectionRepo.save).toHaveBeenCalled();
     });
   });
@@ -160,7 +195,6 @@ describe('SeedShowcase', () => {
       const queries = mockDataSource.query.mock.calls.map((c: any) => c[0] as string);
       const deleteQueries = queries.filter((q: string) => q.includes('DELETE'));
 
-      // entity_links и process_activity_logs должны удаляться раньше process_instances
       const linkIdx = deleteQueries.findIndex((q: string) => q.includes('entity_links'));
       const logIdx = deleteQueries.findIndex((q: string) => q.includes('process_activity_logs'));
       const instIdx = deleteQueries.findIndex((q: string) => q.includes('process_instances'));
@@ -171,7 +205,7 @@ describe('SeedShowcase', () => {
       expect(instIdx).toBeLessThan(defIdx);
     });
 
-    it('должен сохранять Legacy workspace (prefix LEG)', async () => {
+    it('должен удалять ВСЕ данные включая Legacy', async () => {
       sectionRepo.findOne.mockResolvedValue(null);
       userRepo.count.mockResolvedValue(4);
       userRepo.findOne.mockResolvedValue({ id: 'admin-id', email: 'admin@stankoff.ru' });
@@ -181,15 +215,19 @@ describe('SeedShowcase', () => {
 
       const queries = mockDataSource.query.mock.calls.map((c: any) => c[0] as string);
 
-      // Workspaces с prefix != 'LEG' удаляются, но LEG сохраняется
-      const wsDeleteQuery = queries.find(
-        (q: string) => q.includes('workspaces') && q.includes('prefix'),
+      // Не должно быть фильтров по prefix LEG
+      const legFilters = queries.filter((q: string) => q.includes('LEG'));
+      expect(legFilters).toHaveLength(0);
+
+      // Workspaces удаляются безусловно
+      const wsDelete = queries.find((q: string) =>
+        q.includes('"workspaces"') && q.includes('DELETE') && !q.includes('workspace_members'),
       );
-      expect(wsDeleteQuery).toBeDefined();
-      expect(wsDeleteQuery).toContain("!= 'LEG'");
+      expect(wsDelete).toBeDefined();
+      expect(wsDelete).not.toContain('prefix');
     });
 
-    it('должен сохранять admin и legacy-system пользователей', async () => {
+    it('должен сохранять только admin пользователя', async () => {
       sectionRepo.findOne.mockResolvedValue(null);
       userRepo.count.mockResolvedValue(4);
       userRepo.findOne.mockResolvedValue({ id: 'admin-id', email: 'admin@stankoff.ru' });
@@ -203,7 +241,7 @@ describe('SeedShowcase', () => {
       );
       expect(userDeleteQuery).toBeDefined();
       expect(userDeleteQuery).toContain('admin@stankoff.ru');
-      expect(userDeleteQuery).toContain('legacy-system@stankoff.ru');
+      expect(userDeleteQuery).not.toContain('legacy-system@stankoff.ru');
     });
   });
 
@@ -216,7 +254,6 @@ describe('SeedShowcase', () => {
     it('должен создать 20 пользователей', async () => {
       await service.seed();
 
-      // 20 пользователей по одному (каждый проверяется findOne, потом save)
       expect(userRepo.save).toHaveBeenCalledTimes(20);
     });
 
@@ -224,13 +261,10 @@ describe('SeedShowcase', () => {
       await service.seed();
 
       const savedEmails = userRepo.save.mock.calls.map((c: any) => c[0].email);
-      // HR users
       expect(savedEmails).toContain('antonova@stankoff.ru');
       expect(savedEmails).toContain('zhukova@stankoff.ru');
-      // Finance users
       expect(savedEmails).toContain('zakharov@stankoff.ru');
       expect(savedEmails).toContain('osipov@stankoff.ru');
-      // Commercial users
       expect(savedEmails).toContain('polyakova@stankoff.ru');
       expect(savedEmails).toContain('filippov@stankoff.ru');
     });
@@ -329,6 +363,12 @@ describe('SeedShowcase', () => {
       expect(processIds).toContain('simple-approval');
     });
 
+    it('должен задеплоить 4 process definitions в Zeebe', async () => {
+      await service.seed();
+
+      expect(mockBpmnService.deployDefinition).toHaveBeenCalledTimes(4);
+    });
+
     it('должен создать 4 триггера ENTITY_CREATED', async () => {
       await service.seed();
 
@@ -384,11 +424,9 @@ describe('SeedShowcase', () => {
     it('должен создать ~140 entities в 4 workspace', async () => {
       await service.seed();
 
-      // Entities сохраняются батчами по workspace (4 вызова save)
       const entityCalls = entityRepo.save.mock.calls;
       expect(entityCalls).toHaveLength(4);
 
-      // Общее количество entities = 140
       const totalEntities = entityCalls.reduce(
         (sum: number, c: any) => sum + (Array.isArray(c[0]) ? c[0].length : 1),
         0,
@@ -399,7 +437,6 @@ describe('SeedShowcase', () => {
     it('entities должны иметь customId вида PREFIX-N', async () => {
       await service.seed();
 
-      // Первый вызов save - OTP entities
       const otpBatch = entityRepo.save.mock.calls[0][0];
       const customIds = otpBatch.map((e: any) => e.customId);
       expect(customIds).toContain('OTP-1');
@@ -410,7 +447,6 @@ describe('SeedShowcase', () => {
       await service.seed();
 
       expect(commentRepo.save).toHaveBeenCalled();
-      // Комментарии к ~80 entities
       const totalComments = commentRepo.save.mock.calls.length;
       expect(totalComments).toBeGreaterThan(0);
     });
@@ -421,71 +457,26 @@ describe('SeedShowcase', () => {
       expect(slaInstRepo.save).toHaveBeenCalled();
     });
 
-    it('должен создать process instances', async () => {
+    it('должен запустить реальные Zeebe процессы для всех entities', async () => {
       await service.seed();
 
-      expect(processInstRepo.save).toHaveBeenCalled();
+      // 140 entities = 35 OTP + 35 FIN + 35 PO + 35 KP
+      expect(mockBpmnService.startProcess).toHaveBeenCalledTimes(140);
     });
 
-    it('должен создать activity logs для тепловых карт', async () => {
+    it('должен передавать корректные переменные при запуске процессов', async () => {
       await service.seed();
 
-      expect(actLogRepo.save).toHaveBeenCalled();
-      // Activity logs сохраняются батчами по 200
-      const totalLogs = actLogRepo.save.mock.calls.reduce(
-        (sum: number, c: any) => sum + (Array.isArray(c[0]) ? c[0].length : 1),
-        0,
-      );
-      // Ожидаем ~960 логов (минимум 500)
-      expect(totalLogs).toBeGreaterThan(500);
-    });
-
-    it('activity logs должны содержать корректные BPMN element IDs', async () => {
-      await service.seed();
-
-      const allLogs = actLogRepo.save.mock.calls.flatMap(
-        (c: any) => (Array.isArray(c[0]) ? c[0] : [c[0]]),
-      );
-
-      // Все логи должны иметь elementId и elementType
-      for (const log of allLogs) {
-        expect(log.elementId).toBeDefined();
-        expect(log.elementType).toBeDefined();
-        expect(log.startedAt).toBeDefined();
-        // Для ACTIVE процессов последний шаг может быть незавершённым
-        if (log.durationMs !== null) {
-          expect(log.durationMs).toBeGreaterThan(0);
-        }
+      const calls = mockBpmnService.startProcess.mock.calls;
+      // Каждый вызов имеет definitionId, variables, options
+      for (const call of calls) {
+        const [, variables, options] = call;
+        expect(variables.entityId).toBeDefined();
+        expect(variables.title).toBeDefined();
+        expect(options.entityId).toBeDefined();
+        expect(options.businessKey).toBeDefined();
+        expect(options.startedById).toBeDefined();
       }
-
-      // Должны содержать известные element IDs
-      const elementIds = new Set(allLogs.map((l: any) => l.elementId));
-      expect(elementIds.has('StartEvent_1')).toBe(true);
-      expect(elementIds.has('EndEvent_1')).toBe(true);
-    });
-
-    it('activity logs должны включать bottleneck элементы с большей длительностью', async () => {
-      await service.seed();
-
-      const allLogs = actLogRepo.save.mock.calls.flatMap(
-        (c: any) => (Array.isArray(c[0]) ? c[0] : [c[0]]),
-      );
-
-      const bottleneckIds = [
-        'Task_ManagerApproval', 'Task_DirectorApproval',
-        'Task_SelectSupplier', 'Task_ReceiveGoods', 'Task_Review',
-      ];
-
-      const bottleneckLogs = allLogs.filter((l: any) => bottleneckIds.includes(l.elementId));
-      const normalServiceLogs = allLogs.filter((l: any) => l.elementType === 'serviceTask');
-
-      expect(bottleneckLogs.length).toBeGreaterThan(0);
-      expect(normalServiceLogs.length).toBeGreaterThan(0);
-
-      // Средняя длительность bottleneck должна быть значительно больше service tasks
-      const avgBottleneck = bottleneckLogs.reduce((s: number, l: any) => s + l.durationMs, 0) / bottleneckLogs.length;
-      const avgService = normalServiceLogs.reduce((s: number, l: any) => s + l.durationMs, 0) / normalServiceLogs.length;
-      expect(avgBottleneck).toBeGreaterThan(avgService * 10);
     });
 
     it('должен создать entity links (cross-workspace)', async () => {
@@ -515,7 +506,6 @@ describe('SeedShowcase', () => {
 
       expect(sectionMemberRepo.save).toHaveBeenCalled();
       const members = sectionMemberRepo.save.mock.calls[0][0];
-      // Admin входит во все 3 секции + 6 обычных участников = минимум 9
       expect(members.length).toBeGreaterThanOrEqual(9);
     });
   });
@@ -572,13 +562,6 @@ describe('SeedShowcase', () => {
       }
       entityCounter++;
       return Promise.resolve({ id: `ent-${entityCounter}`, ...data, createdAt: data.createdAt || new Date() });
-    });
-
-    processInstRepo.save.mockImplementation((data: any) => {
-      if (Array.isArray(data)) {
-        return Promise.resolve(data.map((d, i) => ({ id: `pi-${i}`, ...d })));
-      }
-      return Promise.resolve({ id: 'pi-0', ...data });
     });
 
     userGroupRepo.create.mockImplementation((data: any) => ({

@@ -2826,19 +2826,31 @@ interface OnboardingStore {
 - Запускается только если нет пользователей
 
 **`SeedShowcase`** (seed-showcase.ts) — полные демо-данные для всех функций:
+- **Требует Zeebe** — деплоит и запускает реальные BPMN процессы
 - 20 пользователей (HR: 7, Финансы: 7, Коммерческий: 6)
 - 3 секции (HR, Финансы, Коммерческий)
 - 4 workspace'а (OTP, FIN, PO, KP) с полными конфигурациями полей
-- 4 BPMN process definitions из шаблонов + 4 триггера (ENTITY_CREATED)
+- 4 BPMN process definitions из шаблонов → деплой в Zeebe + 4 триггера (ENTITY_CREATED)
 - 8 SLA определений (2 на workspace) + SLA instances
 - 4 DMN таблицы (FIRST, COLLECT, RULE_ORDER)
 - 6 automation rules
 - ~140 entities (35 per workspace) с реалистичными данными
 - ~80 комментариев
-- ~120 process instances + ~960 activity logs (для тепловых карт с bottleneck simulation)
+- ~140 реальных Zeebe процессов (запускаются батчами по 10, 200ms между батчами)
 - 15 entity links (cross-workspace: RELATED, PARENT/CHILD, SPAWNED, BLOCKS/BLOCKED_BY, DUPLICATE)
-- Cleanup: удаляет все данные кроме Legacy workspace (prefix LEG)
+- Cleanup: удаляет ВСЕ данные (включая Legacy)
 - Guard: проверяет существование секции "HR" и наличие пользователей
+
+**`SeedServiceDepartment`** (seed-service-department.ts) — сервисный отдел:
+- **Требует Zeebe** — деплоит и запускает реальные BPMN процессы
+- 12 пользователей (руководитель, инженеры, менеджеры)
+- 1 секция "Сервис"
+- 2 workspace'а (ТП — техподдержка, РЕК — рекламации)
+- 3 BPMN process definitions (support-v2, claims-management, sla-escalation) → деплой в Zeebe
+- SLA определения с 3 уровнями серьёзности для рекламаций
+- 2 DMN таблицы
+- 32 ТП entities + 12 РЕК entities → ~44 реальных Zeebe процессов
+- Guard: проверяет отсутствие секции "Сервис"
 
 ## Масштабирование
 

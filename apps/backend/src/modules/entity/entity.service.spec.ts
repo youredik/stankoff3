@@ -466,6 +466,8 @@ describe('EntityService', () => {
       addOrderBy: jest.fn().mockReturnThis(),
       take: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
       getRawMany: jest.fn().mockResolvedValue([]),
       getMany: jest.fn().mockResolvedValue([]),
       getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
@@ -614,8 +616,8 @@ describe('EntityService', () => {
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
         getManyAndCount: jest.fn().mockResolvedValue([[mockEntity], 50]),
       };
       entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
@@ -640,8 +642,8 @@ describe('EntityService', () => {
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
         getManyAndCount: jest.fn().mockResolvedValue([[mockEntity], 5]),
       };
       entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
@@ -664,8 +666,8 @@ describe('EntityService', () => {
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
         getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
       };
       entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
@@ -677,8 +679,8 @@ describe('EntityService', () => {
         limit: 20,
       });
 
-      expect(mockQb.skip).toHaveBeenCalledWith(40);
-      expect(mockQb.take).toHaveBeenCalledWith(20);
+      expect(mockQb.offset).toHaveBeenCalledWith(40);
+      expect(mockQb.limit).toHaveBeenCalledWith(20);
       expect(mockQb.andWhere).toHaveBeenCalledWith('entity.status = :status', { status: 'done' });
     });
   });

@@ -27,6 +27,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { GeocodingModule } from './modules/geocoding/geocoding.module';
 import { SeedService } from './seed.service';
 import { SeedShowcase } from './seed-showcase';
+import { SeedServiceDepartment } from './seed-service-department';
 import { User } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
 import { Comment } from './modules/entity/comment.entity';
@@ -94,6 +95,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
   providers: [
     SeedService,
     SeedShowcase,
+    SeedServiceDepartment,
     // Глобальные guards - порядок важен: сначала JWT, потом Roles
     {
       provide: APP_GUARD,

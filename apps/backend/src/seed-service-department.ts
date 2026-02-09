@@ -22,8 +22,8 @@ import { SlaEvent } from './modules/sla/entities/sla-event.entity';
 import { DecisionTable } from './modules/dmn/entities/decision-table.entity';
 import type { HitPolicy } from './modules/dmn/entities/decision-table.entity';
 import { ProcessDefinition } from './modules/bpmn/entities/process-definition.entity';
-import { ProcessInstance, ProcessInstanceStatus } from './modules/bpmn/entities/process-instance.entity';
 import { ProcessTrigger, TriggerType } from './modules/bpmn/entities/process-trigger.entity';
+import { BpmnService } from './modules/bpmn/bpmn.service';
 import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
 import { FormDefinition } from './modules/bpmn/entities/form-definition.entity';
@@ -64,11 +64,11 @@ export class SeedServiceDepartment implements OnModuleInit {
     @InjectRepository(SlaEvent) private slaEventRepo: Repository<SlaEvent>,
     @InjectRepository(DecisionTable) private dmnTableRepo: Repository<DecisionTable>,
     @InjectRepository(ProcessDefinition) private processDefRepo: Repository<ProcessDefinition>,
-    @InjectRepository(ProcessInstance) private processInstRepo: Repository<ProcessInstance>,
     @InjectRepository(ProcessTrigger) private triggerRepo: Repository<ProcessTrigger>,
     @InjectRepository(AutomationRule) private automationRepo: Repository<AutomationRule>,
     @InjectRepository(UserGroup) private userGroupRepo: Repository<UserGroup>,
     @InjectRepository(FormDefinition) private formDefRepo: Repository<FormDefinition>,
+    private readonly bpmnService: BpmnService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -86,6 +86,9 @@ export class SeedServiceDepartment implements OnModuleInit {
       this.logger.warn('No users found — waiting for base seed to run first');
       return;
     }
+
+    this.logger.log('Waiting for Zeebe connection...');
+    await this.bpmnService.waitForConnection(30000);
 
     this.logger.log('Seeding service department...');
     await this.seed();
@@ -207,9 +210,9 @@ export class SeedServiceDepartment implements OnModuleInit {
     );
 
     // ═══════════════════════════════════════
-    // 15. PROCESS INSTANCES
+    // 15. REAL ZEEBE PROCESSES
     // ═══════════════════════════════════════
-    await this.createProcessInstances(
+    await this.startRealProcesses(
       tpWorkspace,
       rekWorkspace,
       tpEntities,
@@ -218,12 +221,13 @@ export class SeedServiceDepartment implements OnModuleInit {
       users,
     );
 
-    this.logger.log('✅ Service department seed data created:');
+    this.logger.log('Service department seed data created:');
     this.logger.log(`   - 12 users (service department)`);
     this.logger.log(`   - 1 section "Сервис"`);
     this.logger.log(`   - 2 workspaces (TP, REK)`);
     this.logger.log(`   - ${tpEntities.length} tech support tickets`);
     this.logger.log(`   - ${rekEntities.length} claims`);
+    this.logger.log(`   - Real Zeebe processes started`);
   }
 
   // ────────────────────────────────────────────────
@@ -996,6 +1000,12 @@ export class SeedServiceDepartment implements OnModuleInit {
       },
     ]);
 
+    // Деплой в Zeebe
+    for (const def of defs) {
+      await this.bpmnService.deployDefinition(def.id);
+      this.logger.log(`  Deployed: ${def.processId}`);
+    }
+
     return {
       supportV2: defs[0],
       claimsManagement: defs[1],
@@ -1361,9 +1371,9 @@ export class SeedServiceDepartment implements OnModuleInit {
   }
 
   // ────────────────────────────────────────────────
-  // PROCESS INSTANCES
+  // REAL ZEEBE PROCESSES
   // ────────────────────────────────────────────────
-  private async createProcessInstances(
+  private async startRealProcesses(
     tp: Workspace,
     rek: Workspace,
     tpEntities: WorkspaceEntity[],
@@ -1371,70 +1381,60 @@ export class SeedServiceDepartment implements OnModuleInit {
     processDefs: { supportV2: ProcessDefinition; claimsManagement: ProcessDefinition; slaEscalation: ProcessDefinition },
     users: Record<string, User>,
   ) {
-    const instances: Partial<ProcessInstance>[] = [];
-    let keyCounter = 2251799813685249; // Zeebe-style keys
+    const batchSize = 10;
+    const delayMs = 200;
+    let count = 0;
 
-    // Process instances for TP (active tickets get active instances, closed get completed)
-    for (const entity of tpEntities) {
-      const isCompleted = ['closed'].includes(entity.status);
-      const isTerminated = ['rejected'].includes(entity.status);
-
-      instances.push({
-        workspaceId: tp.id,
-        entityId: entity.id,
-        processDefinitionId: processDefs.supportV2.id,
-        processDefinitionKey: `${keyCounter++}`,
-        processInstanceKey: `${keyCounter++}`,
-        businessKey: entity.customId,
-        status: isCompleted
-          ? ProcessInstanceStatus.COMPLETED
-          : isTerminated
-            ? ProcessInstanceStatus.TERMINATED
-            : ProcessInstanceStatus.ACTIVE,
-        variables: {
-          entityId: entity.id,
-          workspaceId: tp.id,
-          title: entity.title,
-          priority: entity.priority,
-          category: (entity.data as any)?.category,
-          assigneeId: entity.assigneeId,
-        },
-        startedById: users.kozlov.id,
-        startedAt: entity.createdAt,
-        completedAt: isCompleted ? entity.resolvedAt : undefined,
-      });
+    // TP entities → service-support-v2
+    for (let i = 0; i < tpEntities.length; i += batchSize) {
+      const batch = tpEntities.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (entity) => {
+        try {
+          await this.bpmnService.startProcess(processDefs.supportV2.id, {
+            entityId: entity.id,
+            workspaceId: tp.id,
+            title: entity.title,
+            priority: entity.priority,
+            category: (entity.data as any)?.category,
+            assigneeId: entity.assigneeId,
+          }, {
+            entityId: entity.id,
+            businessKey: entity.customId,
+            startedById: users.kozlov.id,
+          });
+          count++;
+        } catch (err) {
+          this.logger.warn(`Failed to start process for ${entity.customId}: ${err.message}`);
+        }
+      }));
+      if (i + batchSize < tpEntities.length) await new Promise((r) => setTimeout(r, delayMs));
     }
 
-    // Process instances for REK
-    for (const entity of rekEntities) {
-      const isCompleted = ['closed'].includes(entity.status);
-      const isRejected = ['rejected'].includes(entity.status);
-
-      instances.push({
-        workspaceId: rek.id,
-        entityId: entity.id,
-        processDefinitionId: processDefs.claimsManagement.id,
-        processDefinitionKey: `${keyCounter++}`,
-        processInstanceKey: `${keyCounter++}`,
-        businessKey: entity.customId,
-        status: isCompleted || isRejected
-          ? ProcessInstanceStatus.COMPLETED
-          : ProcessInstanceStatus.ACTIVE,
-        variables: {
-          entityId: entity.id,
-          workspaceId: rek.id,
-          title: entity.title,
-          severity: (entity.data as any)?.severity,
-          claimType: (entity.data as any)?.claim_type,
-        },
-        startedById: users.kuznetsova.id,
-        startedAt: entity.createdAt,
-        completedAt: (isCompleted || isRejected) ? entity.resolvedAt : undefined,
-      });
+    // REK entities → claims-management
+    for (let i = 0; i < rekEntities.length; i += batchSize) {
+      const batch = rekEntities.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (entity) => {
+        try {
+          await this.bpmnService.startProcess(processDefs.claimsManagement.id, {
+            entityId: entity.id,
+            workspaceId: rek.id,
+            title: entity.title,
+            severity: (entity.data as any)?.severity,
+            claimType: (entity.data as any)?.claim_type,
+            clientName: (entity.data as any)?.client_name,
+          }, {
+            entityId: entity.id,
+            businessKey: entity.customId,
+            startedById: users.kuznetsova.id,
+          });
+          count++;
+        } catch (err) {
+          this.logger.warn(`Failed to start process for ${entity.customId}: ${err.message}`);
+        }
+      }));
+      if (i + batchSize < rekEntities.length) await new Promise((r) => setTimeout(r, delayMs));
     }
 
-    if (instances.length > 0) {
-      await this.processInstRepo.save(instances);
-    }
+    this.logger.log(`  Started ${count} real Zeebe processes`);
   }
 }

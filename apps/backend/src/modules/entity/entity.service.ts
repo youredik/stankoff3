@@ -96,7 +96,7 @@ export class EntityService {
 
       this.applyKanbanFilters(qb, query);
       this.applyKanbanSort(qb);
-      qb.take(perColumn);
+      qb.limit(perColumn);
 
       const items = await qb.getMany();
       return { status, items, total, hasMore: total > perColumn };
@@ -123,7 +123,7 @@ export class EntityService {
 
     this.applyKanbanFilters(qb, query);
     this.applyKanbanSort(qb);
-    qb.skip(query.offset).take(limit);
+    qb.offset(query.offset).limit(limit);
 
     const [items, total] = await qb.getManyAndCount();
     return { items, total, hasMore: query.offset + items.length < total };
@@ -154,11 +154,10 @@ export class EntityService {
   }
 
   private applyKanbanSort(qb: SelectQueryBuilder<WorkspaceEntity>): void {
-    qb.addSelect(
-      `CASE "priority" WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END`,
-      'priority_order',
+    qb.orderBy(
+      `CASE "entity"."priority" WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END`,
+      'ASC',
     )
-      .orderBy('"priority_order"', 'ASC')
       .addOrderBy('entity.createdAt', 'DESC');
   }
 

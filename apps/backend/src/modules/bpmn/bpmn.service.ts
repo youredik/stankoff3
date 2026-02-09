@@ -144,6 +144,21 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     return this.isConnected;
   }
 
+  async waitForConnection(timeoutMs = 30000): Promise<void> {
+    if (this.isConnected) return;
+
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (this.isConnected) return;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    throw new Error(
+      `Zeebe connection not established within ${timeoutMs}ms. ` +
+        `Seed requires a running Zeebe instance. Start Camunda: docker compose -f docker-compose.camunda.yml up -d`,
+    );
+  }
+
   async getHealth(): Promise<{
     connected: boolean;
     brokers?: number;

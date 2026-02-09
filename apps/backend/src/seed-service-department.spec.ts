@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { SeedServiceDepartment } from './seed-service-department';
 import { User, UserRole } from './modules/user/user.entity';
 import { WorkspaceEntity } from './modules/entity/entity.entity';
@@ -14,11 +14,11 @@ import { SlaInstance } from './modules/sla/entities/sla-instance.entity';
 import { SlaEvent } from './modules/sla/entities/sla-event.entity';
 import { DecisionTable } from './modules/dmn/entities/decision-table.entity';
 import { ProcessDefinition } from './modules/bpmn/entities/process-definition.entity';
-import { ProcessInstance } from './modules/bpmn/entities/process-instance.entity';
 import { ProcessTrigger } from './modules/bpmn/entities/process-trigger.entity';
 import { AutomationRule } from './modules/automation/automation-rule.entity';
 import { UserGroup } from './modules/bpmn/entities/user-group.entity';
 import { FormDefinition } from './modules/bpmn/entities/form-definition.entity';
+import { BpmnService } from './modules/bpmn/bpmn.service';
 
 // Helper to create mock repository
 function createMockRepository() {
@@ -49,11 +49,15 @@ describe('SeedServiceDepartment', () => {
   let slaEventRepo: ReturnType<typeof createMockRepository>;
   let dmnTableRepo: ReturnType<typeof createMockRepository>;
   let processDefRepo: ReturnType<typeof createMockRepository>;
-  let processInstRepo: ReturnType<typeof createMockRepository>;
   let triggerRepo: ReturnType<typeof createMockRepository>;
   let automationRepo: ReturnType<typeof createMockRepository>;
   let userGroupRepo: ReturnType<typeof createMockRepository>;
   let formDefRepo: ReturnType<typeof createMockRepository>;
+  let mockBpmnService: {
+    waitForConnection: jest.Mock;
+    deployDefinition: jest.Mock;
+    startProcess: jest.Mock;
+  };
 
   beforeEach(async () => {
     userRepo = createMockRepository();
@@ -68,11 +72,24 @@ describe('SeedServiceDepartment', () => {
     slaEventRepo = createMockRepository();
     dmnTableRepo = createMockRepository();
     processDefRepo = createMockRepository();
-    processInstRepo = createMockRepository();
     triggerRepo = createMockRepository();
     automationRepo = createMockRepository();
     userGroupRepo = createMockRepository();
     formDefRepo = createMockRepository();
+    mockBpmnService = {
+      waitForConnection: jest.fn().mockResolvedValue(undefined),
+      deployDefinition: jest.fn().mockResolvedValue({
+        id: 'pd-0',
+        deployedKey: '2251799813685249',
+        version: 1,
+        deployedAt: new Date(),
+      }),
+      startProcess: jest.fn().mockResolvedValue({
+        id: 'pi-0',
+        processInstanceKey: '4503599627370496',
+        status: 'ACTIVE',
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -89,11 +106,11 @@ describe('SeedServiceDepartment', () => {
         { provide: getRepositoryToken(SlaEvent), useValue: slaEventRepo },
         { provide: getRepositoryToken(DecisionTable), useValue: dmnTableRepo },
         { provide: getRepositoryToken(ProcessDefinition), useValue: processDefRepo },
-        { provide: getRepositoryToken(ProcessInstance), useValue: processInstRepo },
         { provide: getRepositoryToken(ProcessTrigger), useValue: triggerRepo },
         { provide: getRepositoryToken(AutomationRule), useValue: automationRepo },
         { provide: getRepositoryToken(UserGroup), useValue: userGroupRepo },
         { provide: getRepositoryToken(FormDefinition), useValue: formDefRepo },
+        { provide: BpmnService, useValue: mockBpmnService },
         { provide: DataSource, useValue: {} },
       ],
     }).compile();
@@ -112,8 +129,8 @@ describe('SeedServiceDepartment', () => {
 
       await service.onModuleInit();
 
-      // Should not create any users since seed was skipped
       expect(userRepo.save).not.toHaveBeenCalled();
+      expect(mockBpmnService.waitForConnection).not.toHaveBeenCalled();
     });
 
     it('should skip if no users exist (base seed not run yet)', async () => {
@@ -122,7 +139,28 @@ describe('SeedServiceDepartment', () => {
 
       await service.onModuleInit();
 
-      // Should not create section since base seed hasn't run
+      expect(sectionRepo.save).not.toHaveBeenCalled();
+      expect(mockBpmnService.waitForConnection).not.toHaveBeenCalled();
+    });
+
+    it('should wait for Zeebe connection before seed', async () => {
+      sectionRepo.findOne.mockResolvedValue(null);
+      userRepo.count.mockResolvedValue(4);
+      userRepo.findOne.mockResolvedValue({ id: 'admin-id', email: 'admin@stankoff.ru' });
+
+      await service.onModuleInit();
+
+      expect(mockBpmnService.waitForConnection).toHaveBeenCalledWith(30000);
+    });
+
+    it('should fail if Zeebe is not connected', async () => {
+      sectionRepo.findOne.mockResolvedValue(null);
+      userRepo.count.mockResolvedValue(4);
+      mockBpmnService.waitForConnection.mockRejectedValue(
+        new Error('Zeebe connection not established within 30000ms'),
+      );
+
+      await expect(service.onModuleInit()).rejects.toThrow('Zeebe connection not established');
       expect(sectionRepo.save).not.toHaveBeenCalled();
     });
 
@@ -133,11 +171,8 @@ describe('SeedServiceDepartment', () => {
 
       await service.onModuleInit();
 
-      // Should create section
       expect(sectionRepo.save).toHaveBeenCalled();
-      // Should create workspaces
       expect(workspaceRepo.save).toHaveBeenCalled();
-      // Should create entities
       expect(entityRepo.save).toHaveBeenCalled();
     });
   });
@@ -192,7 +227,6 @@ describe('SeedServiceDepartment', () => {
     it('should create 11 service department users', async () => {
       await service.seed();
 
-      // 11 individual user saves (checking each doesn't exist first)
       expect(userRepo.save).toHaveBeenCalledTimes(11);
     });
 
@@ -210,7 +244,6 @@ describe('SeedServiceDepartment', () => {
     it('should create 2 workspaces (TP and REK)', async () => {
       await service.seed();
 
-      // Two workspace saves
       expect(workspaceRepo.save).toHaveBeenCalledTimes(2);
 
       const calls = workspaceRepo.save.mock.calls;
@@ -266,11 +299,9 @@ describe('SeedServiceDepartment', () => {
     it('should create SLA definitions for TP (4 priorities)', async () => {
       await service.seed();
 
-      // SLA definitions are saved in 2 batches: TP (4) and REK (3)
       const slaCalls = slaDefRepo.save.mock.calls;
       expect(slaCalls.length).toBeGreaterThanOrEqual(2);
 
-      // First call should be TP with 4 definitions
       const tpSlaDefs = slaCalls[0][0];
       expect(Array.isArray(tpSlaDefs)).toBe(true);
       expect(tpSlaDefs).toHaveLength(4);
@@ -280,7 +311,6 @@ describe('SeedServiceDepartment', () => {
       await service.seed();
 
       const slaCalls = slaDefRepo.save.mock.calls;
-      // Second call should be REK with 3 definitions
       const rekSlaDefs = slaCalls[1][0];
       expect(Array.isArray(rekSlaDefs)).toBe(true);
       expect(rekSlaDefs).toHaveLength(3);
@@ -299,7 +329,6 @@ describe('SeedServiceDepartment', () => {
     it('should create 3 process definitions', async () => {
       await service.seed();
 
-      // Process definitions are saved as array
       const pdCall = processDefRepo.save.mock.calls[0][0];
       expect(Array.isArray(pdCall)).toBe(true);
       expect(pdCall).toHaveLength(3);
@@ -308,6 +337,12 @@ describe('SeedServiceDepartment', () => {
       expect(processIds).toContain('service-support-v2');
       expect(processIds).toContain('claims-management');
       expect(processIds).toContain('sla-escalation');
+    });
+
+    it('should deploy 3 process definitions to Zeebe', async () => {
+      await service.seed();
+
+      expect(mockBpmnService.deployDefinition).toHaveBeenCalledTimes(3);
     });
 
     it('should create BPMN triggers for auto-starting processes', async () => {
@@ -334,7 +369,6 @@ describe('SeedServiceDepartment', () => {
     it('should create 32 TP entities', async () => {
       await service.seed();
 
-      // Entity save is called per entity
       const tpEntityCalls = entityRepo.save.mock.calls.filter(
         (c: any) => c[0].workspaceId === 'ws-1',
       );
@@ -362,17 +396,14 @@ describe('SeedServiceDepartment', () => {
       expect(memberRepo.save).toHaveBeenCalled();
       const members = memberRepo.save.mock.calls[0][0];
       expect(Array.isArray(members)).toBe(true);
-      // At least 14 members (TP: 9 + REK: 5) + 2 admin
       expect(members.length).toBeGreaterThanOrEqual(14);
     });
 
     it('should create 5 user groups', async () => {
       await service.seed();
 
-      // 5 groups: l1-support, l2-hardware, l2-software, management, claims-team
-      // Each group is created (create + save) and then saved again with members
       expect(userGroupRepo.create).toHaveBeenCalledTimes(5);
-      expect(userGroupRepo.save).toHaveBeenCalledTimes(10); // 5 initial + 5 with members
+      expect(userGroupRepo.save).toHaveBeenCalledTimes(10);
     });
 
     it('should create SLA instances', async () => {
@@ -381,10 +412,24 @@ describe('SeedServiceDepartment', () => {
       expect(slaInstRepo.save).toHaveBeenCalled();
     });
 
-    it('should create process instances', async () => {
+    it('should start real Zeebe processes for TP and REK entities', async () => {
       await service.seed();
 
-      expect(processInstRepo.save).toHaveBeenCalled();
+      // 32 TP + 12 REK = 44 processes
+      expect(mockBpmnService.startProcess).toHaveBeenCalledTimes(44);
+    });
+
+    it('should pass correct variables when starting TP processes', async () => {
+      await service.seed();
+
+      const calls = mockBpmnService.startProcess.mock.calls;
+      // First call should be TP entity
+      const tpCall = calls[0];
+      const [defId, variables, options] = tpCall;
+      expect(defId).toBe('pd-0'); // supportV2 definition
+      expect(variables.entityId).toBeDefined();
+      expect(variables.title).toBeDefined();
+      expect(options.startedById).toBeDefined();
     });
   });
 });
