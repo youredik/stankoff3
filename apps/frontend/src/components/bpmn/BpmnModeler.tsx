@@ -2,18 +2,32 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import BpmnJS from 'bpmn-js/lib/Modeler';
+import {
+  BpmnPropertiesPanelModule,
+  BpmnPropertiesProviderModule,
+  ZeebePropertiesProviderModule,
+} from 'bpmn-js-properties-panel';
+import zeebeModdle from 'zeebe-bpmn-moddle/resources/zeebe.json';
+import camundaCloudBehaviors from 'camunda-bpmn-js-behaviors/lib/camunda-cloud';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
+import '@bpmn-io/properties-panel/dist/assets/properties-panel.css';
+import { ensureBpmnLayout } from '@/lib/bpmn-layout';
+import { createFormKeyProviderModule, type FormOption } from './FormKeyPropertiesProvider';
+import { getFormDefinitions } from '@/lib/api/forms';
 
-// Default empty BPMN diagram
+// Default empty BPMN diagram with Zeebe namespace
 const EMPTY_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
   id="Definitions_1"
-  targetNamespace="http://bpmn.io/schema/bpmn">
+  targetNamespace="http://bpmn.io/schema/bpmn"
+  exporter="Stankoff Portal"
+  exporterVersion="1.0.0">
   <bpmn:process id="Process_1" isExecutable="true">
     <bpmn:startEvent id="StartEvent_1" name="Начало"/>
   </bpmn:process>
@@ -31,6 +45,7 @@ const EMPTY_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
 
 interface BpmnModelerProps {
   xml?: string;
+  workspaceId?: string;
   onXmlChange?: (xml: string) => void;
   onProcessIdChange?: (processId: string) => void;
   className?: string;
@@ -38,24 +53,46 @@ interface BpmnModelerProps {
 
 export function BpmnModeler({
   xml,
+  workspaceId,
   onXmlChange,
   onProcessIdChange,
   className = '',
 }: BpmnModelerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const propertiesPanelRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<BpmnJS | null>(null);
   const loadedXmlRef = useRef<string | null>(null);
+  const formsRef = useRef<FormOption[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+
+  // Load workspace form definitions for form key dropdown
+  useEffect(() => {
+    if (!workspaceId) {
+      formsRef.current = [];
+      return;
+    }
+    getFormDefinitions(workspaceId)
+      .then((forms) => {
+        formsRef.current = forms
+          .filter((f) => f.isActive)
+          .map((f) => ({ key: f.key, name: f.name }));
+      })
+      .catch((err) => {
+        console.warn('Failed to load form definitions:', err);
+        formsRef.current = [];
+      });
+  }, [workspaceId]);
 
   // Initialize modeler
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!canvasRef.current || !propertiesPanelRef.current) return;
 
     // Wait for container to have dimensions
-    const container = containerRef.current;
+    const container = canvasRef.current;
     if (container.clientWidth === 0 || container.clientHeight === 0) {
-      // Retry after a short delay if container has no dimensions yet
       if (retryCount < 10) {
         const timeoutId = setTimeout(() => {
           setRetryCount((c) => c + 1);
@@ -67,27 +104,40 @@ export function BpmnModeler({
 
     const modeler = new BpmnJS({
       container,
+      propertiesPanel: {
+        parent: propertiesPanelRef.current,
+      },
+      additionalModules: [
+        BpmnPropertiesPanelModule,
+        BpmnPropertiesProviderModule,
+        ZeebePropertiesProviderModule,
+        camundaCloudBehaviors,
+        ...(workspaceId ? [createFormKeyProviderModule(formsRef)] : []),
+      ],
+      moddleExtensions: {
+        zeebe: zeebeModdle,
+      },
     });
 
     modelerRef.current = modeler;
     let isDestroyed = false;
 
-    // Load initial diagram
+    // Load initial diagram with auto-layout for incomplete BPMNDI
     const initialXml = xml || EMPTY_BPMN;
 
-    modeler
-      .importXML(initialXml)
+    ensureBpmnLayout(initialXml)
+      .then((layoutedXml) => {
+        if (isDestroyed) return;
+        return modeler.importXML(layoutedXml);
+      })
       .then(() => {
-        // Check if modeler was destroyed during async import
         if (isDestroyed || modelerRef.current !== modeler) return;
 
         loadedXmlRef.current = initialXml;
         setIsReady(true);
-        // Fit to viewport
         const canvas = modeler.get('canvas') as { zoom: (level: string) => void };
         canvas.zoom('fit-viewport');
 
-        // Extract process ID
         if (onProcessIdChange) {
           const definitions = modeler.getDefinitions();
           const process = definitions?.rootElements?.find(
@@ -99,7 +149,6 @@ export function BpmnModeler({
         }
       })
       .catch((err: Error) => {
-        // Ignore errors if modeler was destroyed
         if (isDestroyed) return;
         console.error('Failed to import BPMN:', err);
       });
@@ -114,7 +163,6 @@ export function BpmnModeler({
           }
         });
       }
-      // Update process ID on changes
       if (onProcessIdChange) {
         const definitions = modeler.getDefinitions();
         const process = definitions?.rootElements?.find(
@@ -138,10 +186,11 @@ export function BpmnModeler({
   // Update XML when prop changes (but skip if same XML already loaded)
   useEffect(() => {
     if (!modelerRef.current || !isReady || !xml) return;
-    // Skip if this XML was already loaded
     if (loadedXmlRef.current === xml) return;
 
-    modelerRef.current.importXML(xml).then(() => {
+    ensureBpmnLayout(xml).then((layoutedXml) => {
+      return modelerRef.current!.importXML(layoutedXml);
+    }).then(() => {
       loadedXmlRef.current = xml;
     }).catch((err: Error) => {
       console.error('Failed to update BPMN:', err);
@@ -162,20 +211,44 @@ export function BpmnModeler({
     return svg || null;
   }, []);
 
-  // Expose methods via ref
+  // Expose methods via wrapper ref
   useEffect(() => {
-    if (containerRef.current) {
-      (containerRef.current as HTMLDivElement & { exportXml: typeof exportXml; exportSvg: typeof exportSvg }).exportXml = exportXml;
-      (containerRef.current as HTMLDivElement & { exportXml: typeof exportXml; exportSvg: typeof exportSvg }).exportSvg = exportSvg;
+    if (wrapperRef.current) {
+      const el = wrapperRef.current as HTMLDivElement & { exportXml: typeof exportXml; exportSvg: typeof exportSvg };
+      el.exportXml = exportXml;
+      el.exportSvg = exportSvg;
     }
   }, [exportXml, exportSvg]);
 
   return (
     <div
-      ref={containerRef}
+      ref={wrapperRef}
       style={{ height: '100%', minHeight: '500px' }}
-      className={`bpmn-modeler w-full bg-white dark:bg-gray-900 ${className}`}
-    />
+      className={`bpmn-modeler flex w-full bg-white dark:bg-gray-900 ${className}`}
+    >
+      {/* BPMN Canvas */}
+      <div
+        ref={canvasRef}
+        className="flex-1 min-w-0 h-full"
+      />
+
+      {/* Toggle button */}
+      <button
+        onClick={() => setPanelCollapsed((c) => !c)}
+        className="flex-none w-6 h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 border-x border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 text-xs transition-colors"
+        title={panelCollapsed ? 'Показать свойства' : 'Скрыть свойства'}
+      >
+        {panelCollapsed ? '\u25C0' : '\u25B6'}
+      </button>
+
+      {/* Properties Panel */}
+      <div
+        ref={propertiesPanelRef}
+        className={`flex-none h-full overflow-y-auto border-l border-gray-200 dark:border-gray-700 transition-all ${
+          panelCollapsed ? 'w-0 overflow-hidden' : 'w-[320px]'
+        }`}
+      />
+    </div>
   );
 }
 

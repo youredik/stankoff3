@@ -39,6 +39,7 @@
 
     <bpmn:userTask id="Task_Reviewer1" name="Рецензия 1">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= reviewer1Id" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:review-form" />
       </bpmn:extensionElements>
@@ -48,6 +49,7 @@
 
     <bpmn:userTask id="Task_Reviewer2" name="Рецензия 2">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= reviewer2Id" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:review-form" />
       </bpmn:extensionElements>
@@ -57,6 +59,7 @@
 
     <bpmn:userTask id="Task_Reviewer3" name="Рецензия 3">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= reviewer3Id" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:review-form" />
       </bpmn:extensionElements>
@@ -106,6 +109,7 @@
 
     <bpmn:userTask id="Task_Revise" name="Внести правки">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= authorId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:revision-form" />
       </bpmn:extensionElements>

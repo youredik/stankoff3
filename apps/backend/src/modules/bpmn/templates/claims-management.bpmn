@@ -53,6 +53,7 @@
     <!-- Регистрация (проверка полноты данных) -->
     <bpmn:userTask id="Task_Register" name="Регистрация рекламации">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition candidateGroups="claims-specialists" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:claims-register-form" />
       </bpmn:extensionElements>
@@ -128,6 +129,7 @@
     <!-- Расследование -->
     <bpmn:userTask id="Task_Investigate" name="Расследование">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= investigatorId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:claims-investigate-form" />
       </bpmn:extensionElements>
@@ -151,6 +153,7 @@
     <!-- RCA (Root Cause Analysis) -->
     <bpmn:userTask id="Task_RCA" name="Анализ корневых причин (RCA)">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= claimsHeadId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:claims-rca-form" />
       </bpmn:extensionElements>
@@ -197,6 +200,7 @@
     <!-- Принятие решения -->
     <bpmn:userTask id="Task_MakeDecision" name="Принять решение">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= claimsHeadId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:claims-decision-form" />
       </bpmn:extensionElements>
@@ -220,6 +224,7 @@
     <!-- Выполнить корректирующие действия -->
     <bpmn:userTask id="Task_Corrective" name="Выполнить корректирующие действия">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= investigatorId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:claims-corrective-form" />
       </bpmn:extensionElements>

@@ -27,6 +27,7 @@
     <!-- HR Branch -->
     <bpmn:userTask id="Task_Documents" name="Оформить документы">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= hrId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:documents-form" />
       </bpmn:extensionElements>
@@ -36,6 +37,7 @@
 
     <bpmn:userTask id="Task_Briefing" name="Провести инструктаж">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= hrId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:briefing-form" />
       </bpmn:extensionElements>
@@ -46,6 +48,7 @@
     <!-- IT Branch -->
     <bpmn:userTask id="Task_CreateAccounts" name="Создать учетные записи">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= itAdminId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:accounts-form" />
       </bpmn:extensionElements>
@@ -55,6 +58,7 @@
 
     <bpmn:userTask id="Task_SetupWorkplace" name="Настроить рабочее место">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= itAdminId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:workplace-form" />
       </bpmn:extensionElements>
@@ -65,6 +69,7 @@
     <!-- Admin Branch -->
     <bpmn:userTask id="Task_AccessCard" name="Выдать пропуск">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= securityId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:access-card-form" />
       </bpmn:extensionElements>
@@ -81,6 +86,7 @@
 
     <bpmn:userTask id="Task_Training" name="Пройти обучение">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= employeeId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:training-form" />
       </bpmn:extensionElements>
@@ -90,6 +96,7 @@
 
     <bpmn:userTask id="Task_ManagerMeeting" name="Встреча с руководителем">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= managerId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:meeting-form" />
       </bpmn:extensionElements>

@@ -5,6 +5,7 @@ import BpmnJS from 'bpmn-js/lib/NavigatedViewer';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css';
+import { ensureBpmnLayout } from '@/lib/bpmn-layout';
 
 interface BpmnViewerProps {
   xml: string;
@@ -31,9 +32,15 @@ export function BpmnViewer({
 
     viewerRef.current = viewer;
 
-    viewer
-      .importXML(xml)
+    let cancelled = false;
+
+    ensureBpmnLayout(xml)
+      .then((layoutedXml) => {
+        if (cancelled) return;
+        return viewer.importXML(layoutedXml);
+      })
       .then(() => {
+        if (cancelled) return;
         const canvas = viewer.get('canvas') as { zoom: (level: string) => void };
         canvas.zoom('fit-viewport');
 
@@ -52,6 +59,7 @@ export function BpmnViewer({
       });
 
     return () => {
+      cancelled = true;
       viewer.destroy();
       viewerRef.current = null;
     };

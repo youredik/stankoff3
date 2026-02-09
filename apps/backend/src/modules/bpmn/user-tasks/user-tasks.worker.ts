@@ -101,8 +101,12 @@ export class UserTasksWorker {
    * Get our internal process instance ID from Zeebe's key
    */
   private async getProcessInstanceId(zeebeKey: string): Promise<string> {
-    // In a full implementation, we would look up the process instance by its Zeebe key
-    // For now, return the Zeebe key as a placeholder
+    const instance = await this.bpmnService.findInstanceByKey(zeebeKey);
+    if (instance) {
+      return instance.id;
+    }
+    // Fallback: return Zeebe key (task will still be created but won't link to instance)
+    this.logger.warn(`ProcessInstance not found for key ${zeebeKey}, using key as fallback`);
     return zeebeKey;
   }
 

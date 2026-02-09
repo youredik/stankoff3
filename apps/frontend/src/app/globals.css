@@ -66,6 +66,11 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
+
+  /* Скрыть логотип bpmn.io */
+  .bjs-powered-by {
+    display: none !important;
+  }
 }
 
 @layer utilities {

@@ -94,6 +94,7 @@ export class SearchService {
         ts_rank("searchVector", plainto_tsquery('russian', $1)) as rank
       FROM entities
       WHERE "searchVector" @@ plainto_tsquery('russian', $1)
+        AND "workspaceId" NOT IN (SELECT id FROM workspaces WHERE "isInternal" = true)
     `;
 
     const params: any[] = [sanitizedQuery];
@@ -142,6 +143,7 @@ export class SearchService {
       FROM comments c
       JOIN entities e ON e.id = c."entityId"
       WHERE c."searchVector" @@ plainto_tsquery('russian', $1)
+        AND e."workspaceId" NOT IN (SELECT id FROM workspaces WHERE "isInternal" = true)
     `;
 
     const params: any[] = [sanitizedQuery];
@@ -191,6 +193,7 @@ export class SearchService {
       FROM audit_logs a
       LEFT JOIN entities e ON e.id = a."entityId"
       WHERE a.details->>'description' ILIKE $1
+        AND a."workspaceId" NOT IN (SELECT id FROM workspaces WHERE "isInternal" = true)
     `;
 
     const params: any[] = [`%${sanitizedQuery}%`];

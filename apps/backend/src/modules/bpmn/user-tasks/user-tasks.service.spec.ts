@@ -10,6 +10,8 @@ import {
 } from '../entities/user-task.entity';
 import { UserGroup } from '../entities/user-group.entity';
 import { FormDefinition } from '../entities/form-definition.entity';
+import { BpmnWorkersService } from '../bpmn-workers.service';
+import { EventsGateway } from '../../websocket/events.gateway';
 
 describe('UserTasksService', () => {
   let service: UserTasksService;
@@ -17,6 +19,8 @@ describe('UserTasksService', () => {
   let commentRepository: jest.Mocked<Repository<UserTaskComment>>;
   let groupRepository: jest.Mocked<Repository<UserGroup>>;
   let formRepository: jest.Mocked<Repository<FormDefinition>>;
+  let bpmnWorkersService: jest.Mocked<BpmnWorkersService>;
+  let eventsGateway: jest.Mocked<EventsGateway>;
 
   const mockTask: UserTask = {
     id: 'task-1',
@@ -103,6 +107,19 @@ describe('UserTasksService', () => {
             createQueryBuilder: jest.fn(() => mockQueryBuilder),
           },
         },
+        {
+          provide: BpmnWorkersService,
+          useValue: {
+            completeUserTaskJob: jest.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: EventsGateway,
+          useValue: {
+            emitTaskCreated: jest.fn(),
+            emitTaskUpdated: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -111,6 +128,8 @@ describe('UserTasksService', () => {
     commentRepository = module.get(getRepositoryToken(UserTaskComment));
     groupRepository = module.get(getRepositoryToken(UserGroup));
     formRepository = module.get(getRepositoryToken(FormDefinition));
+    bpmnWorkersService = module.get(BpmnWorkersService);
+    eventsGateway = module.get(EventsGateway);
   });
 
   describe('findOne', () => {
@@ -174,6 +193,9 @@ describe('UserTasksService', () => {
       expect(result.assigneeId).toBe('user-1');
       expect(result.status).toBe(UserTaskStatus.CLAIMED);
       expect(result.claimedAt).toBeDefined();
+      expect(eventsGateway.emitTaskUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'task-1', status: UserTaskStatus.CLAIMED }),
+      );
     });
 
     it('должен выбрасывать BadRequestException если задача уже claimed', async () => {
@@ -202,6 +224,7 @@ describe('UserTasksService', () => {
 
       expect(result.assigneeId).toBeNull();
       expect(result.status).toBe(UserTaskStatus.CREATED);
+      expect(eventsGateway.emitTaskUpdated).toHaveBeenCalled();
     });
 
     it('должен выбрасывать ForbiddenException если не своя задача', async () => {
@@ -213,7 +236,7 @@ describe('UserTasksService', () => {
   });
 
   describe('complete', () => {
-    it('должен завершать задачу с form data', async () => {
+    it('должен завершать задачу с form data и вызывать completeUserTaskJob', async () => {
       const claimedTask = { ...mockTask, status: UserTaskStatus.CLAIMED, assigneeId: 'user-1' };
       taskRepository.findOne.mockResolvedValue(claimedTask);
       taskRepository.save.mockImplementation(async (t) => t as UserTask);
@@ -222,7 +245,15 @@ describe('UserTasksService', () => {
 
       expect(result.status).toBe(UserTaskStatus.COMPLETED);
       expect(result.completedAt).toBeDefined();
+      expect(result.completedById).toBe('user-1');
       expect(result.formData).toEqual({ approved: true });
+      expect(bpmnWorkersService.completeUserTaskJob).toHaveBeenCalledWith(
+        'job-key-1',
+        { approved: true },
+      );
+      expect(eventsGateway.emitTaskUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ status: UserTaskStatus.COMPLETED }),
+      );
     });
 
     it('должен выбрасывать ForbiddenException если не assignee', async () => {
@@ -238,6 +269,19 @@ describe('UserTasksService', () => {
 
       await expect(service.complete('task-1', 'user-1', {})).rejects.toThrow(BadRequestException);
     });
+
+    it('должен работать даже если completeUserTaskJob вернул false', async () => {
+      bpmnWorkersService.completeUserTaskJob.mockResolvedValue(false);
+      const claimedTask = { ...mockTask, status: UserTaskStatus.CLAIMED, assigneeId: 'user-1' };
+      taskRepository.findOne.mockResolvedValue(claimedTask);
+      taskRepository.save.mockImplementation(async (t) => t as UserTask);
+
+      const result = await service.complete('task-1', 'user-1', { resolved: true });
+
+      // Задача всё равно завершена в БД
+      expect(result.status).toBe(UserTaskStatus.COMPLETED);
+      bpmnWorkersService.completeUserTaskJob.mockResolvedValue(true);
+    });
   });
 
   describe('delegate', () => {
@@ -252,6 +296,7 @@ describe('UserTasksService', () => {
       expect(result.status).toBe(UserTaskStatus.DELEGATED);
       expect(result.history).toHaveLength(1);
       expect(result.history[0].action).toBe('delegated');
+      expect(eventsGateway.emitTaskUpdated).toHaveBeenCalled();
     });
 
     it('должен выбрасывать ForbiddenException если не assignee', async () => {
@@ -278,6 +323,9 @@ describe('UserTasksService', () => {
 
       expect(result).toEqual(mockTask);
       expect(taskRepository.create).toHaveBeenCalled();
+      expect(eventsGateway.emitTaskCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'task-1', workspaceId: 'ws-1' }),
+      );
     });
 
     it('должен возвращать существующую задачу если уже есть с таким jobKey', async () => {
@@ -304,6 +352,7 @@ describe('UserTasksService', () => {
 
       expect(result.status).toBe(UserTaskStatus.CANCELLED);
       expect(result.processVariables.cancellationReason).toBe('Process cancelled');
+      expect(eventsGateway.emitTaskUpdated).toHaveBeenCalled();
     });
 
     it('должен выбрасывать NotFoundException если задача не найдена', async () => {

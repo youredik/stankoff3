@@ -5,6 +5,47 @@ import { persist } from 'zustand/middleware';
 import { User } from '@/types';
 import { authApi } from '@/lib/api/auth';
 
+/**
+ * Извлекает время истечения JWT токена (в мс) без внешних зависимостей
+ */
+function getTokenExpiryMs(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+// Глобальный таймер — вне store чтобы не сериализовался
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearRefreshTimer() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+function scheduleProactiveRefresh(token: string, doRefresh: () => Promise<boolean>) {
+  clearRefreshTimer();
+
+  const expiryMs = getTokenExpiryMs(token);
+  if (!expiryMs) return;
+
+  const now = Date.now();
+  const ttl = expiryMs - now;
+  // Обновляем за 60 секунд до истечения (минимум 10 сек)
+  const refreshIn = Math.max(ttl - 60_000, 10_000);
+
+  refreshTimer = setTimeout(async () => {
+    const success = await doRefresh();
+    if (!success) {
+      console.log('[AuthStore] Proactive refresh failed, session expired');
+    }
+  }, refreshIn);
+}
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
@@ -27,14 +68,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       user: null,
       accessToken: null,
       isAuthenticated: false,
-      isLoading: true, // Начинаем с true чтобы не было редиректа до проверки авторизации
+      isLoading: true,
       error: null,
 
   logout: async () => {
+    clearRefreshTimer();
     try {
       const response = await authApi.logout();
 
-      // Очищаем состояние
       set({
         user: null,
         accessToken: null,
@@ -43,17 +84,13 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         error: null,
       });
 
-      // Очищаем localStorage напрямую перед редиректом
-      // (persist middleware может не успеть синхронизироваться)
       localStorage.removeItem('auth-storage');
 
-      // Если есть Keycloak logout URL - редиректим на него
       if (response.keycloakLogoutUrl) {
         window.location.href = response.keycloakLogoutUrl;
         return;
       }
     } catch {
-      // Игнорируем ошибки при logout, но всё равно очищаем состояние
       set({
         user: null,
         accessToken: null,
@@ -61,21 +98,19 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         isLoading: false,
         error: null,
       });
-      // Очищаем localStorage и при ошибках
       localStorage.removeItem('auth-storage');
     }
   },
 
   refreshTokens: async () => {
-    console.log('[AuthStore] refreshTokens called');
     try {
       const response = await authApi.refresh();
-      console.log('[AuthStore] refresh success, new token received');
       set({ accessToken: response.accessToken });
+      // Планируем следующий proactive refresh
+      scheduleProactiveRefresh(response.accessToken, get().refreshTokens);
       return true;
-    } catch (err) {
-      console.log('[AuthStore] refresh failed:', err);
-      // Refresh token истёк - выходим
+    } catch {
+      clearRefreshTimer();
       set({
         user: null,
         accessToken: null,
@@ -87,24 +122,29 @@ export const useAuthStore = create<AuthState & AuthActions>()(
   },
 
   checkAuth: async () => {
-    // Если уже авторизован - не проверяем снова
     if (get().isAuthenticated && get().user) {
+      // Даже если уже авторизован — планируем refresh по текущему токену
+      const token = get().accessToken;
+      if (token) {
+        scheduleProactiveRefresh(token, get().refreshTokens);
+      }
       set({ isLoading: false });
       return;
     }
 
     set({ isLoading: true });
     try {
-      // Пробуем получить профиль - если есть валидный refresh token в cookie,
-      // interceptor автоматически получит новый access token
       const user = await authApi.me();
       set({
         user,
         isAuthenticated: true,
         isLoading: false,
       });
+      const token = get().accessToken;
+      if (token) {
+        scheduleProactiveRefresh(token, get().refreshTokens);
+      }
     } catch {
-      // Пробуем обновить токены
       const refreshed = await get().refreshTokens();
       if (refreshed) {
         try {
@@ -130,6 +170,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
   setAccessToken: (token: string | null) => {
     set({ accessToken: token });
+    if (token) {
+      scheduleProactiveRefresh(token, get().refreshTokens);
+    } else {
+      clearRefreshTimer();
+    }
   },
 
   clearError: () => {
@@ -144,9 +189,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        // После восстановления из localStorage - проверяем токен
         if (state?.accessToken) {
-          // Токен есть - нужно проверить его валидность
           state.isLoading = true;
         } else {
           state!.isLoading = false;
@@ -155,3 +198,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     }
   )
 );
+
+// Экспортируем утилиту для тестирования
+export { getTokenExpiryMs };

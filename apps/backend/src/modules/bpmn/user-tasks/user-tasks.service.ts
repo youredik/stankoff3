@@ -4,6 +4,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -14,6 +16,8 @@ import {
 } from '../entities/user-task.entity';
 import { UserGroup } from '../entities/user-group.entity';
 import { FormDefinition } from '../entities/form-definition.entity';
+import { BpmnWorkersService } from '../bpmn-workers.service';
+import { EventsGateway } from '../../websocket/events.gateway';
 
 export interface TaskFilter {
   workspaceId?: string;
@@ -41,6 +45,10 @@ export class UserTasksService {
     private groupRepository: Repository<UserGroup>,
     @InjectRepository(FormDefinition)
     private formRepository: Repository<FormDefinition>,
+    @Inject(forwardRef(() => BpmnWorkersService))
+    private readonly bpmnWorkersService: BpmnWorkersService,
+    @Inject(forwardRef(() => EventsGateway))
+    private readonly eventsGateway: EventsGateway,
   ) {}
 
   // ==================== Task Queries ====================
@@ -203,6 +211,7 @@ export class UserTasksService {
 
     const saved = await this.taskRepository.save(task);
     this.logger.log(`Task ${taskId} claimed by user ${userId}`);
+    this.emitTaskUpdate(saved);
 
     return saved;
   }
@@ -229,6 +238,7 @@ export class UserTasksService {
 
     const saved = await this.taskRepository.save(task);
     this.logger.log(`Task ${taskId} unclaimed by user ${userId}`);
+    this.emitTaskUpdate(saved);
 
     return saved;
   }
@@ -263,10 +273,25 @@ export class UserTasksService {
 
     task.status = UserTaskStatus.COMPLETED;
     task.completedAt = new Date();
+    task.completedById = userId;
     task.formData = formData;
 
     const saved = await this.taskRepository.save(task);
     this.logger.log(`Task ${taskId} completed by user ${userId}`);
+    this.emitTaskUpdate(saved);
+
+    // Complete the Zeebe job so the process can continue
+    if (saved.jobKey) {
+      const completed = await this.bpmnWorkersService.completeUserTaskJob(
+        saved.jobKey,
+        formData,
+      );
+      if (completed) {
+        this.logger.log(`Zeebe job ${saved.jobKey} completed, process continues`);
+      } else {
+        this.logger.warn(`Could not complete Zeebe job ${saved.jobKey} — process may be stalled`);
+      }
+    }
 
     return saved;
   }
@@ -305,6 +330,7 @@ export class UserTasksService {
 
     const saved = await this.taskRepository.save(task);
     this.logger.log(`Task ${taskId} delegated from ${fromUserId} to ${toUserId}`);
+    this.emitTaskUpdate(saved);
 
     return saved;
   }
@@ -360,6 +386,13 @@ export class UserTasksService {
 
     const saved = await this.taskRepository.save(task);
     this.logger.log(`Created user task ${saved.id} from job key ${data.jobKey}`);
+    this.eventsGateway.emitTaskCreated({
+      id: saved.id,
+      workspaceId: saved.workspaceId,
+      assigneeId: saved.assigneeId,
+      candidateUsers: saved.candidateUsers ?? undefined,
+      candidateGroups: saved.candidateGroups ?? undefined,
+    });
 
     return saved;
   }
@@ -382,6 +415,7 @@ export class UserTasksService {
 
     const saved = await this.taskRepository.save(task);
     this.logger.log(`Task ${taskId} cancelled`);
+    this.emitTaskUpdate(saved);
 
     return saved;
   }
@@ -429,6 +463,15 @@ export class UserTasksService {
   }
 
   // ==================== Helper Methods ====================
+
+  private emitTaskUpdate(task: UserTask): void {
+    this.eventsGateway.emitTaskUpdated({
+      id: task.id,
+      workspaceId: task.workspaceId,
+      assigneeId: task.assigneeId,
+      status: task.status,
+    });
+  }
 
   private async canUserClaimTask(task: UserTask, userId: string): Promise<boolean> {
     // User is already in candidate users

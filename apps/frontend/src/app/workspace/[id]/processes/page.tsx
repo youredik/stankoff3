@@ -314,6 +314,7 @@ export default function ProcessesPage() {
               initialName={selectedDefinition?.name || templateData?.name}
               initialDescription={selectedDefinition?.description || templateData?.description}
               initialXml={selectedDefinition?.bpmnXml || templateData?.bpmnXml}
+              workspaceId={workspaceId}
               onSave={handleSave}
               onDeploy={health?.connected ? () => handleDeploy() : undefined}
               onClose={handleBack}

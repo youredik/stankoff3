@@ -135,10 +135,11 @@ Stankoff Portal - это корпоративная система управл�
 - `Breadcrumbs.tsx` - Навигационные хлебные крошки
 
 **BPMN (Бизнес-процессы)**
-- `BpmnModeler.tsx` - Визуальный редактор BPMN диаграмм (bpmn-js Modeler, dynamic import SSR=false)
-- `BpmnViewer.tsx` - Просмотр BPMN диаграмм без редактирования (bpmn-js NavigatedViewer)
-- `BpmnHeatMap.tsx` - Визуализация статистики на диаграмме (цветовые маркеры активных/завершённых/ошибочных элементов)
-- `ProcessEditor.tsx` - Полный редактор процесса (BpmnModeler + форма названия/описания + действия сохранения/деплоя)
+- `BpmnModeler.tsx` - Визуальный редактор BPMN диаграмм с Properties Panel (bpmn-js Modeler + Zeebe Properties Provider, dynamic import SSR=false). Позволяет через UI настраивать свойства элементов: formKey, assignee, candidateGroups, input/output mapping и т.д. При передаче workspaceId — поле "Custom form key" заменяется dropdown'ом с формами workspace
+- `FormKeyPropertiesProvider.ts` - Кастомный bpmn-js properties provider (priority 400), заменяет TextFieldEntry на SelectEntry для выбора form key из списка определений форм workspace. Использует React Ref Bridge для передачи данных из React в bpmn-js DI
+- `BpmnViewer.tsx` - Просмотр BPMN диаграмм без редактирования (bpmn-js NavigatedViewer, auto-layout для неполных BPMNDI)
+- `BpmnHeatMap.tsx` - Тепловая карта процесса с Canvas-based gaussian blur эффектом (radial gradient ауры вокруг элементов, цвет от синего/зелёного до красного по частоте выполнения, бейджи с числами и средним временем, переключатель бейджей). Fallback на CSS-маркеры при отсутствии per-element статистики
+- `ProcessEditor.tsx` - Полный редактор процесса (BpmnModeler + форма названия/описания + действия сохранения/деплоя). Принимает workspaceId для передачи в BpmnModeler
 - `ProcessList.tsx` - Список определений процессов workspace с возможностью создания и деплоя
 - `ProcessInstanceList.tsx` - Список экземпляров процессов (запущенных/завершённых) с раскрываемыми деталями
 - `ProcessStatisticsCard.tsx` - Карточка аналитики процесса (активные/завершённые/ошибки/среднее время)
@@ -422,6 +423,11 @@ interface PresenceState {
 - `sla:warning` - SLA приближается к дедлайну (toast уведомление)
 - `sla:breached` - SLA нарушен (urgent toast уведомление, показывается дольше)
 - `sla:batch-update` - Batch обновления SLA таймеров (каждые 10 сек, сохраняется в useSlaStore)
+- `task:created` - Новая user task создана (обновляет inboxCount через useTaskStore)
+- `task:updated` - User task обновлена (claim/unclaim/complete/delegate/cancel, обновляет inboxCount)
+- `auth:refresh` - Client → Server: обновление JWT токена без разрыва WebSocket соединения
+
+> **Proactive token refresh:** Фронтенд автоматически обновляет access token за 60 секунд до истечения (без ожидания 401). При обновлении токена отправляет `auth:refresh` событие серверу для переаутентификации WebSocket без reconnect.
 
 > **URL подключения:** В браузере используется `window.location.origin` (динамически определяется текущий хост). Nginx проксирует `/socket.io/` на backend. Это позволяет работать на любом окружении (localhost, preprod, production) без изменения конфигурации.
 
@@ -496,6 +502,7 @@ interface Workspace {
   prefix: string;           // Префикс для номеров заявок: TP, REK и т.д.
   lastEntityNumber: number; // Счётчик для автогенерации номеров
   isArchived: boolean;      // Архивирован ли workspace
+  isInternal: boolean;      // Внутренний workspace (скрыт от UI, используется для AI/RAG)
   sectionId: string | null; // ID раздела (группировка)
   section: Section | null;  // Связанный раздел
   showInMenu: boolean;      // Отображать в боковом меню (по умолчанию true)
@@ -874,18 +881,32 @@ interface SectionMember {
 ```
 bpmn/
 ├── bpmn.module.ts
-├── bpmn.controller.ts       # API для определений и экземпляров
-├── bpmn.service.ts          # Логика работы с процессами
+├── bpmn.controller.ts           # API для определений и экземпляров
+├── bpmn.service.ts              # Логика работы с процессами
+├── bpmn-workers.service.ts      # Регистрация Zeebe worker'ов (9 типов)
+├── bpmn-templates.service.ts    # Метаданные BPMN шаблонов
 ├── camunda/
-│   └── camunda.service.ts   # Интеграция с Zeebe через @camunda8/sdk
+│   └── camunda.service.ts       # Интеграция с Zeebe через @camunda8/sdk
 ├── dto/
 │   ├── create-process-definition.dto.ts
 │   ├── start-process.dto.ts
 │   └── send-message.dto.ts
-└── entities/
-    ├── process-definition.entity.ts
-    ├── process-instance.entity.ts
-    └── process-activity-log.entity.ts  # Логирование выполнения элементов (heat map)
+├── entities/
+│   ├── process-definition.entity.ts
+│   ├── process-instance.entity.ts
+│   ├── process-activity-log.entity.ts  # Логирование элементов (heat map)
+│   ├── user-task.entity.ts      # User task + UserTaskComment
+│   ├── user-group.entity.ts     # Группы пользователей
+│   └── form-definition.entity.ts # Определения форм
+├── user-tasks/
+│   ├── user-tasks.controller.ts # API inbox, claim, complete, delegate
+│   ├── user-tasks.service.ts    # Логика работы с user tasks
+│   └── user-tasks.worker.ts     # Обработчик Zeebe user task jobs
+├── entity-links/
+│   ├── entity-links.controller.ts
+│   ├── entity-links.service.ts
+│   └── create-entity.worker.ts  # Worker для создания связанных сущностей
+└── templates/                   # BPMN шаблоны (12 файлов)
 ```
 
 ```typescript
@@ -937,6 +958,31 @@ interface ProcessActivityLog {
 - Deployment: деплой BPMN XML в Zeebe кластер
 - Process Instance: создание и отслеживание экземпляров
 - Message Correlation: отправка сообщений в процессы
+
+**Zeebe Workers (9 штук в `BpmnWorkersService`):**
+
+| Worker Type | Назначение | Завершение |
+|---|---|---|
+| `update-entity-status` | Обновляет статус заявки | Мгновенное |
+| `send-notification` | In-app уведомление через WebSocket | Мгновенное |
+| `send-email` | Отправка email через EmailService | Мгновенное |
+| `log-activity` | Запись в audit log (ProcessActivityLog) | Мгновенное |
+| `set-assignee` | Назначение исполнителя на заявку | Мгновенное |
+| `classify-entity` | AI-классификация через AiClassifierService | Мгновенное |
+| `process-completed` | Пометка ProcessInstance как completed | Мгновенное |
+| `io.camunda.zeebe:userTask` | **User task** — создаёт задачу в inbox | Отложенное (job.forward) |
+| `create-entity` | Создание связанной сущности (cross-workspace) | Мгновенное |
+
+**User Task Flow (отложенное завершение):**
+1. Zeebe активирует job → worker вызывает `UserTasksWorker.handleUserTask()` → создаёт `UserTask` в БД
+2. Worker возвращает `job.forward()` — освобождает capacity, но **не завершает** job (timeout: 30 дней)
+3. Пользователь видит задачу в inbox → claim → complete с formData
+4. `UserTasksService.complete()` → вызывает `BpmnWorkersService.completeUserTaskJob(jobKey, formData)`
+5. `completeUserTaskJob()` вызывает `zeebeClient.completeJob({ jobKey, variables })` → Zeebe продолжает процесс
+
+**BPMN шаблоны:**
+- 12 шаблонов в `templates/`, все user tasks имеют `<zeebe:taskDefinition type="io.camunda.zeebe:userTask" />`
+- Метаданные (name, description, category) в `BpmnTemplatesService` (hardcoded map)
 
 **SlaModule**
 Модуль управления SLA (Service Level Agreement) для отслеживания сроков выполнения заявок.
@@ -1311,7 +1357,14 @@ import { AiUsageDashboard } from '@/components/ai';
    - Архивированные workspace отображаются с приглушённым стилем и иконкой архива
    - Можно разархивировать обратно
 
-3. **Экспорт JSON** - полный бэкап workspace:
+3. **Internal workspaces** - скрыты от UI, доступны только программно:
+   - Workspace с `isInternal: true` не возвращается через `findAll()` / `getAccessibleWorkspaces()`
+   - Исключён из глобального поиска (SearchService)
+   - Не отображается в sidebar, dashboard, аналитике
+   - Используется для хранения данных AI/RAG (например, Legacy CRM с prefix `LEG`)
+   - AI-сервисы (KnowledgeBaseService, RagIndexerService) работают напрямую через pgvector, не зависят от workspace visibility
+
+4. **Экспорт JSON** - полный бэкап workspace:
    - Включает workspace с настройками секций/полей
    - Включает все сущности с полями
    - Добавляет timestamp экспорта

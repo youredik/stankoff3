@@ -45,6 +45,7 @@
 
     <bpmn:userTask id="Task_ManagerApproval" name="Согласование руководителем">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= managerId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:expense-approval-form" />
       </bpmn:extensionElements>
@@ -54,6 +55,7 @@
 
     <bpmn:userTask id="Task_DirectorApproval" name="Согласование директором">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= directorId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:expense-approval-form" />
       </bpmn:extensionElements>

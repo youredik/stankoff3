@@ -11,6 +11,8 @@ import { AuditActionType } from '../audit-log/audit-log.entity';
 import { BpmnService } from './bpmn.service';
 import { ProcessInstanceStatus, ProcessInstance } from './entities/process-instance.entity';
 import { ProcessActivityLog } from './entities/process-activity-log.entity';
+import { UserTasksWorker } from './user-tasks/user-tasks.worker';
+import { CreateEntityWorker } from './entity-links/create-entity.worker';
 
 @Injectable()
 export class BpmnWorkersService implements OnModuleInit {
@@ -27,6 +29,8 @@ export class BpmnWorkersService implements OnModuleInit {
   private auditLogService?: AuditLogService;
   private eventsGateway?: EventsGateway;
   private aiClassifierService?: any;
+  private userTasksWorker?: UserTasksWorker;
+  private createEntityWorker?: CreateEntityWorker;
 
   constructor(
     private readonly moduleRef: ModuleRef,
@@ -73,6 +77,18 @@ export class BpmnWorkersService implements OnModuleInit {
       });
     } catch {
       this.logger.warn('AiClassifierService not available for workers');
+    }
+
+    try {
+      this.userTasksWorker = this.moduleRef.get(UserTasksWorker, { strict: false });
+    } catch {
+      this.logger.warn('UserTasksWorker not available for workers');
+    }
+
+    try {
+      this.createEntityWorker = this.moduleRef.get(CreateEntityWorker, { strict: false });
+    } catch {
+      this.logger.warn('CreateEntityWorker not available for workers');
     }
   }
 
@@ -147,9 +163,11 @@ export class BpmnWorkersService implements OnModuleInit {
     this.registerSetAssigneeWorker();
     this.registerProcessCompletedWorker();
     this.registerClassifyEntityWorker();
+    this.registerUserTasksWorker();
+    this.registerCreateEntityWorker();
 
     this.logger.log(
-      'BPMN workers registered: update-entity-status, send-notification, send-email, log-activity, set-assignee, process-completed, classify-entity',
+      'BPMN workers registered: update-entity-status, send-notification, send-email, log-activity, set-assignee, process-completed, classify-entity, io.camunda.zeebe:userTask, create-entity',
     );
   }
 
@@ -422,6 +440,141 @@ export class BpmnWorkersService implements OnModuleInit {
         }
       },
     });
+  }
+
+  /**
+   * Worker: Handle user tasks from Zeebe
+   * Creates UserTask records in DB; does NOT complete the job —
+   * the job stays active until the user completes the task via the API.
+   */
+  private registerUserTasksWorker() {
+    this.zeebeClient!.createWorker({
+      taskType: 'io.camunda.zeebe:userTask',
+      // User tasks can take days/weeks — set a 30-day timeout
+      timeout: 30 * 24 * 60 * 60 * 1000,
+      taskHandler: async (job) => {
+        const startTime = Date.now();
+        this.logger.log(
+          `[Worker] io.camunda.zeebe:userTask: job=${job.key}, element=${job.elementId}, instance=${job.processInstanceKey}`,
+        );
+
+        try {
+          if (!this.userTasksWorker) {
+            this.logger.warn('UserTasksWorker not available, failing job');
+            return job.fail({
+              errorMessage: 'UserTasksWorker not available',
+              retries: job.retries - 1,
+            });
+          }
+
+          const result = await this.userTasksWorker.handleUserTask({
+            key: String(job.key),
+            type: job.type,
+            processInstanceKey: String(job.processInstanceKey),
+            processDefinitionKey: String((job as any).processDefinitionKey || ''),
+            bpmnProcessId: (job as any).bpmnProcessId || '',
+            elementId: job.elementId,
+            variables: job.variables as Record<string, any>,
+            customHeaders: job.customHeaders as Record<string, any>,
+          });
+
+          this.logger.log(
+            `User task ${result.taskId} created from job ${job.key} (awaiting user completion)`,
+          );
+
+          await this.logElementExecution(job, 'success', startTime);
+
+          // Forward: release worker capacity, do NOT complete the job.
+          // The job stays active in Zeebe until completeUserTaskJob() is called.
+          return job.forward();
+        } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
+          this.logger.error(
+            `Failed to handle user task: ${error.message}`,
+            error.stack,
+          );
+          return job.fail({
+            errorMessage: error.message,
+            retries: job.retries - 1,
+          });
+        }
+      },
+    });
+  }
+
+  /**
+   * Worker: Create entity in another workspace (cross-workspace spawn)
+   * Variables: { sourceEntityId, targetWorkspaceId, title, status?, priority?, data?, linkType?, createdById? }
+   */
+  private registerCreateEntityWorker() {
+    this.zeebeClient!.createWorker({
+      taskType: 'create-entity',
+      taskHandler: async (job) => {
+        const startTime = Date.now();
+        this.logger.log(
+          `[Worker] create-entity: job=${job.key}, instance=${job.processInstanceKey}`,
+        );
+
+        try {
+          if (!this.createEntityWorker) {
+            this.logger.warn('CreateEntityWorker not available, failing job');
+            return job.fail({
+              errorMessage: 'CreateEntityWorker not available',
+              retries: job.retries - 1,
+            });
+          }
+
+          const result = await this.createEntityWorker.handleCreateEntity({
+            key: String(job.key),
+            variables: job.variables as Record<string, any>,
+            processInstanceKey: String(job.processInstanceKey),
+          });
+
+          await this.logElementExecution(job, 'success', startTime);
+          return job.complete({
+            createdEntityId: result.createdEntityId,
+            createdEntityCustomId: result.createdEntityCustomId,
+            linkId: result.linkId || '',
+          });
+        } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
+          this.logger.error(
+            `Failed to create entity: ${error.message}`,
+            error.stack,
+          );
+          return job.fail({
+            errorMessage: error.message,
+            retries: job.retries - 1,
+          });
+        }
+      },
+    });
+  }
+
+  /**
+   * Complete a user task job in Zeebe by its key.
+   * Called by UserTasksService when a user completes a task through the API.
+   */
+  async completeUserTaskJob(
+    jobKey: string,
+    variables: Record<string, any>,
+  ): Promise<boolean> {
+    if (!this.zeebeClient) {
+      this.logger.warn('Zeebe client not available, cannot complete job');
+      return false;
+    }
+
+    try {
+      await this.zeebeClient.completeJob({ jobKey, variables });
+      this.logger.log(`Zeebe job ${jobKey} completed with variables`);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to complete Zeebe job ${jobKey}: ${error.message}`,
+        error.stack,
+      );
+      return false;
+    }
   }
 
   /**

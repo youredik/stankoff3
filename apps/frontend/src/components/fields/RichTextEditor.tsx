@@ -2,7 +2,6 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Bold, Italic, Strikethrough, Link as LinkIcon, List, ListOrdered } from 'lucide-react';
 
@@ -34,8 +33,9 @@ export function RichTextEditor({ value, onChange, placeholder, editable = true, 
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit,
-      Link.configure({ openOnClick: false }),
+      StarterKit.configure({
+        link: { openOnClick: false },
+      }),
       Placeholder.configure({ placeholder: placeholder || 'Введите текст...' }),
     ],
     content: value || '',

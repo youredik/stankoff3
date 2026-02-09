@@ -32,6 +32,7 @@
 
     <bpmn:userTask id="Task_ManagerApproval" name="Согласование руководителем">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= managerId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:vacation-approval-form" />
       </bpmn:extensionElements>

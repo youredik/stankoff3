@@ -177,6 +177,7 @@ export interface Workspace {
   prefix: string; // Префикс для номеров заявок: TP, REK и т.д.
   lastEntityNumber: number; // Последний использованный номер
   isArchived?: boolean; // Архивирован ли workspace
+  isInternal?: boolean; // Внутренний workspace (не отображается в UI)
   sectionId?: string | null; // ID раздела (MenuSection)
   section?: MenuSection | null; // Раздел, к которому принадлежит workspace
   showInMenu: boolean; // Показывать в боковом меню

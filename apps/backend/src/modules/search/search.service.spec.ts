@@ -138,6 +138,17 @@ describe('SearchService', () => {
       expect(result[0].type).toBe('entity');
     });
 
+    it('должен исключать internal workspaces из результатов', async () => {
+      dataSource.query.mockResolvedValue([mockEntityResult]);
+
+      await service.searchEntities('test');
+
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('"isInternal" = true'),
+        expect.any(Array),
+      );
+    });
+
     it('должен вернуть пустой массив для пустого запроса', async () => {
       const result = await service.searchEntities('');
 
@@ -175,6 +186,17 @@ describe('SearchService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('comment');
+    });
+
+    it('должен исключать internal workspaces из результатов', async () => {
+      dataSource.query.mockResolvedValue([mockCommentResult]);
+
+      await service.searchComments('test');
+
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('"isInternal" = true'),
+        expect.any(Array),
+      );
     });
 
     it('должен вернуть пустой массив для пустого запроса', async () => {
@@ -220,6 +242,17 @@ describe('SearchService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('audit');
+    });
+
+    it('должен исключать internal workspaces из результатов', async () => {
+      dataSource.query.mockResolvedValue([mockAuditResult]);
+
+      await service.searchAuditLogs('test');
+
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('"isInternal" = true'),
+        expect.any(Array),
+      );
     });
 
     it('должен вернуть пустой массив для пустого запроса', async () => {

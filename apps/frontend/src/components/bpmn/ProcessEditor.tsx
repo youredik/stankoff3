@@ -18,6 +18,7 @@ interface ProcessEditorProps {
   initialName?: string;
   initialDescription?: string;
   initialXml?: string;
+  workspaceId?: string;
   onSave: (data: {
     name: string;
     description: string;
@@ -35,6 +36,7 @@ export function ProcessEditor({
   initialName = '',
   initialDescription = '',
   initialXml,
+  workspaceId,
   onSave,
   onDeploy,
   onClose,
@@ -158,6 +160,7 @@ export function ProcessEditor({
         <div className="absolute inset-0">
           <BpmnModeler
             xml={initialXml}
+            workspaceId={workspaceId}
             onXmlChange={handleXmlChange}
             onProcessIdChange={handleProcessIdChange}
           />

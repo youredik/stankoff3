@@ -426,6 +426,7 @@ describe('LegacyMigrationService', () => {
           icon: expect.any(String),
           prefix: 'LEG',
           lastEntityNumber: 0,
+          isInternal: true,
         }),
       );
       expect(workspaceRepository.save).toHaveBeenCalled();

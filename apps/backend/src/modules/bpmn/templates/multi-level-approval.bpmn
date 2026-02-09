@@ -19,6 +19,7 @@
 
     <bpmn:userTask id="Task_Level1" name="Согласование уровень 1 (Руководитель)">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= level1ApproverId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:approval-form" />
       </bpmn:extensionElements>
@@ -46,6 +47,7 @@
 
     <bpmn:userTask id="Task_Level2" name="Согласование уровень 2 (Директор)">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= level2ApproverId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:approval-form" />
       </bpmn:extensionElements>
@@ -73,6 +75,7 @@
 
     <bpmn:userTask id="Task_Level3" name="Согласование уровень 3 (CEO)">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= level3ApproverId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:approval-form" />
       </bpmn:extensionElements>

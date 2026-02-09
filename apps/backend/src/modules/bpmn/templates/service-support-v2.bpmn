@@ -63,6 +63,7 @@
     <!-- Маршрутизация (выбор исполнителя) -->
     <bpmn:userTask id="Task_Route" name="Назначить исполнителя">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition candidateGroups="l1-supervisors" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:support-route-form" />
       </bpmn:extensionElements>
@@ -129,6 +130,7 @@
     <!-- === ОСНОВНАЯ РАБОТА === -->
     <bpmn:userTask id="Task_Work" name="Работа над заявкой">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= selectedAssigneeId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:support-work-form" />
       </bpmn:extensionElements>
@@ -251,6 +253,7 @@
 
     <bpmn:userTask id="Task_L2Work" name="Расследование L2">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition candidateGroups="l2-support" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:support-l2-form" />
       </bpmn:extensionElements>
@@ -320,6 +323,7 @@
     <!-- Подтверждение закрытия -->
     <bpmn:userTask id="Task_Confirm" name="Подтвердить закрытие">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= creatorId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:support-confirm-form" />
       </bpmn:extensionElements>

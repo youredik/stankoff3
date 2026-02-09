@@ -32,6 +32,9 @@ export class Workspace {
   @Column({ default: false })
   isArchived: boolean; // Архивирован ли workspace
 
+  @Column({ default: false })
+  isInternal: boolean; // Внутренний workspace (не отображается в UI, используется для AI/RAG)
+
   @Column({ type: 'uuid', nullable: true })
   sectionId: string | null; // FK на раздел (может быть без раздела)
 

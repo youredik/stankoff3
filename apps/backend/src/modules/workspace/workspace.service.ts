@@ -18,23 +18,26 @@ export class WorkspaceService {
     private entityRepository: Repository<WorkspaceEntity>,
   ) {}
 
-  // Получить все workspaces (фильтрация по пользователю)
+  // Получить все workspaces (фильтрация по пользователю, исключая internal)
   async findAll(userId: string, userRole: UserRole): Promise<Workspace[]> {
-    // Глобальный admin видит все
+    // Глобальный admin видит все (кроме internal)
     if (userRole === UserRole.ADMIN) {
       return this.workspaceRepository.find({
+        where: { isInternal: false },
         relations: ['section'],
         order: { orderInSection: 'ASC', name: 'ASC' },
       });
     }
 
-    // Остальные видят только свои
+    // Остальные видят только свои (кроме internal)
     const memberships = await this.memberRepository.find({
       where: { userId },
       relations: ['workspace', 'workspace.section'],
     });
 
-    return memberships.map((m) => m.workspace);
+    return memberships
+      .map((m) => m.workspace)
+      .filter((ws) => !ws.isInternal);
   }
 
   // Алиас для findAll — для использования в поиске
@@ -110,9 +113,11 @@ export class WorkspaceService {
   ): Promise<Record<string, WorkspaceRole>> {
     const roles: Record<string, WorkspaceRole> = {};
 
-    // Глобальный admin имеет admin роль во всех workspaces
+    // Глобальный admin имеет admin роль во всех workspaces (кроме internal)
     if (userRole === UserRole.ADMIN) {
-      const workspaces = await this.workspaceRepository.find();
+      const workspaces = await this.workspaceRepository.find({
+        where: { isInternal: false },
+      });
       for (const ws of workspaces) {
         roles[ws.id] = WorkspaceRole.ADMIN;
       }

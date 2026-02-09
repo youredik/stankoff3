@@ -19,6 +19,7 @@
 
     <bpmn:userTask id="Task_Categorize" name="Категоризация и приоритет">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= serviceDesk" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-categorize-form" />
       </bpmn:extensionElements>
@@ -60,6 +61,7 @@
 
     <bpmn:userTask id="Task_Investigate" name="Расследование">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= technicianId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-investigate-form" />
       </bpmn:extensionElements>
@@ -75,6 +77,7 @@
 
     <bpmn:userTask id="Task_L2Support" name="Эскалация L2">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= l2SupportId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-l2-form" />
       </bpmn:extensionElements>
@@ -84,6 +87,7 @@
 
     <bpmn:userTask id="Task_Resolve" name="Решение инцидента">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= technicianId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-resolve-form" />
       </bpmn:extensionElements>
@@ -119,6 +123,7 @@
 
     <bpmn:userTask id="Task_Confirmation" name="Подтверждение пользователем">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= creatorId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:incident-confirm-form" />
       </bpmn:extensionElements>

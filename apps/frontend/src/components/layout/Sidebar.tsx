@@ -136,10 +136,9 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     fetchSections();
   }, [fetchWorkspaces, fetchSections]);
 
+  // Начальная загрузка; дальнейшие обновления через WebSocket (task:created / task:updated)
   useEffect(() => {
     fetchInboxCount();
-    const interval = setInterval(fetchInboxCount, 60000);
-    return () => clearInterval(interval);
   }, [fetchInboxCount]);
 
   const handleCreateWorkspace = async (sectionId?: string) => {

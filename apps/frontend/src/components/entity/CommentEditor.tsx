@@ -2,7 +2,6 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useState, useRef, useCallback } from 'react';
@@ -55,8 +54,9 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit,
-      Link.configure({ openOnClick: false }),
+      StarterKit.configure({
+        link: { openOnClick: false },
+      }),
       Placeholder.configure({
         placeholder: 'Добавить комментарий… (Ctrl+Enter — отправить)',
       }),

@@ -686,7 +686,7 @@ export class SlaService {
       await this.sendSlaBreachEmail(instance, type);
     }
 
-    this.logger.error(`SLA breached: ${instance.id} (${type})`);
+    this.logger.warn(`SLA breached: ${instance.id} (${type})`);
   }
 
   private async logEvent(

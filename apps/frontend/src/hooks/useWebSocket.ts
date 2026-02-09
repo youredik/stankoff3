@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSlaStore, SlaUpdate } from '@/store/useSlaStore';
 import { usePresenceStore } from '@/store/usePresenceStore';
+import { useTaskStore } from '@/store/useTaskStore';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -306,6 +307,15 @@ export function useWebSocket() {
       useSlaStore.getState().setUpdates(data.workspaceId, data.updates);
     });
 
+    // User task events — обновляем inbox count
+    socket.on('task:created', () => {
+      useTaskStore.getState().fetchInboxCount();
+    });
+
+    socket.on('task:updated', () => {
+      useTaskStore.getState().fetchInboxCount();
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
@@ -316,8 +326,10 @@ export function useWebSocket() {
   useEffect(() => {
     if (socketRef.current && accessToken) {
       socketRef.current.auth = { token: accessToken };
-      // Переподключаемся только если соединение было разорвано
-      if (!socketRef.current.connected) {
+      if (socketRef.current.connected) {
+        // Отправляем новый токен серверу без разрыва соединения
+        socketRef.current.emit('auth:refresh', { token: accessToken });
+      } else {
         socketRef.current.connect();
       }
     }

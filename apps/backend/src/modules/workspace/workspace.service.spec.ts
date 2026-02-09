@@ -88,13 +88,15 @@ describe('WorkspaceService', () => {
   });
 
   describe('findAll', () => {
-    it('должен вернуть все workspaces для admin', async () => {
+    it('должен вернуть все workspaces для admin (кроме internal)', async () => {
       workspaceRepo.find.mockResolvedValue([mockWorkspace]);
 
       const result = await service.findAll('user-1', UserRole.ADMIN);
 
       expect(result).toEqual([mockWorkspace]);
-      expect(workspaceRepo.find).toHaveBeenCalled();
+      expect(workspaceRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { isInternal: false } }),
+      );
     });
 
     it('должен вернуть только доступные workspaces для обычного пользователя', async () => {
@@ -107,6 +109,17 @@ describe('WorkspaceService', () => {
         where: { userId: 'user-2' },
         relations: ['workspace', 'workspace.section'],
       });
+    });
+
+    it('должен исключить internal workspaces для обычного пользователя', async () => {
+      const internalWorkspace = { ...mockWorkspace, id: 'ws-internal', isInternal: true } as unknown as Workspace;
+      const internalMember = { ...mockMember, workspace: internalWorkspace } as unknown as WorkspaceMember;
+      memberRepo.find.mockResolvedValue([mockMember, internalMember]);
+
+      const result = await service.findAll('user-2', UserRole.EMPLOYEE);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('ws-1');
     });
   });
 
@@ -208,12 +221,13 @@ describe('WorkspaceService', () => {
   });
 
   describe('getMyRoles', () => {
-    it('должен вернуть admin роль во всех workspaces для глобального admin', async () => {
+    it('должен вернуть admin роль во всех workspaces для глобального admin (кроме internal)', async () => {
       workspaceRepo.find.mockResolvedValue([mockWorkspace]);
 
       const result = await service.getMyRoles('user-1', UserRole.ADMIN);
 
       expect(result['ws-1']).toBe(WorkspaceRole.ADMIN);
+      expect(workspaceRepo.find).toHaveBeenCalledWith({ where: { isInternal: false } });
     });
 
     it('должен вернуть роли по membership для обычного пользователя', async () => {

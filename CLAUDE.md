@@ -564,4 +564,6 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `status:changed` — изменение статуса
 - `comment:created` — новый комментарий
 - `user:assigned` — назначение ответственного
+- `task:created`, `task:updated` — user task lifecycle (inbox обновляется через WebSocket, без polling)
+- `auth:refresh` (client → server) — обновление JWT без разрыва WebSocket
 - `presence:update` — список онлайн-пользователей (usePresenceStore)

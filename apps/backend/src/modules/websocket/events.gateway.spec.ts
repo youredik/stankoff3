@@ -208,6 +208,80 @@ describe('EventsGateway', () => {
     });
   });
 
+  describe('handleAuthRefresh', () => {
+    it('должен обновлять user при валидном токене', () => {
+      const newPayload = { sub: 'user-1', email: 'new@example.com', role: 'admin' };
+      jwtService.verify.mockReturnValue(newPayload);
+
+      const socket = createMockSocket('socket-1', undefined, {
+        sub: 'user-1',
+        email: 'old@example.com',
+        role: 'user',
+      });
+
+      // Подключаем сокет для presence
+      const connectPayload = { sub: 'user-1', email: 'old@example.com', role: 'user' };
+      jwtService.verify.mockReturnValueOnce(connectPayload);
+      gateway.handleConnection(
+        createMockSocket('socket-1', 'old-token') as any,
+      );
+      jwtService.verify.mockReturnValue(newPayload);
+
+      const result = gateway.handleAuthRefresh(socket as any, { token: 'new-token' });
+
+      expect(result).toEqual({ success: true });
+      expect(socket.data.user).toEqual(newPayload);
+    });
+
+    it('должен возвращать success: false при невалидном токене', () => {
+      jwtService.verify.mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      const socket = createMockSocket('socket-1', undefined, {
+        sub: 'user-1',
+        email: 'test@example.com',
+        role: 'user',
+      });
+
+      const result = gateway.handleAuthRefresh(socket as any, { token: 'bad-token' });
+
+      expect(result).toEqual({ success: false });
+    });
+
+    it('должен обновлять presence при смене userId', () => {
+      const oldPayload = { sub: 'user-1', email: 'a@test.com', role: 'user' };
+      jwtService.verify.mockReturnValue(oldPayload);
+      const socket = createMockSocket('socket-1', 'old-token');
+      gateway.handleConnection(socket as any);
+
+      expect(gateway.getOnlineUserIds()).toContain('user-1');
+
+      const newPayload = { sub: 'user-2', email: 'b@test.com', role: 'user' };
+      jwtService.verify.mockReturnValue(newPayload);
+      socket.data.user = oldPayload;
+
+      gateway.handleAuthRefresh(socket as any, { token: 'new-token' });
+
+      expect(gateway.getOnlineUserIds()).not.toContain('user-1');
+      expect(gateway.getOnlineUserIds()).toContain('user-2');
+    });
+  });
+
+  describe('task events', () => {
+    it('emitTaskCreated должен отправлять событие', () => {
+      const data = { id: 'task-1', workspaceId: 'ws-1', assigneeId: 'user-1' };
+      gateway.emitTaskCreated(data);
+      expect(mockServer.emit).toHaveBeenCalledWith('task:created', data);
+    });
+
+    it('emitTaskUpdated должен отправлять событие', () => {
+      const data = { id: 'task-1', workspaceId: 'ws-1', assigneeId: 'user-1', status: 'claimed' };
+      gateway.emitTaskUpdated(data);
+      expect(mockServer.emit).toHaveBeenCalledWith('task:updated', data);
+    });
+  });
+
   describe('handleMessage', () => {
     it('должен возвращать подтверждение', () => {
       const result = gateway.handleMessage({} as any, {});

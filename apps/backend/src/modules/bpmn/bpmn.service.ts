@@ -361,6 +361,12 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async findInstanceByKey(processInstanceKey: string): Promise<ProcessInstance | null> {
+    return this.processInstanceRepository.findOne({
+      where: { processInstanceKey },
+    });
+  }
+
   async updateInstanceStatus(
     processInstanceKey: string,
     status: ProcessInstanceStatus,

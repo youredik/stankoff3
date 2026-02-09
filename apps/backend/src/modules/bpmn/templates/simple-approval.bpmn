@@ -19,6 +19,7 @@
 
     <bpmn:userTask id="Task_Review" name="Рассмотреть заявку">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= assigneeId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:review-form" />
       </bpmn:extensionElements>

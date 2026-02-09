@@ -172,6 +172,37 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('sla:batch-update', { workspaceId, updates });
   }
 
+  // User task events — отправляем конкретным пользователям
+  emitTaskCreated(task: { id: string; workspaceId: string; assigneeId?: string | null; candidateUsers?: string[]; candidateGroups?: string[] }) {
+    this.server.emit('task:created', task);
+  }
+
+  emitTaskUpdated(task: { id: string; workspaceId: string; assigneeId?: string | null; status: string }) {
+    this.server.emit('task:updated', task);
+  }
+
+  // Обновление токена без разрыва соединения
+  @SubscribeMessage('auth:refresh')
+  handleAuthRefresh(client: AuthenticatedSocket, payload: { token: string }): { success: boolean } {
+    try {
+      const oldUserId = client.data?.user?.sub;
+      const newPayload = this.jwtService.verify(payload.token);
+      client.data.user = newPayload;
+
+      // Обновляем presence если userId изменился (на практике не должно)
+      if (oldUserId && oldUserId !== newPayload.sub) {
+        this.removeUserPresence(oldUserId, client.id);
+        this.addUserPresence(newPayload.sub, client.id);
+      } else if (!oldUserId && newPayload.sub) {
+        this.addUserPresence(newPayload.sub, client.id);
+      }
+
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
+  }
+
   @SubscribeMessage('sla:subscribe')
   handleSlaSubscribe(client: AuthenticatedSocket, payload: { entityIds: string[] }): void {
     // Client wants to subscribe to SLA updates for specific entities

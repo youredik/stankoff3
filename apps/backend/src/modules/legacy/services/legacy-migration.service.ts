@@ -666,6 +666,7 @@ export class LegacyMigrationService {
       icon: '📦',
       prefix: LEGACY_WORKSPACE_PREFIX,
       lastEntityNumber: 0,
+      isInternal: true,
       sections: [
         {
           id: 'main',

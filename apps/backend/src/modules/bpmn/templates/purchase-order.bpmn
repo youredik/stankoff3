@@ -19,6 +19,7 @@
 
     <bpmn:userTask id="Task_Review" name="Проверка заявки">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= procurementId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:po-review-form" />
       </bpmn:extensionElements>
@@ -47,6 +48,7 @@
 
     <bpmn:userTask id="Task_ManagerApproval" name="Согласование руководителем">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= managerId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:po-approval-form" />
       </bpmn:extensionElements>
@@ -74,6 +76,7 @@
 
     <bpmn:userTask id="Task_SelectSupplier" name="Выбор поставщика">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= procurementId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:po-supplier-form" />
       </bpmn:extensionElements>
@@ -83,6 +86,7 @@
 
     <bpmn:userTask id="Task_CreatePO" name="Создание заказа">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= procurementId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:po-create-form" />
       </bpmn:extensionElements>
@@ -104,6 +108,7 @@
 
     <bpmn:userTask id="Task_ReceiveGoods" name="Приёмка товара">
       <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
         <zeebe:assignmentDefinition assignee="= warehouseId" />
         <zeebe:formDefinition formKey="camunda-forms:bpmn:po-receive-form" />
       </bpmn:extensionElements>

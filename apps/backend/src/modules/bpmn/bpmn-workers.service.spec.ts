@@ -9,6 +9,8 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { EventsGateway } from '../websocket/events.gateway';
 import { ProcessInstance, ProcessInstanceStatus } from './entities/process-instance.entity';
 import { ProcessActivityLog } from './entities/process-activity-log.entity';
+import { UserTasksWorker } from './user-tasks/user-tasks.worker';
+import { CreateEntityWorker } from './entity-links/create-entity.worker';
 
 // Тип для обработчика задач Zeebe
 type ZeebeJobHandler = (job: Record<string, unknown>) => Promise<void>;
@@ -24,6 +26,8 @@ describe('BpmnWorkersService', () => {
   let registeredWorkers: Map<string, ZeebeJobHandler>;
   let mockActivityLogRepo: any;
   let mockProcessInstanceRepo: any;
+  let mockUserTasksWorker: any;
+  let mockCreateEntityWorker: any;
 
   beforeEach(async () => {
     registeredWorkers = new Map();
@@ -66,12 +70,26 @@ describe('BpmnWorkersService', () => {
       }),
     };
 
+    mockUserTasksWorker = {
+      handleUserTask: jest.fn().mockResolvedValue({ taskId: 'user-task-1' }),
+    };
+
+    mockCreateEntityWorker = {
+      handleCreateEntity: jest.fn().mockResolvedValue({
+        createdEntityId: 'new-entity-1',
+        createdEntityCustomId: 'CLM-1',
+        linkId: 'link-1',
+      }),
+    };
+
     const mockModuleRef = {
       get: jest.fn((type) => {
         if (type === EntityService) return mockEntityService;
         if (type === EmailService) return mockEmailService;
         if (type === AuditLogService) return mockAuditLogService;
         if (type === EventsGateway) return mockEventsGateway;
+        if (type === UserTasksWorker) return mockUserTasksWorker;
+        if (type === CreateEntityWorker) return mockCreateEntityWorker;
         throw new Error(`Unknown type`);
       }),
     };
@@ -104,7 +122,7 @@ describe('BpmnWorkersService', () => {
 
   describe('setZeebeClient', () => {
     it('должен зарегистрировать все воркеры', () => {
-      expect(registeredWorkers.size).toBe(7);
+      expect(registeredWorkers.size).toBe(9);
       expect(registeredWorkers.has('update-entity-status')).toBe(true);
       expect(registeredWorkers.has('send-notification')).toBe(true);
       expect(registeredWorkers.has('send-email')).toBe(true);
@@ -112,6 +130,8 @@ describe('BpmnWorkersService', () => {
       expect(registeredWorkers.has('set-assignee')).toBe(true);
       expect(registeredWorkers.has('process-completed')).toBe(true);
       expect(registeredWorkers.has('classify-entity')).toBe(true);
+      expect(registeredWorkers.has('io.camunda.zeebe:userTask')).toBe(true);
+      expect(registeredWorkers.has('create-entity')).toBe(true);
     });
   });
 
@@ -387,6 +407,222 @@ describe('BpmnWorkersService', () => {
       expect(mockJob.complete).toHaveBeenCalledWith(
         expect.objectContaining({ classified: false }),
       );
+    });
+  });
+
+  describe('io.camunda.zeebe:userTask worker', () => {
+    it('должен создать user task и вернуть forward()', async () => {
+      const handler = registeredWorkers.get('io.camunda.zeebe:userTask')!;
+      const mockJob = {
+        key: '456789',
+        type: 'io.camunda.zeebe:userTask',
+        processInstanceKey: '123456',
+        processDefinitionKey: '111',
+        bpmnProcessId: 'test-process',
+        elementId: 'Task_Review',
+        variables: { workspaceId: 'ws-1', entityId: 'entity-1' },
+        customHeaders: { name: 'Review Task' },
+        forward: jest.fn().mockReturnValue('forwarded'),
+        fail: jest.fn(),
+        retries: 3,
+      };
+
+      const result = await handler(mockJob);
+
+      expect(mockUserTasksWorker.handleUserTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: '456789',
+          elementId: 'Task_Review',
+          processInstanceKey: '123456',
+        }),
+      );
+      expect(mockJob.forward).toHaveBeenCalled();
+      expect(result).toBe('forwarded');
+    });
+
+    it('должен fail при отсутствии UserTasksWorker', async () => {
+      // Создаём сервис без UserTasksWorker
+      const moduleRefNoWorker = {
+        get: jest.fn(() => { throw new Error('Not found'); }),
+      };
+
+      const module2 = await Test.createTestingModule({
+        providers: [
+          BpmnWorkersService,
+          { provide: ModuleRef, useValue: moduleRefNoWorker },
+          { provide: BpmnService, useValue: { updateInstanceStatus: jest.fn() } },
+          { provide: getRepositoryToken(ProcessActivityLog), useValue: { save: jest.fn() } },
+          { provide: getRepositoryToken(ProcessInstance), useValue: { findOne: jest.fn() } },
+        ],
+      }).compile();
+
+      const serviceNoWorker = module2.get<BpmnWorkersService>(BpmnWorkersService);
+      await serviceNoWorker.onModuleInit();
+
+      const workers2 = new Map<string, any>();
+      serviceNoWorker.setZeebeClient({
+        createWorker: jest.fn((config: any) => { workers2.set(config.taskType, config.taskHandler); }),
+      } as any);
+
+      const handler = workers2.get('io.camunda.zeebe:userTask')!;
+      const mockJob = {
+        key: '456789',
+        type: 'io.camunda.zeebe:userTask',
+        processInstanceKey: '123456',
+        elementId: 'Task_Review',
+        variables: {},
+        customHeaders: {},
+        forward: jest.fn(),
+        fail: jest.fn().mockReturnValue('failed'),
+        retries: 3,
+      };
+
+      const result = await handler(mockJob);
+
+      expect(mockJob.fail).toHaveBeenCalledWith(
+        expect.objectContaining({ errorMessage: 'UserTasksWorker not available' }),
+      );
+      expect(result).toBe('failed');
+    });
+
+    it('должен fail при ошибке в handleUserTask', async () => {
+      mockUserTasksWorker.handleUserTask.mockRejectedValue(new Error('DB error'));
+
+      const handler = registeredWorkers.get('io.camunda.zeebe:userTask')!;
+      const mockJob = {
+        key: '456789',
+        type: 'io.camunda.zeebe:userTask',
+        processInstanceKey: '123456',
+        elementId: 'Task_Review',
+        variables: { workspaceId: 'ws-1' },
+        customHeaders: {},
+        forward: jest.fn(),
+        fail: jest.fn().mockReturnValue('failed'),
+        retries: 3,
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.fail).toHaveBeenCalledWith({
+        errorMessage: 'DB error',
+        retries: 2,
+      });
+
+      // Restore
+      mockUserTasksWorker.handleUserTask.mockResolvedValue({ taskId: 'user-task-1' });
+    });
+  });
+
+  describe('completeUserTaskJob', () => {
+    it('должен завершить job через zeebeClient.completeJob', async () => {
+      mockZeebeClient.completeJob = jest.fn().mockResolvedValue(undefined);
+
+      const result = await service.completeUserTaskJob('job-123', { approved: true });
+
+      expect(result).toBe(true);
+      expect(mockZeebeClient.completeJob).toHaveBeenCalledWith({
+        jobKey: 'job-123',
+        variables: { approved: true },
+      });
+    });
+
+    it('должен вернуть false при ошибке completeJob', async () => {
+      mockZeebeClient.completeJob = jest.fn().mockRejectedValue(new Error('Job not found'));
+
+      const result = await service.completeUserTaskJob('job-123', {});
+
+      expect(result).toBe(false);
+    });
+
+    it('должен вернуть false если zeebeClient недоступен', async () => {
+      // Создаём сервис без zeebeClient
+      const module2 = await Test.createTestingModule({
+        providers: [
+          BpmnWorkersService,
+          { provide: ModuleRef, useValue: { get: jest.fn(() => { throw new Error('x'); }) } },
+          { provide: BpmnService, useValue: { updateInstanceStatus: jest.fn() } },
+          { provide: getRepositoryToken(ProcessActivityLog), useValue: { save: jest.fn() } },
+          { provide: getRepositoryToken(ProcessInstance), useValue: { findOne: jest.fn() } },
+        ],
+      }).compile();
+
+      const serviceNoClient = module2.get<BpmnWorkersService>(BpmnWorkersService);
+      await serviceNoClient.onModuleInit();
+
+      // Don't call setZeebeClient — zeebeClient is null
+      const result = await serviceNoClient.completeUserTaskJob('job-123', {});
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('create-entity worker', () => {
+    it('должен создать entity через CreateEntityWorker', async () => {
+      const handler = registeredWorkers.get('create-entity')!;
+      const mockJob = {
+        key: '789012',
+        type: 'create-entity',
+        processInstanceKey: '123456',
+        elementId: 'Task_CreateClaim',
+        variables: {
+          sourceEntityId: 'entity-1',
+          targetWorkspaceId: 'ws-2',
+          title: 'Рекламация из ТП',
+          status: 'received',
+          linkType: 'spawned',
+        },
+        customHeaders: {},
+        complete: jest.fn().mockReturnValue({}),
+        fail: jest.fn(),
+        retries: 3,
+      };
+
+      await handler(mockJob);
+
+      expect(mockCreateEntityWorker.handleCreateEntity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: '789012',
+          processInstanceKey: '123456',
+        }),
+      );
+      expect(mockJob.complete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdEntityId: 'new-entity-1',
+          createdEntityCustomId: 'CLM-1',
+        }),
+      );
+    });
+
+    it('должен fail при ошибке в CreateEntityWorker', async () => {
+      mockCreateEntityWorker.handleCreateEntity.mockRejectedValue(
+        new Error('targetWorkspaceId is required'),
+      );
+
+      const handler = registeredWorkers.get('create-entity')!;
+      const mockJob = {
+        key: '789012',
+        type: 'create-entity',
+        processInstanceKey: '123456',
+        elementId: 'Task_CreateClaim',
+        variables: {},
+        customHeaders: {},
+        complete: jest.fn(),
+        fail: jest.fn().mockReturnValue({}),
+        retries: 3,
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.fail).toHaveBeenCalledWith({
+        errorMessage: 'targetWorkspaceId is required',
+        retries: 2,
+      });
+
+      // Restore
+      mockCreateEntityWorker.handleCreateEntity.mockResolvedValue({
+        createdEntityId: 'new-entity-1',
+        createdEntityCustomId: 'CLM-1',
+        linkId: 'link-1',
+      });
     });
   });
 
