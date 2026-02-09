@@ -2,6 +2,7 @@
 
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Loader2 } from 'lucide-react';
 import { KanbanCard } from './KanbanCard';
 import type { Entity } from '@/types';
 
@@ -10,11 +11,26 @@ interface KanbanColumnProps {
   title: string;
   color?: string;
   cards: Entity[];
+  totalCount: number;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   canEdit?: boolean;
 }
 
-export function KanbanColumn({ id, title, color, cards, canEdit = true }: KanbanColumnProps) {
+export function KanbanColumn({
+  id,
+  title,
+  color,
+  cards,
+  totalCount,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  canEdit = true,
+}: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const remaining = totalCount - cards.length;
 
   return (
     <div
@@ -34,7 +50,7 @@ export function KanbanColumn({ id, title, color, cards, canEdit = true }: Kanban
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
         </div>
         <span className="bg-white/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded text-sm font-medium">
-          {cards.length}
+          {totalCount}
         </span>
       </div>
 
@@ -54,6 +70,20 @@ export function KanbanColumn({ id, title, color, cards, canEdit = true }: Kanban
           ))}
         </SortableContext>
 
+        {/* Load more button */}
+        {hasMore && (
+          <button
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="w-full py-2.5 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors cursor-pointer disabled:cursor-wait"
+          >
+            {loadingMore ? (
+              <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+            ) : (
+              `Показать ещё (${remaining})`
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

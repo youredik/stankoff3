@@ -1,10 +1,67 @@
 import { apiClient } from './client';
 import type { Entity } from '@/types';
 
+export interface KanbanColumnData {
+  status: string;
+  items: Entity[];
+  total: number;
+  hasMore: boolean;
+}
+
+export interface KanbanResponse {
+  columns: KanbanColumnData[];
+  totalAll: number;
+}
+
+export interface EntityFilters {
+  search?: string;
+  assigneeId?: string[];
+  priority?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export const entitiesApi = {
   getByWorkspace: (workspaceId: string) =>
     apiClient
       .get<Entity[]>('/entities', { params: { workspaceId } })
+      .then((r) => r.data),
+
+  getKanban: (workspaceId: string, filters?: EntityFilters, perColumn = 20) =>
+    apiClient
+      .get<KanbanResponse>('/entities/kanban', {
+        params: {
+          workspaceId,
+          perColumn,
+          ...filters,
+          assigneeId: filters?.assigneeId?.join(',') || undefined,
+          priority: filters?.priority?.join(',') || undefined,
+        },
+      })
+      .then((r) => r.data),
+
+  loadMoreColumn: (
+    workspaceId: string,
+    status: string,
+    offset: number,
+    filters?: EntityFilters,
+    limit = 20,
+  ) =>
+    apiClient
+      .get<{ items: Entity[]; total: number; hasMore: boolean }>(
+        '/entities/kanban/column',
+        {
+          params: {
+            workspaceId,
+            status,
+            offset,
+            limit,
+            ...filters,
+            assigneeId: filters?.assigneeId?.join(',') || undefined,
+            priority: filters?.priority?.join(',') || undefined,
+          },
+        },
+      )
       .then((r) => r.data),
 
   getById: (id: string) =>

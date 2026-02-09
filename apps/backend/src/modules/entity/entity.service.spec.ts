@@ -454,6 +454,232 @@ describe('EntityService', () => {
     });
   });
 
+  describe('findForKanban', () => {
+    const createMockQb = (overrides: Record<string, any> = {}) => ({
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+      getMany: jest.fn().mockResolvedValue([]),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      ...overrides,
+    });
+
+    it('должен вернуть сгруппированные по статусу entities с counts', async () => {
+      const entity1 = { ...mockEntity, status: 'new' };
+      const entity2 = { ...mockEntity, id: 'entity-2', status: 'done' };
+
+      let callCount = 0;
+      entityRepo.createQueryBuilder.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          // Count query
+          return createMockQb({
+            getRawMany: jest.fn().mockResolvedValue([
+              { status: 'new', count: 150 },
+              { status: 'done', count: 30 },
+            ]),
+          }) as any;
+        }
+        if (callCount === 2) {
+          // Items for 'new'
+          return createMockQb({
+            getMany: jest.fn().mockResolvedValue([entity1]),
+          }) as any;
+        }
+        // Items for 'done'
+        return createMockQb({
+          getMany: jest.fn().mockResolvedValue([entity2]),
+        }) as any;
+      });
+
+      const result = await service.findForKanban({ workspaceId: 'ws-1', perColumn: 20 });
+
+      expect(result.totalAll).toBe(180);
+      expect(result.columns).toHaveLength(2);
+      expect(result.columns.find((c) => c.status === 'new')?.total).toBe(150);
+      expect(result.columns.find((c) => c.status === 'new')?.hasMore).toBe(true);
+      expect(result.columns.find((c) => c.status === 'done')?.total).toBe(30);
+      expect(result.columns.find((c) => c.status === 'done')?.hasMore).toBe(true);
+    });
+
+    it('должен установить hasMore=false когда total <= perColumn', async () => {
+      let callCount = 0;
+      entityRepo.createQueryBuilder.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return createMockQb({
+            getRawMany: jest.fn().mockResolvedValue([{ status: 'new', count: 5 }]),
+          }) as any;
+        }
+        return createMockQb({
+          getMany: jest.fn().mockResolvedValue([mockEntity]),
+        }) as any;
+      });
+
+      const result = await service.findForKanban({ workspaceId: 'ws-1', perColumn: 20 });
+
+      expect(result.columns[0].hasMore).toBe(false);
+    });
+
+    it('должен вернуть пустой результат для workspace без entities', async () => {
+      entityRepo.createQueryBuilder.mockReturnValue(createMockQb({
+        getRawMany: jest.fn().mockResolvedValue([]),
+      }) as any);
+
+      const result = await service.findForKanban({ workspaceId: 'ws-1' });
+
+      expect(result.columns).toHaveLength(0);
+      expect(result.totalAll).toBe(0);
+    });
+
+    it('должен применять фильтр по search', async () => {
+      const mockQb = createMockQb({
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForKanban({ workspaceId: 'ws-1', search: 'test' });
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('LOWER(entity.title)'),
+        expect.objectContaining({ search: '%test%' }),
+      );
+    });
+
+    it('должен применять фильтр по assigneeId', async () => {
+      const mockQb = createMockQb({
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForKanban({ workspaceId: 'ws-1', assigneeId: ['user-1', 'user-2'] });
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.assigneeId IN (:...assigneeIds)',
+        { assigneeIds: ['user-1', 'user-2'] },
+      );
+    });
+
+    it('должен применять фильтр по priority', async () => {
+      const mockQb = createMockQb({
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForKanban({ workspaceId: 'ws-1', priority: ['high', 'critical'] });
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.priority IN (:...priorities)',
+        { priorities: ['high', 'critical'] },
+      );
+    });
+
+    it('должен применять фильтр по дате', async () => {
+      const mockQb = createMockQb({
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForKanban({
+        workspaceId: 'ws-1',
+        dateFrom: '2026-01-01',
+        dateTo: '2026-12-31',
+      });
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.createdAt >= :dateFrom',
+        { dateFrom: '2026-01-01' },
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.createdAt <= :dateTo',
+        expect.objectContaining({ dateTo: expect.any(Date) }),
+      );
+    });
+  });
+
+  describe('findColumnPage', () => {
+    it('должен вернуть страницу entities для конкретного статуса', async () => {
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockEntity], 50]),
+      };
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const result = await service.findColumnPage({
+        workspaceId: 'ws-1',
+        status: 'new',
+        offset: 20,
+        limit: 20,
+      });
+
+      expect(result.items).toEqual([mockEntity]);
+      expect(result.total).toBe(50);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it('должен вернуть hasMore=false когда все загружены', async () => {
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockEntity], 5]),
+      };
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const result = await service.findColumnPage({
+        workspaceId: 'ws-1',
+        status: 'new',
+        offset: 4,
+        limit: 20,
+      });
+
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('должен применять offset и limit', async () => {
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findColumnPage({
+        workspaceId: 'ws-1',
+        status: 'done',
+        offset: 40,
+        limit: 20,
+      });
+
+      expect(mockQb.skip).toHaveBeenCalledWith(40);
+      expect(mockQb.take).toHaveBeenCalledWith(20);
+      expect(mockQb.andWhere).toHaveBeenCalledWith('entity.status = :status', { status: 'done' });
+    });
+  });
+
   describe('exportToCsv', () => {
     it('должен экспортировать entities в CSV формат', async () => {
       const entityWithAssignee = { ...mockEntity, assignee: mockUser };

@@ -39,117 +39,134 @@ export function LinkedEntities({
   // Стабильный ключ для сравнения массива (вместо reference equality)
   const linkedIdsKey = useMemo(() => linkedEntityIds.join(','), [linkedEntityIds]);
 
-  // Fetch linked entity details
+  // Fetch linked entity details via search API (not loading all entities)
   useEffect(() => {
     if (linkedEntityIds.length === 0) {
       setLinkedEntities([]);
       return;
     }
 
+    let cancelled = false;
+
     const fetchLinkedEntities = async () => {
       setLoading(true);
       try {
-        const [workspacesData, entitiesData] = await Promise.all([
-          workspacesApi.getAll(),
-          Promise.all(
-            linkedEntityIds.map(async (customId) => {
-              // linkedEntityIds are customIds like "REK-445"
-              // We need to fetch all entities and find by customId
-              return customId;
-            })
-          ),
-        ]);
-
-        // Fetch all entities to find by customId
-        const allWorkspaceEntities: Entity[] = [];
-        for (const ws of workspacesData) {
-          try {
-            const wsEntities = await entitiesApi.getByWorkspace(ws.id);
-            allWorkspaceEntities.push(...wsEntities);
-          } catch {
-            // ignore
-          }
-        }
-
-        const linked: LinkedEntityInfo[] = [];
-        for (const customId of linkedEntityIds) {
-          const entity = allWorkspaceEntities.find(
-            (e) => e.customId === customId
-          );
-          if (entity) {
-            const workspace = workspacesData.find(
-              (w) => w.id === entity.workspaceId
-            );
-            linked.push({
-              id: entity.id,
-              customId: entity.customId,
-              title: entity.title,
-              status: entity.status,
-              workspaceName: workspace?.name || 'Неизвестно',
-              workspaceIcon: workspace?.icon || '📋',
-            });
-          } else {
-            // Entity not found but still show the customId
-            linked.push({
+        // Search each customId individually (they're short, fast queries)
+        const results = await Promise.all(
+          linkedEntityIds.map(async (customId) => {
+            try {
+              const searchResults = await entitiesApi.search(customId, 5);
+              const match = searchResults.find((r) => r.customId === customId);
+              if (match) {
+                return {
+                  id: match.id,
+                  customId: match.customId,
+                  title: match.title,
+                  status: match.status,
+                  workspaceName: match.workspaceName || '',
+                  workspaceIcon: match.workspaceIcon || '',
+                } as LinkedEntityInfo;
+              }
+            } catch {
+              // ignore individual search failure
+            }
+            return {
               id: customId,
               customId,
               title: 'Не найдено',
               status: '',
               workspaceName: '',
-              workspaceIcon: '❓',
-            });
-          }
-        }
+              workspaceIcon: '',
+            } as LinkedEntityInfo;
+          }),
+        );
 
-        setLinkedEntities(linked);
-        setWorkspaces(workspacesData);
+        if (!cancelled) {
+          setLinkedEntities(results);
+          // Fetch workspaces for the add modal
+          try {
+            const ws = await workspacesApi.getAll();
+            if (!cancelled) setWorkspaces(ws);
+          } catch { /* silent */ }
+        }
       } catch {
         // silent
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     };
 
     fetchLinkedEntities();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkedIdsKey]); // Используем стабильный ключ вместо массива
 
-  // Fetch entities for add modal (только при открытии модалки)
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedIdsKey]);
+
+  // Fetch workspaces for add modal and search entities by query
   useEffect(() => {
     if (!showAddModal) return;
 
     let cancelled = false;
 
-    const fetchAll = async () => {
+    const fetchWorkspacesForModal = async () => {
       try {
         const workspacesData = await workspacesApi.getAll();
         if (cancelled) return;
-
         setWorkspaces(workspacesData);
-
         if (workspacesData.length > 0) {
           setSelectedWorkspaceId((prev) => prev || workspacesData[0].id);
-        }
-
-        const allEntitiesData: Entity[] = [];
-        for (const ws of workspacesData) {
-          if (cancelled) return;
-          const wsEntities = await entitiesApi.getByWorkspace(ws.id);
-          allEntitiesData.push(...wsEntities);
-        }
-        if (!cancelled) {
-          setAllEntities(allEntitiesData);
         }
       } catch {
         // silent
       }
     };
 
-    fetchAll();
+    fetchWorkspacesForModal();
 
     return () => {
       cancelled = true;
     };
-  }, [showAddModal]); // Убрали selectedWorkspaceId — он менялся внутри эффекта
+  }, [showAddModal]);
+
+  // Search entities when searchQuery changes in modal
+  useEffect(() => {
+    if (!showAddModal || !searchQuery || searchQuery.length < 2) {
+      setAllEntities([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await entitiesApi.search(searchQuery, 20);
+        if (!cancelled) {
+          // Convert SearchResult to Entity-like objects for the modal list
+          setAllEntities(
+            results.map((r) => ({
+              id: r.id,
+              customId: r.customId,
+              title: r.title,
+              status: r.status,
+              priority: r.priority,
+              workspaceId: r.workspaceId,
+              assignee: r.assignee,
+              data: {},
+              createdAt: new Date(r.createdAt),
+              updatedAt: new Date(r.createdAt),
+            })) as Entity[],
+          );
+        }
+      } catch {
+        // silent
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [showAddModal, searchQuery]);
 
   const handleRemoveLink = (customId: string) => {
     const updated = linkedEntityIds.filter((id) => id !== customId);

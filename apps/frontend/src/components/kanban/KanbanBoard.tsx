@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -20,7 +20,6 @@ import { CreateEntityModal } from './CreateEntityModal';
 import {
   FilterPanel,
   createEmptyFilters,
-  applyFilters,
   isFilterActive,
   type FilterState,
 } from './FilterPanel';
@@ -28,6 +27,7 @@ import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { Entity, FieldOption } from '@/types';
+import type { EntityFilters } from '@/lib/api/entities';
 
 interface KanbanBoardProps {
   workspaceId: string;
@@ -41,28 +41,46 @@ const DEFAULT_COLUMNS: FieldOption[] = [
   { id: 'done', label: 'Готово', color: '#10B981' },
 ];
 
+function filtersToApi(filters: FilterState): EntityFilters {
+  return {
+    search: filters.search || undefined,
+    assigneeId: filters.assigneeIds.length > 0 ? filters.assigneeIds : undefined,
+    priority: filters.priorities.length > 0 ? filters.priorities : undefined,
+    dateFrom: filters.dateFrom || undefined,
+    dateTo: filters.dateTo || undefined,
+  };
+}
+
 export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const router = useRouter();
   const [activeCard, setActiveCard] = useState<Entity | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>(createEmptyFilters);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { entities, loading, fetchEntities, fetchUsers, updateStatus } =
-    useEntityStore();
+  const {
+    kanbanColumns,
+    kanbanLoading,
+    totalAll,
+    fetchKanban,
+    loadMoreColumn,
+    setKanbanFilters,
+    fetchUsers,
+    updateStatus,
+    getAllEntities,
+  } = useEntityStore();
   const { currentWorkspace, fetchWorkspace, canEdit, currentRole } = useWorkspaceStore();
   const { user } = useAuthStore();
 
-  // Проверка прав: глобальный админ или workspace admin
   const isAdmin = user?.role === 'admin' || currentRole === 'admin';
-  // Может ли редактировать (editor или admin)
   const canEditEntities = canEdit();
 
   useEffect(() => {
-    fetchEntities(workspaceId);
+    fetchKanban(workspaceId);
     fetchUsers();
     fetchWorkspace(workspaceId);
-  }, [workspaceId, fetchEntities, fetchUsers, fetchWorkspace]);
+  }, [workspaceId, fetchKanban, fetchUsers, fetchWorkspace]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -70,25 +88,21 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     })
   );
 
-  // Get status columns from workspace configuration
   const columns = useMemo(() => {
     if (!currentWorkspace?.sections) return DEFAULT_COLUMNS;
-
-    // Find the status field in any section
     for (const section of currentWorkspace.sections) {
       const statusField = section.fields.find((f) => f.type === 'status');
       if (statusField?.options && statusField.options.length > 0) {
         return statusField.options;
       }
     }
-
     return DEFAULT_COLUMNS;
   }, [currentWorkspace]);
 
-  // Apply filters to entities
-  const filteredEntities = useMemo(() => {
-    return applyFilters(entities, filters);
-  }, [entities, filters]);
+  // Count loaded entities across all columns
+  const loadedCount = useMemo(() => {
+    return Object.values(kanbanColumns).reduce((sum, col) => sum + col.items.length, 0);
+  }, [kanbanColumns]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -103,8 +117,34 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     return count;
   }, [filters]);
 
+  // Handle filter changes with debounce for search
+  const prevSearchRef = useRef(filters.search);
+  const handleFiltersChange = useCallback(
+    (newFilters: FilterState) => {
+      setFilters(newFilters);
+
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
+
+      const apiFilters = filtersToApi(newFilters);
+      const searchChanged = newFilters.search !== prevSearchRef.current;
+      prevSearchRef.current = newFilters.search;
+
+      if (searchChanged && newFilters.search) {
+        searchTimerRef.current = setTimeout(() => {
+          setKanbanFilters(apiFilters);
+        }, 300);
+      } else {
+        setKanbanFilters(apiFilters);
+      }
+    },
+    [setKanbanFilters],
+  );
+
   const handleDragStart = (event: DragStartEvent) => {
-    const card = filteredEntities.find((e) => e.id === event.active.id);
+    const allEntities = getAllEntities();
+    const card = allEntities.find((e) => e.id === event.active.id);
     if (card) setActiveCard(card);
   };
 
@@ -112,46 +152,31 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     const { active, over } = event;
     setActiveCard(null);
 
-    // Viewer не может менять статус
     if (!canEditEntities) return;
-
     if (!over || active.id === over.id) return;
 
     const overId = over.id as string;
-
-    // Проверяем, является ли overId колонкой (статусом)
     const isColumn = columns.some((col) => col.id === overId);
 
     if (isColumn) {
-      // Перетащили на колонку — меняем статус
       updateStatus(active.id as string, overId);
     } else {
-      // Перетащили на другую карточку — находим её статус
-      const targetCard = entities.find((e) => e.id === overId);
+      const allEntities = getAllEntities();
+      const targetCard = allEntities.find((e) => e.id === overId);
       if (targetCard) {
         updateStatus(active.id as string, targetCard.status);
       }
     }
   };
 
-  const getColumnCards = (statusId: string) => {
-    const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-    return filteredEntities
-      .filter((e) => e.status === statusId)
-      .sort((a, b) => {
-        // Сначала по приоритету (high > medium > low)
-        const priorityDiff = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
-        if (priorityDiff !== 0) return priorityDiff;
-        // Затем по дате создания (новые сверху)
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-  };
-
   const clearFilters = () => {
-    setFilters(createEmptyFilters());
+    const empty = createEmptyFilters();
+    setFilters(empty);
+    prevSearchRef.current = '';
+    setKanbanFilters({});
   };
 
-  if (loading && entities.length === 0) {
+  if (kanbanLoading && Object.keys(kanbanColumns).length === 0) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4">
         <SkeletonColumn />
@@ -173,9 +198,10 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                   {currentWorkspace?.name || 'Загрузка...'}
                 </h2>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">
-                  {filteredEntities.length === entities.length
-                    ? `${entities.length} заявок`
-                    : `${filteredEntities.length} из ${entities.length} заявок`}
+                  {activeFilterCount > 0
+                    ? `${totalAll} из всех заявок`
+                    : `${totalAll} заявок`}
+                  {loadedCount < totalAll && ` (загружено ${loadedCount})`}
                 </p>
               </div>
             </div>
@@ -208,7 +234,6 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                   <span>Сбросить</span>
                 </button>
               )}
-              {/* Настройки - только для админов */}
               {isAdmin && (
                 <button
                   onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
@@ -219,7 +244,6 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                   <span>Настройки</span>
                 </button>
               )}
-              {/* Создание заявки - только для editor+ */}
               {canEditEntities && (
                 <button
                   onClick={() => setShowCreateModal(true)}
@@ -234,7 +258,6 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           </div>
         </div>
 
-        {/* Индикатор режима просмотра */}
         {!canEditEntities && currentRole && (
           <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
             <Eye className="w-4 h-4" />
@@ -248,16 +271,28 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           onDragEnd={handleDragEnd}
         >
           <div className="flex overflow-x-auto pb-4">
-            {columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                id={column.id}
-                title={column.label}
-                color={column.color}
-                cards={getColumnCards(column.id)}
-                canEdit={canEditEntities}
-              />
-            ))}
+            {columns.map((column) => {
+              const colData = kanbanColumns[column.id] || {
+                items: [],
+                total: 0,
+                hasMore: false,
+                loading: false,
+              };
+              return (
+                <KanbanColumn
+                  key={column.id}
+                  id={column.id}
+                  title={column.label}
+                  color={column.color}
+                  cards={colData.items}
+                  totalCount={colData.total}
+                  hasMore={colData.hasMore}
+                  loadingMore={colData.loading}
+                  onLoadMore={() => loadMoreColumn(column.id)}
+                  canEdit={canEditEntities}
+                />
+              );
+            })}
           </div>
 
           <DragOverlay>
@@ -278,7 +313,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
       {showFilters && (
         <FilterPanel
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={handleFiltersChange}
           onClose={() => setShowFilters(false)}
         />
       )}

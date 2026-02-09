@@ -397,7 +397,9 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/auth/logout` — выход (очистка cookies + Keycloak logout URL)
 
 **Основные эндпоинты:**
-- `GET/POST /api/entities` — сущности
+- `GET/POST /api/entities` — сущности (GET без пагинации — legacy)
+- `GET /api/entities/kanban` — канбан с серверной пагинацией (query: workspaceId, perColumn, search, assigneeId[], priority[], dateFrom, dateTo)
+- `GET /api/entities/kanban/column` — подгрузка колонки (query: workspaceId, status, offset, limit + фильтры)
 - `PATCH /api/entities/:id/status` — изменение статуса
 - `PATCH /api/entities/:id/assignee` — назначение исполнителя
 - `DELETE /api/entities/cleanup/test-data` — очистка тестовых данных (E2E)
@@ -454,6 +456,13 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/bpmn/tasks/:id/unclaim` — отпустить задачу
 - `POST /api/bpmn/tasks/:id/complete` — завершить с данными формы
 - `POST /api/bpmn/tasks/:id/delegate` — делегировать
+
+**BPMN Form Definitions (формы для user tasks):**
+- `GET /api/bpmn/forms?workspaceId=...` — список определений форм
+- `GET /api/bpmn/forms/:id` — детали определения формы
+- `POST /api/bpmn/forms` — создать определение формы
+- `PUT /api/bpmn/forms/:id` — обновить определение формы
+- `DELETE /api/bpmn/forms/:id` — удалить определение формы
 
 **BPMN Entity Links:**
 - `GET /api/bpmn/entity-links/entity/:id` — связи сущности
@@ -532,6 +541,7 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `POST /api/legacy/migration/validate` — проверка целостности после миграции
 - `GET /api/legacy/migration/log?status=failed&limit=20` — записи migration log
 - `POST /api/legacy/migration/retry-failed` — повтор ошибочных записей
+- `POST /api/legacy/migration/update-assignees` — ретроактивное обновление assignee (manager.id → User.id)
 
 **Legacy Sync (синхронизация новых данных):**
 - `GET /api/legacy/sync/status` — статус синхронизации

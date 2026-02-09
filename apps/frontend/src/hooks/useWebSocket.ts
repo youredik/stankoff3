@@ -70,12 +70,32 @@ export function useWebSocket() {
 
     socket.on('entity:created', (entity) => {
       const state = useEntityStore.getState();
-      const exists = state.entities.find((e) => e.id === entity.id);
-      if (!exists) {
+
+      // Update kanban columns if entity belongs to current workspace
+      if (state.kanbanWorkspaceId && entity.workspaceId === state.kanbanWorkspaceId) {
+        const statusId = entity.status;
+        const columns = { ...state.kanbanColumns };
+        const col = columns[statusId];
+        if (col) {
+          const exists = col.items.find((e: any) => e.id === entity.id);
+          if (!exists) {
+            columns[statusId] = {
+              ...col,
+              items: [entity, ...col.items],
+              total: col.total + 1,
+            };
+          }
+        } else {
+          columns[statusId] = { items: [entity], total: 1, hasMore: false, loading: false };
+        }
+        const entities = Object.values(columns).flatMap((c) => c.items);
         useEntityStore.setState({
-          entities: [entity, ...state.entities],
+          kanbanColumns: columns,
+          entities,
+          totalAll: state.totalAll + 1,
         });
       }
+
       useNotificationStore.getState().addNotification({
         text: `Новая заявка ${entity.customId}: ${entity.title}`,
         type: 'entity',
@@ -86,11 +106,25 @@ export function useWebSocket() {
 
     socket.on('entity:updated', (entity) => {
       const state = useEntityStore.getState();
+
+      // Update in kanban columns
+      const columns = { ...state.kanbanColumns };
+      for (const statusId of Object.keys(columns)) {
+        const col = columns[statusId];
+        const idx = col.items.findIndex((e) => e.id === entity.id);
+        if (idx !== -1) {
+          columns[statusId] = {
+            ...col,
+            items: col.items.map((e) => (e.id === entity.id ? { ...e, ...entity } : e)),
+          };
+          break;
+        }
+      }
       useEntityStore.setState({
-        entities: state.entities.map((e) =>
-          e.id === entity.id ? { ...e, ...entity } : e,
-        ),
+        kanbanColumns: columns,
+        entities: Object.values(columns).flatMap((c) => c.items),
       });
+
       if (state.selectedEntity?.id === entity.id) {
         useEntityStore.setState({
           selectedEntity: { ...state.selectedEntity, ...entity },
@@ -100,11 +134,42 @@ export function useWebSocket() {
 
     socket.on('status:changed', (data: { id: string; status: string; entity?: any }) => {
       const state = useEntityStore.getState();
+      const columns = { ...state.kanbanColumns };
+
+      // Find entity in old column and move to new column
+      let movedEntity: any = null;
+      for (const statusId of Object.keys(columns)) {
+        const col = columns[statusId];
+        const found = col.items.find((e) => e.id === data.id);
+        if (found) {
+          movedEntity = { ...found, status: data.status };
+          columns[statusId] = {
+            ...col,
+            items: col.items.filter((e) => e.id !== data.id),
+            total: col.total - 1,
+          };
+          break;
+        }
+      }
+
+      if (movedEntity) {
+        const newCol = columns[data.status];
+        if (newCol) {
+          columns[data.status] = {
+            ...newCol,
+            items: [movedEntity, ...newCol.items],
+            total: newCol.total + 1,
+          };
+        } else {
+          columns[data.status] = { items: [movedEntity], total: 1, hasMore: false, loading: false };
+        }
+      }
+
       useEntityStore.setState({
-        entities: state.entities.map((e) =>
-          e.id === data.id ? { ...e, status: data.status } : e,
-        ),
+        kanbanColumns: columns,
+        entities: Object.values(columns).flatMap((c) => c.items),
       });
+
       if (state.selectedEntity?.id === data.id) {
         useEntityStore.setState({
           selectedEntity: { ...state.selectedEntity, status: data.status },
@@ -145,10 +210,26 @@ export function useWebSocket() {
       const state = useEntityStore.getState();
       const entity = data.entity;
 
+      // Update in kanban columns
+      const columns = { ...state.kanbanColumns };
+      for (const statusId of Object.keys(columns)) {
+        const col = columns[statusId];
+        const idx = col.items.findIndex((e) => e.id === data.entityId);
+        if (idx !== -1) {
+          columns[statusId] = {
+            ...col,
+            items: col.items.map((e) =>
+              e.id === data.entityId
+                ? { ...e, assigneeId: data.assigneeId ?? undefined, assignee: entity?.assignee }
+                : e,
+            ),
+          };
+          break;
+        }
+      }
       useEntityStore.setState({
-        entities: state.entities.map((e) =>
-          e.id === data.entityId ? { ...e, assigneeId: data.assigneeId ?? undefined, assignee: entity?.assignee } : e,
-        ),
+        kanbanColumns: columns,
+        entities: Object.values(columns).flatMap((c) => c.items),
       });
 
       if (state.selectedEntity?.id === data.entityId) {

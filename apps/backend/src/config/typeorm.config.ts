@@ -8,6 +8,7 @@ dotenv.config({ path: join(__dirname, '../../../../.env') });
 // Паттерны для entities основной БД (PostgreSQL)
 // ВАЖНО: legacy entities исключены - они используют отдельный MySQL DataSource
 const entityPatterns = [
+  __dirname + '/../modules/ai/**/*.entity{.ts,.js}',
   __dirname + '/../modules/analytics/*.entity{.ts,.js}',
   __dirname + '/../modules/audit-log/*.entity{.ts,.js}',
   __dirname + '/../modules/auth/*.entity{.ts,.js}',

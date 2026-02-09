@@ -63,8 +63,8 @@ Stankoff Portal - это корпоративная система управл�
 - `UserModal.tsx` - Модальное окно создания/редактирования пользователя
 
 **Kanban**
-- `KanbanBoard.tsx` - Основной контейнер с DndContext, фильтрами и индикатором режима просмотра
-- `KanbanColumn.tsx` - Droppable колонка статуса (динамические из workspace)
+- `KanbanBoard.tsx` - Основной контейнер с DndContext, серверной пагинацией и фильтрацией (debounce 300ms)
+- `KanbanColumn.tsx` - Droppable колонка статуса с серверным total, кнопкой «Показать ещё» и lazy-loading
 - `KanbanCard.tsx` - Draggable карточка сущности (отключается для viewer)
 - `EntityDetailPanel.tsx` - Модальное окно сущности с комментариями, вложениями, кастомными полями, ML-рекомендациями исполнителей и tooltips на заблокированных элементах
 - `CreateEntityModal.tsx` - Создание новой сущности с поддержкой кастомных полей из структуры workspace
@@ -150,6 +150,7 @@ Stankoff Portal - это корпоративная система управл�
 - `forms/DynamicForm.tsx` - Компонент формы на основе JSON Schema с валидацией и поддержкой различных типов полей (text, number, boolean, select, date, textarea)
 - `forms/FormViewer.tsx` - Компонент отображения форм User Tasks на основе @bpmn-io/form-js (dynamic import, SSR=false)
 - `forms/FormEditor.tsx` - Визуальный drag-and-drop редактор форм (@bpmn-io/form-js-editor) с undo/redo, import/export, preview
+- `forms/FormDefinitionsSettings.tsx` - CRUD управление определениями форм (список, создание, редактирование, предпросмотр, удаление). Встроен как таб «Формы» в WorkspaceBuilder
 
 **BPMN Triggers (Триггеры процессов)**
 - `triggers/TriggersList.tsx` - Список триггеров workspace с управлением (включить/выключить/удалить)
@@ -182,24 +183,46 @@ Stankoff Portal - это корпоративная система управл�
 
 **useEntityStore**
 ```typescript
+interface KanbanColumnState {
+  items: Entity[];
+  total: number;
+  hasMore: boolean;
+  loading: boolean;
+}
+
 interface EntityStore {
-  entities: Entity[];           // Все сущности
-  selectedEntity: Entity | null; // Выбранная сущность
-  comments: Comment[];          // Комментарии выбранной сущности
-  users: User[];                // Список пользователей
+  // Kanban state (серверная пагинация)
+  kanbanColumns: Record<string, KanbanColumnState>; // статус → колонка
+  kanbanLoading: boolean;
+  kanbanFilters: EntityFilters;
+  kanbanWorkspaceId: string | null;
+  totalAll: number;                  // Общее количество сущностей
+
+  // Backward compat
+  entities: Entity[];                // Derived: flatMap из kanbanColumns
+  selectedEntity: Entity | null;
+  comments: Comment[];
+  users: User[];
   loading: boolean;
   error: string | null;
 
-  fetchEntities(workspaceId: string): Promise<void>;
+  // Kanban actions
+  fetchKanban(workspaceId: string, filters?: EntityFilters): Promise<void>;
+  loadMoreColumn(statusId: string): Promise<void>;
+  setKanbanFilters(filters: EntityFilters): void;
+  getAllEntities(): Entity[];
+
+  // Legacy (backward compat)
+  fetchEntities(workspaceId: string): Promise<void>; // → redirect to fetchKanban
   fetchUsers(): Promise<void>;
   selectEntity(id: string): Promise<void>;
   deselectEntity(): void;
-  updateStatus(id: string, status: string): Promise<void>;
+  updateStatus(id: string, status: string): Promise<void>;      // Оптимистичное перемещение между колонками
   updateAssignee(id: string, assigneeId: string | null): Promise<void>;
   updateLinkedEntities(id: string, linkedEntityIds: string[]): Promise<void>;
-  updateEntityData(id: string, fieldId: string, value: any): Promise<void>; // Обновление кастомного поля
+  updateEntityData(id: string, fieldId: string, value: any): Promise<void>;
   addComment(entityId: string, content: string, attachments?: UploadedAttachment[]): Promise<void>;
-  createEntity(data: CreateEntityData): Promise<void>;  // data может содержать кастомные поля
+  createEntity(data: CreateEntityData): Promise<void>;
 }
 ```
 
@@ -372,12 +395,12 @@ interface PresenceState {
 #### Hooks
 
 **useWebSocket**
-Подписывается на WebSocket события:
-- `entity:created` - Новая сущность
-- `entity:updated` - Обновление сущности
-- `status:changed` - Изменение статуса
+Подписывается на WebSocket события и обновляет kanbanColumns:
+- `entity:created` - Добавляет в kanbanColumns[status], увеличивает totalAll
+- `entity:updated` - Обновляет entity в соответствующей колонке kanbanColumns
+- `status:changed` - Перемещает entity между колонками kanbanColumns (удаляет из старой, добавляет в новую)
 - `comment:created` - Новый комментарий
-- `user:assigned` - Назначение ответственного
+- `user:assigned` - Обновляет assignee в соответствующей колонке kanbanColumns
 - `presence:update` - Обновление списка онлайн-пользователей (сохраняется в usePresenceStore)
 - `sla:warning` - SLA приближается к дедлайну (toast уведомление)
 - `sla:breached` - SLA нарушен (urgent toast уведомление, показывается дольше)
@@ -1302,7 +1325,9 @@ geocoding/
 
 | Метод | URL | Описание |
 |-------|-----|----------|
-| GET | /api/entities | Список сущностей (query: workspaceId) |
+| GET | /api/entities | Список сущностей (query: workspaceId) — legacy, без пагинации |
+| GET | /api/entities/kanban | Канбан с серверной пагинацией (query: workspaceId, perColumn, search, assigneeId[], priority[], dateFrom, dateTo) |
+| GET | /api/entities/kanban/column | Подгрузка колонки (query: workspaceId, status, offset, limit + фильтры) |
 | GET | /api/entities/:id | Детали с комментариями |
 | POST | /api/entities | Создать |
 | PUT | /api/entities/:id | Обновить |
@@ -1393,6 +1418,11 @@ geocoding/
 | POST | /api/bpmn/tasks/:id/complete | Завершить задачу с данными формы |
 | POST | /api/bpmn/tasks/:id/delegate | Делегировать задачу |
 | POST | /api/bpmn/tasks/:id/comments | Добавить комментарий к задаче |
+| GET | /api/bpmn/forms?workspaceId=:id | Список определений форм |
+| GET | /api/bpmn/forms/:id | Детали определения формы |
+| POST | /api/bpmn/forms | Создать определение формы |
+| PUT | /api/bpmn/forms/:id | Обновить определение формы |
+| DELETE | /api/bpmn/forms/:id | Удалить определение формы |
 | GET | /api/bpmn/entity-links/entity/:entityId | Связи сущности |
 | GET | /api/bpmn/entity-links/entity/:entityId/linked | Связанные сущности с деталями |
 | GET | /api/bpmn/entity-links/entity/:entityId/type/:type | Связи по типу |

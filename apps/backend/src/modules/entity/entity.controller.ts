@@ -18,6 +18,7 @@ import { Response } from 'express';
 import { EntityService } from './entity.service';
 import { CreateEntityDto } from './dto/create-entity.dto';
 import { UpdateEntityDto } from './dto/update-entity.dto';
+import { KanbanQueryDto, ColumnLoadMoreDto } from './dto/kanban-query.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole, User } from '../user/user.entity';
@@ -48,6 +49,38 @@ export class EntityController {
       }
     }
     return this.entityService.findAll(workspaceId);
+  }
+
+  @Get('kanban')
+  async findForKanban(
+    @Query() query: KanbanQueryDto,
+    @CurrentUser() user: User,
+  ) {
+    const access = await this.workspaceService.checkAccess(
+      query.workspaceId,
+      user.id,
+      user.role,
+    );
+    if (!access) {
+      throw new ForbiddenException('Нет доступа к этому рабочему месту');
+    }
+    return this.entityService.findForKanban(query);
+  }
+
+  @Get('kanban/column')
+  async loadMoreColumn(
+    @Query() query: ColumnLoadMoreDto,
+    @CurrentUser() user: User,
+  ) {
+    const access = await this.workspaceService.checkAccess(
+      query.workspaceId,
+      user.id,
+      user.role,
+    );
+    if (!access) {
+      throw new ForbiddenException('Нет доступа к этому рабочему месту');
+    }
+    return this.entityService.findColumnPage(query);
   }
 
   @Get('search')

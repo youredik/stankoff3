@@ -1,13 +1,14 @@
 import { Injectable, NotFoundException, Inject, forwardRef, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, SelectQueryBuilder } from 'typeorm';
 import { WorkspaceEntity } from './entity.entity';
 import { GlobalCounter } from './global-counter.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { User } from '../user/user.entity';
 import { CreateEntityDto } from './dto/create-entity.dto';
 import { UpdateEntityDto } from './dto/update-entity.dto';
+import { KanbanQueryDto, ColumnLoadMoreDto } from './dto/kanban-query.dto';
 import { EventsGateway } from '../websocket/events.gateway';
 import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -60,6 +61,103 @@ export class EntityService {
       relations: ['assignee'],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findForKanban(query: KanbanQueryDto): Promise<{
+    columns: { status: string; items: WorkspaceEntity[]; total: number; hasMore: boolean }[];
+    totalAll: number;
+  }> {
+    const perColumn = query.perColumn || 20;
+
+    // 1) Counts per status
+    const countQb = this.entityRepository
+      .createQueryBuilder('entity')
+      .select('entity.status', 'status')
+      .addSelect('COUNT(*)::int', 'count')
+      .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId });
+
+    this.applyKanbanFilters(countQb, query);
+    countQb.groupBy('entity.status');
+
+    const statusCounts = await countQb.getRawMany<{ status: string; count: number }>();
+    const countMap = new Map(statusCounts.map((r) => [r.status, Number(r.count)]));
+
+    // 2) First N entities per status (parallel)
+    const statuses = Array.from(countMap.keys());
+    const columnPromises = statuses.map(async (status) => {
+      const total = countMap.get(status) || 0;
+      if (total === 0) return { status, items: [] as WorkspaceEntity[], total: 0, hasMore: false };
+
+      const qb = this.entityRepository
+        .createQueryBuilder('entity')
+        .leftJoinAndSelect('entity.assignee', 'assignee')
+        .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId })
+        .andWhere('entity.status = :status', { status });
+
+      this.applyKanbanFilters(qb, query);
+      this.applyKanbanSort(qb);
+      qb.take(perColumn);
+
+      const items = await qb.getMany();
+      return { status, items, total, hasMore: total > perColumn };
+    });
+
+    const columns = await Promise.all(columnPromises);
+    const totalAll = statusCounts.reduce((sum, r) => sum + Number(r.count), 0);
+
+    return { columns, totalAll };
+  }
+
+  async findColumnPage(query: ColumnLoadMoreDto): Promise<{
+    items: WorkspaceEntity[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const limit = query.limit || 20;
+
+    const qb = this.entityRepository
+      .createQueryBuilder('entity')
+      .leftJoinAndSelect('entity.assignee', 'assignee')
+      .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId })
+      .andWhere('entity.status = :status', { status: query.status });
+
+    this.applyKanbanFilters(qb, query);
+    this.applyKanbanSort(qb);
+    qb.skip(query.offset).take(limit);
+
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, hasMore: query.offset + items.length < total };
+  }
+
+  private applyKanbanFilters(
+    qb: SelectQueryBuilder<WorkspaceEntity>,
+    filters: { search?: string; assigneeId?: string[]; priority?: string[]; dateFrom?: string; dateTo?: string },
+  ): void {
+    if (filters.search) {
+      qb.andWhere(
+        '(LOWER(entity.title) LIKE LOWER(:search) OR LOWER(entity.customId) LIKE LOWER(:search))',
+        { search: `%${filters.search}%` },
+      );
+    }
+    if (filters.assigneeId?.length) {
+      qb.andWhere('entity.assigneeId IN (:...assigneeIds)', { assigneeIds: filters.assigneeId });
+    }
+    if (filters.priority?.length) {
+      qb.andWhere('entity.priority IN (:...priorities)', { priorities: filters.priority });
+    }
+    if (filters.dateFrom) {
+      qb.andWhere('entity.createdAt >= :dateFrom', { dateFrom: filters.dateFrom });
+    }
+    if (filters.dateTo) {
+      qb.andWhere('entity.createdAt <= :dateTo', { dateTo: new Date(filters.dateTo + 'T23:59:59.999Z') });
+    }
+  }
+
+  private applyKanbanSort(qb: SelectQueryBuilder<WorkspaceEntity>): void {
+    qb.orderBy(
+      "CASE entity.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END",
+      'ASC',
+    ).addOrderBy('entity.createdAt', 'DESC');
   }
 
   async search(
