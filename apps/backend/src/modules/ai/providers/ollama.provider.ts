@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   BaseLlmProvider,
@@ -43,7 +43,7 @@ interface OllamaEmbeddingResponse {
  * Запуск: ollama serve
  */
 @Injectable()
-export class OllamaProvider extends BaseLlmProvider {
+export class OllamaProvider extends BaseLlmProvider implements OnModuleInit {
   private readonly logger = new Logger(OllamaProvider.name);
   private readonly baseUrl: string;
   private readonly model: string;
@@ -63,9 +63,10 @@ export class OllamaProvider extends BaseLlmProvider {
       this.configService.get<string>('OLLAMA_EMBEDDING_DIMENSION') || '768',
       10,
     );
+  }
 
-    // Проверяем доступность при старте
-    this.checkAvailability();
+  async onModuleInit(): Promise<void> {
+    await this.checkAvailability();
   }
 
   get isConfigured(): boolean {
