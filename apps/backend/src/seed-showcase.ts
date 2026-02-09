@@ -86,9 +86,17 @@ export class SeedShowcase implements OnModuleInit {
       this.logger.log('Showcase seed already exists, skipping');
       return;
     }
+
+    // Wait for base SeedService to create users (onModuleInit runs concurrently)
+    const start = Date.now();
+    while (Date.now() - start < 30000) {
+      const userCount = await this.userRepo.count();
+      if (userCount > 0) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
     const userCount = await this.userRepo.count();
     if (userCount === 0) {
-      this.logger.warn('No users found — waiting for base seed');
+      this.logger.warn('No users found after 30s — base seed did not run');
       return;
     }
 

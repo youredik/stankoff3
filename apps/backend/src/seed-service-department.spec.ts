@@ -134,11 +134,18 @@ describe('SeedServiceDepartment', () => {
     });
 
     it('should skip if no users exist (base seed not run yet)', async () => {
+      jest.useFakeTimers();
       sectionRepo.findOne.mockResolvedValue(null);
       userRepo.count.mockResolvedValue(0);
 
-      await service.onModuleInit();
+      const initPromise = service.onModuleInit();
+      for (let i = 0; i < 65; i++) {
+        jest.advanceTimersByTime(500);
+        await Promise.resolve();
+      }
+      await initPromise;
 
+      jest.useRealTimers();
       expect(sectionRepo.save).not.toHaveBeenCalled();
       expect(mockBpmnService.waitForConnection).not.toHaveBeenCalled();
     });

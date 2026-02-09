@@ -134,11 +134,19 @@ describe('SeedShowcase', () => {
     });
 
     it('должен пропустить если нет пользователей (base seed не запущен)', async () => {
+      jest.useFakeTimers();
       sectionRepo.findOne.mockResolvedValue(null);
       userRepo.count.mockResolvedValue(0);
 
-      await service.onModuleInit();
+      const initPromise = service.onModuleInit();
+      // Advance past the 30s polling timeout
+      for (let i = 0; i < 65; i++) {
+        jest.advanceTimersByTime(500);
+        await Promise.resolve();
+      }
+      await initPromise;
 
+      jest.useRealTimers();
       expect(mockDataSource.query).not.toHaveBeenCalled();
       expect(sectionRepo.save).not.toHaveBeenCalled();
       expect(mockBpmnService.waitForConnection).not.toHaveBeenCalled();
