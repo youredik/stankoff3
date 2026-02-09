@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { browserNotifications } from '@/hooks/useBrowserNotifications';
 
-export type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace' | 'sla_warning' | 'sla_breach';
+export type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace' | 'sla_warning' | 'sla_breach' | 'ai_suggestion';
 
 export interface AppNotification {
   id: string;
@@ -25,6 +25,7 @@ const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   workspace: 'Рабочее место',
   sla_warning: 'Предупреждение SLA',
   sla_breach: 'Нарушение SLA',
+  ai_suggestion: 'AI подсказка',
 };
 
 interface NotificationStore {

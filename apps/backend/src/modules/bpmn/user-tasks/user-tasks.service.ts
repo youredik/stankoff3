@@ -8,7 +8,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, DataSource } from 'typeorm';
 import {
   UserTask,
   UserTaskStatus,
@@ -26,6 +26,21 @@ export interface TaskFilter {
   candidateGroups?: string[];
   processInstanceId?: string;
   entityId?: string;
+}
+
+export interface PaginationParams {
+  page?: number;
+  perPage?: number;
+  sortBy?: 'createdAt' | 'priority' | 'dueDate';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
 }
 
 export interface TaskWithForm extends UserTask {
@@ -49,6 +64,7 @@ export class UserTasksService {
     private readonly bpmnWorkersService: BpmnWorkersService,
     @Inject(forwardRef(() => EventsGateway))
     private readonly eventsGateway: EventsGateway,
+    private readonly dataSource: DataSource,
   ) {}
 
   // ==================== Task Queries ====================
@@ -56,7 +72,10 @@ export class UserTasksService {
   /**
    * Find tasks by filter criteria
    */
-  async findTasks(filter: TaskFilter, limit = 100): Promise<UserTask[]> {
+  async findTasks(
+    filter: TaskFilter,
+    pagination?: PaginationParams,
+  ): Promise<PaginatedResult<UserTask>> {
     const qb = this.taskRepository.createQueryBuilder('task')
       .leftJoinAndSelect('task.assignee', 'assignee')
       .leftJoinAndSelect('task.entity', 'entity')
@@ -96,9 +115,34 @@ export class UserTasksService {
       );
     }
 
-    qb.orderBy('task.createdAt', 'DESC').take(limit);
+    // Sorting
+    const sortBy = pagination?.sortBy || 'createdAt';
+    const sortOrder = pagination?.sortOrder || 'DESC';
 
-    return qb.getMany();
+    if (sortBy === 'dueDate') {
+      qb.orderBy('task.dueDate', sortOrder, 'NULLS LAST')
+        .addOrderBy('task.createdAt', 'DESC');
+    } else if (sortBy === 'priority') {
+      qb.orderBy('task.priority', sortOrder)
+        .addOrderBy('task.createdAt', 'DESC');
+    } else {
+      qb.orderBy(`task.${sortBy}`, sortOrder);
+    }
+
+    // Pagination
+    const page = Math.max(1, pagination?.page || 1);
+    const perPage = Math.min(100, Math.max(1, pagination?.perPage || 20));
+    qb.skip((page - 1) * perPage).take(perPage);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      items,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    };
   }
 
   /**
@@ -108,7 +152,8 @@ export class UserTasksService {
     userId: string,
     workspaceId?: string,
     includeCompleted = false,
-  ): Promise<UserTask[]> {
+    pagination?: PaginationParams,
+  ): Promise<PaginatedResult<UserTask>> {
     // Get user's groups
     const userGroups = await this.getUserGroups(userId, workspaceId);
     const groupNames = userGroups.map((g) => g.name);
@@ -136,11 +181,35 @@ export class UserTasksService {
       { userId, groups: groupNames.length > 0 ? groupNames : ['__none__'] },
     );
 
-    qb.orderBy('task.priority', 'DESC')
-      .addOrderBy('task.dueDate', 'ASC', 'NULLS LAST')
-      .addOrderBy('task.createdAt', 'DESC');
+    // Sorting
+    const sortBy = pagination?.sortBy || 'priority';
+    const sortOrder = pagination?.sortOrder || 'DESC';
 
-    return qb.getMany();
+    if (sortBy === 'priority') {
+      qb.orderBy('task.priority', 'DESC')
+        .addOrderBy('task.dueDate', 'ASC', 'NULLS LAST')
+        .addOrderBy('task.createdAt', 'DESC');
+    } else if (sortBy === 'dueDate') {
+      qb.orderBy('task.dueDate', sortOrder, 'NULLS LAST')
+        .addOrderBy('task.createdAt', 'DESC');
+    } else {
+      qb.orderBy(`task.${sortBy}`, sortOrder);
+    }
+
+    // Pagination
+    const page = Math.max(1, pagination?.page || 1);
+    const perPage = Math.min(100, Math.max(1, pagination?.perPage || 20));
+    qb.skip((page - 1) * perPage).take(perPage);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      items,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    };
   }
 
   /**
@@ -604,6 +673,111 @@ export class UserTasksService {
         );
       }
     }
+  }
+
+  // ==================== Batch Operations ====================
+
+  /**
+   * Batch claim tasks - assign multiple tasks to the requesting user
+   */
+  async batchClaim(
+    taskIds: string[],
+    userId: string,
+  ): Promise<{ succeeded: string[]; failed: { id: string; reason: string }[] }> {
+    const succeeded: string[] = [];
+    const failed: { id: string; reason: string }[] = [];
+
+    await this.dataSource.transaction(async (manager) => {
+      const tasks = await manager.find(UserTask, {
+        where: { id: In(taskIds) },
+        relations: ['assignee', 'entity'],
+      });
+
+      for (const taskId of taskIds) {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) {
+          failed.push({ id: taskId, reason: 'Task not found' });
+          continue;
+        }
+        if (task.status !== UserTaskStatus.CREATED) {
+          failed.push({ id: taskId, reason: `Invalid status: ${task.status}` });
+          continue;
+        }
+
+        const canClaim = await this.canUserClaimTask(task, userId);
+        if (!canClaim) {
+          failed.push({ id: taskId, reason: 'Not a candidate' });
+          continue;
+        }
+
+        task.assigneeId = userId;
+        task.status = UserTaskStatus.CLAIMED;
+        task.claimedAt = new Date();
+        await manager.save(task);
+        succeeded.push(taskId);
+        this.emitTaskUpdate(task);
+      }
+    });
+
+    this.logger.log(
+      `Batch claim by ${userId}: ${succeeded.length} succeeded, ${failed.length} failed`,
+    );
+    return { succeeded, failed };
+  }
+
+  /**
+   * Batch delegate tasks - reassign multiple tasks to another user
+   */
+  async batchDelegate(
+    taskIds: string[],
+    fromUserId: string,
+    toUserId: string,
+  ): Promise<{ succeeded: string[]; failed: { id: string; reason: string }[] }> {
+    const succeeded: string[] = [];
+    const failed: { id: string; reason: string }[] = [];
+
+    await this.dataSource.transaction(async (manager) => {
+      const tasks = await manager.find(UserTask, {
+        where: { id: In(taskIds) },
+        relations: ['assignee', 'entity'],
+      });
+
+      for (const taskId of taskIds) {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) {
+          failed.push({ id: taskId, reason: 'Task not found' });
+          continue;
+        }
+        if (task.assigneeId !== fromUserId) {
+          failed.push({ id: taskId, reason: 'Not assignee' });
+          continue;
+        }
+        if ([UserTaskStatus.COMPLETED, UserTaskStatus.CANCELLED].includes(task.status)) {
+          failed.push({ id: taskId, reason: `Invalid status: ${task.status}` });
+          continue;
+        }
+
+        task.assigneeId = toUserId;
+        task.status = UserTaskStatus.DELEGATED;
+        task.history = [
+          ...task.history,
+          {
+            action: 'delegated',
+            userId: fromUserId,
+            timestamp: new Date().toISOString(),
+            data: { toUserId },
+          },
+        ];
+        await manager.save(task);
+        succeeded.push(taskId);
+        this.emitTaskUpdate(task);
+      }
+    });
+
+    this.logger.log(
+      `Batch delegate from ${fromUserId} to ${toUserId}: ${succeeded.length} succeeded, ${failed.length} failed`,
+    );
+    return { succeeded, failed };
   }
 
   // ==================== Statistics ====================

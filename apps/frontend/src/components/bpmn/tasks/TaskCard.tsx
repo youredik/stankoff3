@@ -17,6 +17,9 @@ interface TaskCardProps {
   onClick?: (task: UserTask) => void;
   onClaim?: (task: UserTask) => void;
   compact?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectToggle?: (taskId: string) => void;
 }
 
 const statusConfig: Record<
@@ -64,7 +67,7 @@ function getPriorityStyle(priority: number): string {
   return 'border-l-gray-300 dark:border-l-gray-600';
 }
 
-export function TaskCard({ task, onClick, onClaim, compact = false }: TaskCardProps) {
+export function TaskCard({ task, onClick, onClaim, compact = false, selectable, selected, onSelectToggle }: TaskCardProps) {
   const status = statusConfig[task.status] || statusConfig.created;
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'completed';
 
@@ -75,6 +78,11 @@ export function TaskCard({ task, onClick, onClaim, compact = false }: TaskCardPr
   const handleClaim = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onClaim) onClaim(task);
+  };
+
+  const handleCheckbox = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelectToggle) onSelectToggle(task.id);
   };
 
   if (compact) {
@@ -103,17 +111,31 @@ export function TaskCard({ task, onClick, onClaim, compact = false }: TaskCardPr
   return (
     <div
       onClick={handleClick}
-      className={`p-4 bg-white dark:bg-gray-800 border-l-4 ${getPriorityStyle(task.priority)} border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-teal-300 dark:hover:border-teal-600 transition-colors`}
+      className={`p-4 bg-white dark:bg-gray-800 border-l-4 ${getPriorityStyle(task.priority)} border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-teal-300 dark:hover:border-teal-600 transition-colors ${selected ? 'ring-2 ring-teal-500 ring-offset-1 dark:ring-offset-gray-900' : ''}`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="min-w-0">
-          <h3 className="font-medium text-gray-900 dark:text-white truncate">
-            {task.elementName || task.elementId}
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {taskTypeLabels[task.taskType] || task.taskType}
-          </p>
+        <div className="flex items-start gap-3 min-w-0">
+          {selectable && (
+            <button
+              onClick={handleCheckbox}
+              className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                selected
+                  ? 'bg-teal-500 border-teal-500 text-white'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-teal-400'
+              }`}
+            >
+              {selected && <CheckCircle2 className="w-3 h-3" />}
+            </button>
+          )}
+          <div className="min-w-0">
+            <h3 className="font-medium text-gray-900 dark:text-white truncate">
+              {task.elementName || task.elementId}
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {taskTypeLabels[task.taskType] || task.taskType}
+            </p>
+          </div>
         </div>
         <span className={`px-2 py-1 text-xs font-medium rounded shrink-0 ${status.bgColor} ${status.color}`}>
           {status.label}

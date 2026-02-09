@@ -8,6 +8,7 @@ import { WorkspaceEntity } from './entity.entity';
 import { EventsGateway } from '../websocket/events.gateway';
 import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { BpmnService } from '../bpmn/bpmn.service';
 import { SlaService } from '../sla/sla.service';
 
 describe('CommentService', () => {
@@ -17,6 +18,7 @@ describe('CommentService', () => {
   let eventsGateway: jest.Mocked<EventsGateway>;
   let s3Service: jest.Mocked<S3Service>;
   let auditLogService: jest.Mocked<AuditLogService>;
+  let bpmnService: jest.Mocked<BpmnService>;
 
   const mockComment = {
     id: 'comment-1',
@@ -66,6 +68,10 @@ describe('CommentService', () => {
       recordResponse: jest.fn(),
     };
 
+    const mockBpmnService = {
+      sendMessage: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentService,
@@ -74,6 +80,7 @@ describe('CommentService', () => {
         { provide: EventsGateway, useValue: mockEventsGateway },
         { provide: S3Service, useValue: mockS3Service },
         { provide: AuditLogService, useValue: mockAuditLogService },
+        { provide: BpmnService, useValue: mockBpmnService },
         { provide: SlaService, useValue: mockSlaService },
       ],
     }).compile();
@@ -84,6 +91,7 @@ describe('CommentService', () => {
     eventsGateway = module.get(EventsGateway);
     s3Service = module.get(S3Service);
     auditLogService = module.get(AuditLogService);
+    bpmnService = module.get(BpmnService);
   });
 
   describe('findOne', () => {
@@ -180,6 +188,78 @@ describe('CommentService', () => {
 
       expect(result.attachments).toHaveLength(1);
       expect(result.attachments[0].url).toBe('https://signed-url');
+    });
+
+    it('должен отправить BPMN messages при комментарии от не-исполнителя', async () => {
+      const entityWithAssignee = {
+        ...mockEntity,
+        assigneeId: 'assignee-1',
+      };
+      commentRepo.create.mockReturnValue(mockComment);
+      commentRepo.save.mockResolvedValue(mockComment);
+      commentRepo.findOne.mockResolvedValue(mockComment);
+      entityRepo.findOne.mockResolvedValue(entityWithAssignee as any);
+
+      const dto = { authorId: 'user-1', content: 'Client response' };
+      await service.create('entity-1', dto);
+
+      // user-1 !== assignee-1 → messages sent
+      expect(bpmnService.sendMessage).toHaveBeenCalledWith(
+        'client-response',
+        'entity-1',
+        { commentId: 'comment-1', authorId: 'user-1' },
+      );
+      expect(bpmnService.sendMessage).toHaveBeenCalledWith(
+        'customer-response',
+        'entity-1',
+        { commentId: 'comment-1', authorId: 'user-1' },
+      );
+    });
+
+    it('НЕ должен отправлять BPMN messages при комментарии от исполнителя', async () => {
+      const entityWithAssignee = {
+        ...mockEntity,
+        assigneeId: 'user-1', // same as authorId
+      };
+      commentRepo.create.mockReturnValue(mockComment);
+      commentRepo.save.mockResolvedValue(mockComment);
+      commentRepo.findOne.mockResolvedValue(mockComment);
+      entityRepo.findOne.mockResolvedValue(entityWithAssignee as any);
+
+      const dto = { authorId: 'user-1', content: 'Staff comment' };
+      await service.create('entity-1', dto);
+
+      expect(bpmnService.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('НЕ должен отправлять BPMN messages если entity без assignee', async () => {
+      commentRepo.create.mockReturnValue(mockComment);
+      commentRepo.save.mockResolvedValue(mockComment);
+      commentRepo.findOne.mockResolvedValue(mockComment);
+      entityRepo.findOne.mockResolvedValue(mockEntity); // no assigneeId
+
+      const dto = { authorId: 'user-1', content: 'Comment' };
+      await service.create('entity-1', dto);
+
+      expect(bpmnService.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('должен gracefully обработать ошибку отправки BPMN message', async () => {
+      const entityWithAssignee = {
+        ...mockEntity,
+        assigneeId: 'assignee-1',
+      };
+      commentRepo.create.mockReturnValue(mockComment);
+      commentRepo.save.mockResolvedValue(mockComment);
+      commentRepo.findOne.mockResolvedValue(mockComment);
+      entityRepo.findOne.mockResolvedValue(entityWithAssignee as any);
+      bpmnService.sendMessage.mockRejectedValue(new Error('Zeebe not connected'));
+
+      const dto = { authorId: 'user-1', content: 'Client response' };
+      // Should not throw
+      const result = await service.create('entity-1', dto);
+
+      expect(result.content).toBe('Test comment');
     });
 
     it('должен работать без entity (не логировать)', async () => {

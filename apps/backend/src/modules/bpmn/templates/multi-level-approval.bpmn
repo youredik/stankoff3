@@ -27,6 +27,32 @@
       <bpmn:outgoing>Flow_3</bpmn:outgoing>
     </bpmn:userTask>
 
+    <!-- Boundary Timer: 24ч на согласование уровень 1 (non-interrupting) -->
+    <bpmn:boundaryEvent id="BoundaryTimer_Level1_24h" name="24ч ожидания" cancelActivity="false" attachedToRef="Task_Level1">
+      <bpmn:outgoing>Flow_Level1TimerNotify</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_Level1_24h">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT24H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Task_RemindLevel1" name="Напоминание: согласование ожидает">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= level1ApproverId" target="userId" />
+          <zeebe:input source="= &quot;Заявка ожидает вашего согласования более 24 часов (уровень 1)&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Level1TimerNotify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Level1TimerEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Level1TimerReminder">
+      <bpmn:incoming>Flow_Level1TimerEnd</bpmn:incoming>
+    </bpmn:endEvent>
+
     <bpmn:exclusiveGateway id="Gateway_Level1" name="Решение уровень 1">
       <bpmn:incoming>Flow_3</bpmn:incoming>
       <bpmn:outgoing>Flow_Level1_Approve</bpmn:outgoing>
@@ -55,6 +81,32 @@
       <bpmn:outgoing>Flow_5</bpmn:outgoing>
     </bpmn:userTask>
 
+    <!-- Boundary Timer: 24ч на согласование уровень 2 (non-interrupting) -->
+    <bpmn:boundaryEvent id="BoundaryTimer_Level2_24h" name="24ч ожидания" cancelActivity="false" attachedToRef="Task_Level2">
+      <bpmn:outgoing>Flow_Level2TimerNotify</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_Level2_24h">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT24H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Task_RemindLevel2" name="Напоминание: согласование ожидает">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= level2ApproverId" target="userId" />
+          <zeebe:input source="= &quot;Заявка ожидает вашего согласования более 24 часов (уровень 2)&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Level2TimerNotify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Level2TimerEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Level2TimerReminder">
+      <bpmn:incoming>Flow_Level2TimerEnd</bpmn:incoming>
+    </bpmn:endEvent>
+
     <bpmn:exclusiveGateway id="Gateway_Level2" name="Решение уровень 2">
       <bpmn:incoming>Flow_5</bpmn:incoming>
       <bpmn:outgoing>Flow_Level2_Approve</bpmn:outgoing>
@@ -82,6 +134,32 @@
       <bpmn:incoming>Flow_6</bpmn:incoming>
       <bpmn:outgoing>Flow_7</bpmn:outgoing>
     </bpmn:userTask>
+
+    <!-- Boundary Timer: 24ч на согласование уровень 3 (non-interrupting) -->
+    <bpmn:boundaryEvent id="BoundaryTimer_Level3_24h" name="24ч ожидания" cancelActivity="false" attachedToRef="Task_Level3">
+      <bpmn:outgoing>Flow_Level3TimerNotify</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_Level3_24h">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT24H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Task_RemindLevel3" name="Напоминание: согласование ожидает">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= level3ApproverId" target="userId" />
+          <zeebe:input source="= &quot;Заявка ожидает вашего согласования более 24 часов (уровень 3 — CEO)&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Level3TimerNotify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Level3TimerEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Level3TimerReminder">
+      <bpmn:incoming>Flow_Level3TimerEnd</bpmn:incoming>
+    </bpmn:endEvent>
 
     <bpmn:exclusiveGateway id="Gateway_Level3" name="Решение уровень 3">
       <bpmn:incoming>Flow_7</bpmn:incoming>
@@ -161,6 +239,14 @@
     <bpmn:sequenceFlow id="Flow_ToNotifyApproved" sourceRef="Task_Approve" targetRef="Task_Notify" />
     <bpmn:sequenceFlow id="Flow_ToNotifyRejected" sourceRef="Task_Reject" targetRef="Task_Notify" />
     <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_Notify" targetRef="EndEvent_1" />
+
+    <!-- Boundary Timer flows: 24ч напоминания на каждом уровне -->
+    <bpmn:sequenceFlow id="Flow_Level1TimerNotify" sourceRef="BoundaryTimer_Level1_24h" targetRef="Task_RemindLevel1" />
+    <bpmn:sequenceFlow id="Flow_Level1TimerEnd" sourceRef="Task_RemindLevel1" targetRef="End_Level1TimerReminder" />
+    <bpmn:sequenceFlow id="Flow_Level2TimerNotify" sourceRef="BoundaryTimer_Level2_24h" targetRef="Task_RemindLevel2" />
+    <bpmn:sequenceFlow id="Flow_Level2TimerEnd" sourceRef="Task_RemindLevel2" targetRef="End_Level2TimerReminder" />
+    <bpmn:sequenceFlow id="Flow_Level3TimerNotify" sourceRef="BoundaryTimer_Level3_24h" targetRef="Task_RemindLevel3" />
+    <bpmn:sequenceFlow id="Flow_Level3TimerEnd" sourceRef="Task_RemindLevel3" targetRef="End_Level3TimerReminder" />
   </bpmn:process>
 
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">

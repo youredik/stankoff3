@@ -489,7 +489,18 @@ export interface UserTaskFilter {
   dueBeforeDate?: string;
   taskType?: string;
   entityId?: string;
-  limit?: number;
+  page?: number;
+  perPage?: number;
+  sortBy?: 'createdAt' | 'priority' | 'dueDate';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
 }
 
 // ==================== Forms ====================

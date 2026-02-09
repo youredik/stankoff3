@@ -14,6 +14,7 @@ import {
   Settings,
   AlertTriangle,
   AlertOctagon,
+  Sparkles,
 } from 'lucide-react';
 import { useNotificationStore, NotificationType } from '@/store/useNotificationStore';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -32,6 +33,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
   workspace: Briefcase,
   sla_warning: AlertTriangle,
   sla_breach: AlertOctagon,
+  ai_suggestion: Sparkles,
 };
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
@@ -43,6 +45,7 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   workspace: 'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40',
   sla_warning: 'text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40',
   sla_breach: 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40',
+  ai_suggestion: 'text-teal-600 dark:text-teal-400 bg-teal-100 dark:bg-teal-900/40',
 };
 
 export function NotificationPanel({ onClose }: NotificationPanelProps) {

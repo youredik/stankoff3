@@ -162,7 +162,7 @@ describe('ServiceName', () => {
 - Используй `'use client'` только когда нужны хуки или браузерные API
 - Состояние храни в Zustand stores
 - Стили — Tailwind CSS классы, без отдельных CSS файлов
-- Компоненты размещай по функциональности: `kanban/`, `entity/`, `workspace/`, `layout/`, `ui/`, `bpmn/`
+- Компоненты размещай по функциональности: `kanban/`, `table/`, `entity/`, `workspace/`, `layout/`, `ui/`, `bpmn/`
 - Компоненты с bpmn-js используй только с `dynamic(() => import(...), { ssr: false })` — библиотека требует браузерных API
 
 **API запросы:**
@@ -176,8 +176,8 @@ describe('ServiceName', () => {
   - ❌ `fetch('http://localhost:3001/api/auth/me')` → обход rewrites, cookies не работают
 
 **Авторизация:**
-- Текущий режим: **только Keycloak SSO** (локальная авторизация отключена)
-- Страница `/login` автоматически редиректит на Keycloak
+- Production/Preprod: **Keycloak SSO** — `/login` автоматически редиректит на Keycloak
+- **Dev mode** (`AUTH_DEV_MODE=true`): страница `/login` показывает карточки пользователей для быстрого входа без Keycloak
 - `AuthProvider` обрабатывает токен из URL после callback
 - Access token хранится в памяти (Zustand), refresh token в HttpOnly cookie
 
@@ -396,9 +396,14 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/auth/refresh` — обновление access token
 - `POST /api/auth/logout` — выход (очистка cookies + Keycloak logout URL)
 
+**Dev Auth (только при AUTH_DEV_MODE=true, NODE_ENV !== production):**
+- `GET /api/auth/dev/users` — список пользователей для dev login
+- `POST /api/auth/dev/login` — вход по email (body: `{ email }`) → `{ accessToken }` + refresh cookie
+
 **Основные эндпоинты:**
 - `GET/POST /api/entities` — сущности (GET без пагинации — legacy)
 - `GET /api/entities/kanban` — канбан с серверной пагинацией (query: workspaceId, perColumn, search, assigneeId[], priority[], dateFrom, dateTo)
+- `GET /api/entities/table` — табличное представление с пагинацией, сортировкой (query: workspaceId, page, perPage, sortBy, sortOrder, search, assigneeId[], priority[], status[], dateFrom, dateTo)
 - `GET /api/entities/kanban/column` — подгрузка колонки (query: workspaceId, status, offset, limit + фильтры)
 - `PATCH /api/entities/:id/status` — изменение статуса
 - `PATCH /api/entities/:id/assignee` — назначение исполнителя
@@ -428,9 +433,13 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `GET /api/bpmn/health` — статус подключения к Camunda/Zeebe
 - `GET /api/bpmn/definitions?workspaceId=...` — список определений процессов
 - `POST /api/bpmn/definitions` — создать/обновить определение
-- `POST /api/bpmn/definitions/:id/deploy` — развернуть процесс в Zeebe
+- `POST /api/bpmn/definitions/:id/deploy` — развернуть процесс в Zeebe (body: { changelog? })
+- `GET /api/bpmn/definition/:id/versions` — история версий процесса
+- `GET /api/bpmn/definition/:id/versions/:version` — конкретная версия с BPMN XML
+- `POST /api/bpmn/definition/:id/rollback/:version` — откатить на версию
 - `GET /api/bpmn/instances/workspace/:id` — экземпляры процессов workspace
 - `GET /api/bpmn/instances/entity/:id` — процессы для сущности (заявки)
+- `GET /api/bpmn/instances/:instanceId/timeline` — унифицированный timeline (activity logs + user tasks + lifecycle)
 - `POST /api/bpmn/instances` — запустить процесс
 - `GET /api/bpmn/statistics/definition/:id` — статистика по процессу
 
@@ -446,16 +455,24 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `PUT /api/bpmn/triggers/:id` — обновить триггер
 - `PATCH /api/bpmn/triggers/:id/toggle` — включить/выключить
 - `DELETE /api/bpmn/triggers/:id` — удалить триггер
-- `POST /api/bpmn/webhooks/:workspaceId/:triggerId` — webhook endpoint
+- `POST /api/bpmn/triggers/webhook/:triggerId` — webhook endpoint (HMAC-SHA256: `X-Webhook-Signature: sha256=<hex>`, или plain: `X-Webhook-Secret: <ключ>`)
 
 **BPMN User Tasks (Inbox):**
-- `GET /api/bpmn/tasks/inbox` — задачи пользователя
-- `GET /api/bpmn/tasks` — фильтрация задач
+- `GET /api/bpmn/tasks/inbox` — задачи пользователя (пагинация: page, perPage, sortBy, sortOrder)
+- `GET /api/bpmn/tasks` — фильтрация задач (пагинация: page, perPage, sortBy, sortOrder)
 - `GET /api/bpmn/tasks/:id` — детали задачи с формой
+- `POST /api/bpmn/tasks/batch/claim` — массовый claim (`{ taskIds: string[] }`)
+- `POST /api/bpmn/tasks/batch/delegate` — массовое делегирование (`{ taskIds, targetUserId }`)
 - `POST /api/bpmn/tasks/:id/claim` — взять задачу
 - `POST /api/bpmn/tasks/:id/unclaim` — отпустить задачу
 - `POST /api/bpmn/tasks/:id/complete` — завершить с данными формы
 - `POST /api/bpmn/tasks/:id/delegate` — делегировать
+
+**BPMN Incidents (Инциденты):**
+- `GET /api/bpmn/incidents?workspaceId=...` — список инцидентов
+- `GET /api/bpmn/incidents/count?workspaceId=...` — количество инцидентов (для badge)
+- `POST /api/bpmn/incidents/:id/retry` — повторить (сброс статуса на active)
+- `POST /api/bpmn/incidents/:id/cancel` — отменить (terminate process)
 
 **BPMN Form Definitions (формы для user tasks):**
 - `GET /api/bpmn/forms?workspaceId=...` — список определений форм
@@ -565,5 +582,9 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `comment:created` — новый комментарий
 - `user:assigned` — назначение ответственного
 - `task:created`, `task:updated` — user task lifecycle (inbox обновляется через WebSocket, без polling)
+- `task:reminder` — напоминание о приближающемся дедлайне задачи (за 1 час)
+- `task:overdue` — уведомление о просроченной задаче
+- `process:incident` — процесс зависнул (worker retries исчерпаны)
+- `ai:classification:ready` — автоклассификация AI завершена (entityId, workspaceId, classification)
 - `auth:refresh` (client → server) — обновление JWT без разрыва WebSocket
 - `presence:update` — список онлайн-пользователей (usePresenceStore)

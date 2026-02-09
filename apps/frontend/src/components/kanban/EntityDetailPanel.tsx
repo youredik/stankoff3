@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
+import type { Editor } from '@tiptap/react';
 import { X, MessageSquare, Clock, Paperclip, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -12,6 +13,7 @@ import { LinkedEntities } from '@/components/entity/LinkedEntities';
 import { EntityTimeline } from '@/components/entity/timeline';
 import { AiAssistantTab } from '@/components/entity/AiAssistantTab';
 import { AiClassificationPanel } from '@/components/ai/AiClassificationPanel';
+import { AiInsightsPanel } from '@/components/ai/AiInsightsPanel';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment, Field, Section, Attachment } from '@/types';
@@ -177,6 +179,7 @@ export function EntityDetailPanel() {
 
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'activity' | 'ai'>('activity');
+  const [commentEditor, setCommentEditor] = useState<Editor | null>(null);
   const [showStartProcess, setShowStartProcess] = useState(false);
   const [processInstances, setProcessInstances] = useState<ProcessInstance[]>([]);
   const [loadingProcesses, setLoadingProcesses] = useState(false);
@@ -447,14 +450,27 @@ export function EntityDetailPanel() {
 
                 {/* AI Assistant Tab */}
                 {activeTab === 'ai' && (
-                  <AiAssistantTab entityId={selectedEntity.id} />
+                  <AiAssistantTab
+                    entityId={selectedEntity.id}
+                    onInsertDraft={(draft) => {
+                      if (commentEditor) {
+                        commentEditor.chain().focus().insertContent(draft).run();
+                        setActiveTab('activity');
+                      }
+                    }}
+                  />
                 )}
               </div>
 
               {/* Comment editor — pinned to bottom */}
               {canEditEntity && (
                 <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-                  <CommentEditor users={users} onSubmit={handleSubmitComment} />
+                  <CommentEditor
+                    users={users}
+                    onSubmit={handleSubmitComment}
+                    entityId={selectedEntity.id}
+                    onEditorReady={setCommentEditor}
+                  />
                 </div>
               )}
             </div>
@@ -678,6 +694,14 @@ export function EntityDetailPanel() {
                     targetType="entity"
                     targetId={selectedEntity.id}
                     showDetails={true}
+                  />
+                </div>
+
+                {/* AI Insights */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <AiInsightsPanel
+                    entityId={selectedEntity.id}
+                    onShowDetails={() => setActiveTab('ai')}
                   />
                 </div>
 

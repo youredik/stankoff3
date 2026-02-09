@@ -122,7 +122,7 @@ describe('BpmnController', () => {
       const deployed = { ...mockDefinition, deployedAt: new Date(), deployedKey: 'key-123' };
       bpmnService.deployDefinition.mockResolvedValue(deployed as any);
 
-      const result = await controller.deployDefinition('def-1');
+      const result = await controller.deployDefinition('def-1', {}, { user: { id: 'user-1' } });
 
       expect(result.deployedAt).toBeDefined();
       expect(result.deployedKey).toBe('key-123');

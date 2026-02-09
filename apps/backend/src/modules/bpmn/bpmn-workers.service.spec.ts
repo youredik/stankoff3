@@ -122,7 +122,7 @@ describe('BpmnWorkersService', () => {
 
   describe('setZeebeClient', () => {
     it('должен зарегистрировать все воркеры', () => {
-      expect(registeredWorkers.size).toBe(9);
+      expect(registeredWorkers.size).toBe(11);
       expect(registeredWorkers.has('update-entity-status')).toBe(true);
       expect(registeredWorkers.has('send-notification')).toBe(true);
       expect(registeredWorkers.has('send-email')).toBe(true);
@@ -132,6 +132,8 @@ describe('BpmnWorkersService', () => {
       expect(registeredWorkers.has('classify-entity')).toBe(true);
       expect(registeredWorkers.has('io.camunda.zeebe:userTask')).toBe(true);
       expect(registeredWorkers.has('create-entity')).toBe(true);
+      expect(registeredWorkers.has('suggest-assignee')).toBe(true);
+      expect(registeredWorkers.has('check-duplicate')).toBe(true);
     });
   });
 
@@ -407,6 +409,213 @@ describe('BpmnWorkersService', () => {
       expect(mockJob.complete).toHaveBeenCalledWith(
         expect.objectContaining({ classified: false }),
       );
+    });
+  });
+
+  describe('suggest-assignee worker', () => {
+    it('должен вернуть hasSuggestion: false когда AiAssistantService недоступен', async () => {
+      const handler = registeredWorkers.get('suggest-assignee')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      // AI assistant not available in test — should complete with hasSuggestion: false
+      expect(mockJob.complete).toHaveBeenCalledWith(
+        expect.objectContaining({ hasSuggestion: false }),
+      );
+    });
+
+    it('должен вернуть hasSuggestion: false при пустом entityId', async () => {
+      const handler = registeredWorkers.get('suggest-assignee')!;
+      const mockJob = {
+        variables: { entityId: '' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith(
+        expect.objectContaining({ hasSuggestion: false }),
+      );
+    });
+
+    it('должен вернуть top эксперта когда AI доступен', async () => {
+      // Inject mock AI assistant
+      (service as any).aiAssistantService = {
+        getAssistance: jest.fn().mockResolvedValue({
+          suggestedExperts: [
+            { name: 'Иванов И.И.', managerId: 42, department: 'Техподдержка' },
+            { name: 'Петров П.П.', managerId: 43, department: 'Сервис' },
+          ],
+          similarCases: [],
+        }),
+      };
+
+      const handler = registeredWorkers.get('suggest-assignee')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith({
+        hasSuggestion: true,
+        suggestedAssigneeName: 'Иванов И.И.',
+        suggestedAssigneeManagerId: 42,
+        suggestedAssigneeDepartment: 'Техподдержка',
+      });
+
+      // Cleanup
+      (service as any).aiAssistantService = undefined;
+    });
+
+    it('должен вернуть hasSuggestion: false если нет экспертов', async () => {
+      (service as any).aiAssistantService = {
+        getAssistance: jest.fn().mockResolvedValue({
+          suggestedExperts: [],
+          similarCases: [],
+        }),
+      };
+
+      const handler = registeredWorkers.get('suggest-assignee')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith(
+        expect.objectContaining({ hasSuggestion: false }),
+      );
+
+      // Cleanup
+      (service as any).aiAssistantService = undefined;
+    });
+
+    it('должен обработать ошибку AI без падения', async () => {
+      (service as any).aiAssistantService = {
+        getAssistance: jest.fn().mockRejectedValue(new Error('AI unavailable')),
+      };
+
+      const handler = registeredWorkers.get('suggest-assignee')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith({
+        hasSuggestion: false,
+        error: 'AI unavailable',
+      });
+
+      // Cleanup
+      (service as any).aiAssistantService = undefined;
+    });
+  });
+
+  describe('check-duplicate worker', () => {
+    it('должен вернуть isDuplicate: false когда AiAssistantService недоступен', async () => {
+      const handler = registeredWorkers.get('check-duplicate')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith({
+        isDuplicate: false,
+        duplicateRequestId: 0,
+        duplicateSimilarity: 0,
+      });
+    });
+
+    it('должен определить дубликат при similarity > 0.95', async () => {
+      (service as any).aiAssistantService = {
+        getAssistance: jest.fn().mockResolvedValue({
+          suggestedExperts: [],
+          similarCases: [
+            { requestId: 12345, similarity: 0.97, subject: 'Сломался двигатель' },
+            { requestId: 12346, similarity: 0.80, subject: 'Проблема с двигателем' },
+          ],
+        }),
+      };
+
+      const handler = registeredWorkers.get('check-duplicate')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith({
+        isDuplicate: true,
+        duplicateRequestId: 12345,
+        duplicateSimilarity: 0.97,
+      });
+
+      // Cleanup
+      (service as any).aiAssistantService = undefined;
+    });
+
+    it('должен вернуть isDuplicate: false при обычных результатах (similarity <= 0.95)', async () => {
+      (service as any).aiAssistantService = {
+        getAssistance: jest.fn().mockResolvedValue({
+          suggestedExperts: [],
+          similarCases: [
+            { requestId: 12345, similarity: 0.85, subject: 'Похожая заявка' },
+            { requestId: 12346, similarity: 0.72, subject: 'Другая заявка' },
+          ],
+        }),
+      };
+
+      const handler = registeredWorkers.get('check-duplicate')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith({
+        isDuplicate: false,
+        duplicateRequestId: 0,
+        duplicateSimilarity: 0,
+      });
+
+      // Cleanup
+      (service as any).aiAssistantService = undefined;
+    });
+
+    it('должен обработать ошибку AI без падения', async () => {
+      (service as any).aiAssistantService = {
+        getAssistance: jest.fn().mockRejectedValue(new Error('AI timeout')),
+      };
+
+      const handler = registeredWorkers.get('check-duplicate')!;
+      const mockJob = {
+        variables: { entityId: 'entity-1' },
+        complete: jest.fn().mockReturnValue({}),
+      };
+
+      await handler(mockJob);
+
+      expect(mockJob.complete).toHaveBeenCalledWith({
+        isDuplicate: false,
+        duplicateRequestId: 0,
+        duplicateSimilarity: 0,
+      });
+
+      // Cleanup
+      (service as any).aiAssistantService = undefined;
     });
   });
 

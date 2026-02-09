@@ -12,11 +12,8 @@ export const useTaskStore = create<TaskState>((set) => ({
   inboxCount: 0,
   fetchInboxCount: async () => {
     try {
-      const tasks = await tasksApi.getInbox();
-      const activeCount = tasks.filter(
-        (t) => t.status !== 'completed' && t.status !== 'cancelled',
-      ).length;
-      set({ inboxCount: activeCount });
+      const result = await tasksApi.getInbox({ perPage: 1 });
+      set({ inboxCount: result.total });
     } catch {
       // Silent fail — badge won't show if API is unavailable
     }

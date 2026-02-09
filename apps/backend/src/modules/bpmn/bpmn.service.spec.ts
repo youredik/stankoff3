@@ -8,6 +8,9 @@ import {
   ProcessInstance,
   ProcessInstanceStatus,
 } from './entities/process-instance.entity';
+import { ProcessDefinitionVersion } from './entities/process-definition-version.entity';
+import { ProcessActivityLog } from './entities/process-activity-log.entity';
+import { UserTask } from './entities/user-task.entity';
 import { BpmnWorkersService } from './bpmn-workers.service';
 import { ConnectorsService } from '../connectors/connectors.service';
 
@@ -103,6 +106,36 @@ describe('BpmnService', () => {
         {
           provide: ConnectorsService,
           useValue: mockConnectorsService,
+        },
+        {
+          provide: getRepositoryToken(ProcessDefinitionVersion),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(ProcessActivityLog),
+          useValue: {
+            createQueryBuilder: jest.fn(() => ({
+              where: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue([]),
+            })),
+          },
+        },
+        {
+          provide: getRepositoryToken(UserTask),
+          useValue: {
+            createQueryBuilder: jest.fn(() => ({
+              leftJoinAndSelect: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue([]),
+            })),
+          },
         },
       ],
     }).compile();

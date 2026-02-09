@@ -2,16 +2,31 @@
 
 import { useEffect, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Shield } from 'lucide-react';
+import { Shield, User as UserIcon, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { setAuthInterceptors } from '@/lib/api/client';
-import { authApi } from '@/lib/api/auth';
+import { authApi, DevUser } from '@/lib/api/auth';
+
+const roleBadgeColors: Record<string, string> = {
+  admin: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  manager: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  employee: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+};
+
+const roleLabels: Record<string, string> = {
+  admin: 'Админ',
+  manager: 'Менеджер',
+  employee: 'Сотрудник',
+};
 
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, error, clearError } = useAuthStore();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [devUsers, setDevUsers] = useState<DevUser[] | null>(null);
+  const [devLoading, setDevLoading] = useState(true);
+  const [devLoginLoading, setDevLoginLoading] = useState<string | null>(null);
 
   // Устанавливаем interceptors при монтировании
   useEffect(() => {
@@ -21,8 +36,27 @@ function LoginPageContent() {
     );
   }, []);
 
+  // Проверяем dev mode при загрузке
+  useEffect(() => {
+    authApi.getDevUsers()
+      .then((users) => {
+        setDevUsers(users);
+        setDevLoading(false);
+      })
+      .catch(() => {
+        setDevUsers(null);
+        setDevLoading(false);
+      });
+  }, []);
+
   // Обработка ошибок и редиректа
   useEffect(() => {
+    // Если dev users загружаются — ждём
+    if (devLoading) return;
+
+    // Если dev mode — не делаем автоматический redirect
+    if (devUsers) return;
+
     // Проверяем ошибку SSO
     const ssoError = searchParams.get('error');
     const logoutSuccess = searchParams.get('logout');
@@ -43,12 +77,34 @@ function LoginPageContent() {
       setIsRedirecting(true);
       window.location.href = authApi.getKeycloakLoginUrl();
     }
-  }, [searchParams, isAuthenticated, isLoading, router]);
+  }, [searchParams, isAuthenticated, isLoading, router, devLoading, devUsers]);
+
+  // Redirect if already authenticated (regardless of dev mode)
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleLogin = () => {
     clearError();
     setIsRedirecting(true);
     window.location.href = authApi.getKeycloakLoginUrl();
+  };
+
+  const handleDevLogin = async (email: string) => {
+    setDevLoginLoading(email);
+    clearError();
+    try {
+      const { accessToken } = await authApi.devLogin(email);
+      useAuthStore.getState().setAccessToken(accessToken);
+      // checkAuth загрузит профиль через /auth/me и обновит store
+      await useAuthStore.getState().checkAuth();
+      router.push('/dashboard');
+    } catch {
+      useAuthStore.setState({ error: 'Ошибка входа. Попробуйте снова.' });
+      setDevLoginLoading(null);
+    }
   };
 
   // Показываем loading при редиректе
@@ -64,7 +120,7 @@ function LoginPageContent() {
   }
 
   // Показываем loading пока проверяется авторизация
-  if (isLoading) {
+  if (isLoading || devLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <div className="text-center">
@@ -75,7 +131,89 @@ function LoginPageContent() {
     );
   }
 
-  // Показываем страницу входа
+  // Dev Login UI
+  if (devUsers) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+        <div className="w-full max-w-2xl">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-teal-500 rounded-lg mb-4">
+                <span className="text-3xl">🏭</span>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Stankoff Portal</h1>
+              <div className="inline-block mt-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">
+                DEV MODE
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-lg mb-4">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
+
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-4">
+              Выберите пользователя для входа
+            </p>
+
+            {/* User cards grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {devUsers.map((user) => (
+                <button
+                  key={user.id}
+                  onClick={() => handleDevLogin(user.email)}
+                  disabled={devLoginLoading !== null}
+                  className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/10 transition-all text-left disabled:opacity-50 disabled:cursor-wait"
+                >
+                  {/* Avatar */}
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {user.firstName} {user.lastName}
+                      </span>
+                      <span className={`inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded ${roleBadgeColors[user.role] || 'bg-gray-100 text-gray-600'}`}>
+                        {roleLabels[user.role] || user.role}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                  </div>
+
+                  {/* Loading indicator */}
+                  {devLoginLoading === user.email && (
+                    <Loader2 className="w-4 h-4 animate-spin text-teal-500 flex-shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={handleLogin}
+                className="w-full py-2 px-4 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <Shield className="w-4 h-4" />
+                Или войти через Keycloak SSO
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Стандартная страница входа (SSO)
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
       <div className="w-full max-w-md">

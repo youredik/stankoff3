@@ -12,8 +12,10 @@ import { EntityLink } from './entities/entity-link.entity';
 import { UserGroup } from './entities/user-group.entity';
 import { FormDefinition } from './entities/form-definition.entity';
 import { ProcessActivityLog } from './entities/process-activity-log.entity';
+import { ProcessDefinitionVersion } from './entities/process-definition-version.entity';
 import { TriggersService } from './triggers/triggers.service';
 import { CronTriggerScheduler } from './triggers/cron-trigger.scheduler';
+import { UserTaskDeadlineScheduler } from './user-tasks/user-task-deadline.scheduler';
 import { TriggersController, WebhookTriggersController } from './triggers/triggers.controller';
 import { UserTasksService } from './user-tasks/user-tasks.service';
 import { UserTasksController } from './user-tasks/user-tasks.controller';
@@ -25,6 +27,8 @@ import { ProcessMiningService } from './process-mining/process-mining.service';
 import { ProcessMiningController } from './process-mining/process-mining.controller';
 import { FormDefinitionsService } from './forms/form-definitions.service';
 import { FormDefinitionsController } from './forms/form-definitions.controller';
+import { IncidentService } from './incidents/incident.service';
+import { IncidentController } from './incidents/incident.controller';
 import { EntityModule } from '../entity/entity.module';
 import { EmailModule } from '../email/email.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
@@ -44,6 +48,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
       UserGroup,
       FormDefinition,
       ProcessActivityLog,
+      ProcessDefinitionVersion,
     ]),
     // Import modules for workers (use forwardRef to avoid circular dependencies)
     forwardRef(() => EntityModule),
@@ -60,6 +65,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
     EntityLinksController,
     ProcessMiningController,
     FormDefinitionsController,
+    IncidentController,
   ],
   providers: [
     BpmnService,
@@ -67,12 +73,14 @@ import { ConnectorsModule } from '../connectors/connectors.module';
     BpmnTemplatesService,
     TriggersService,
     CronTriggerScheduler,
+    UserTaskDeadlineScheduler,
     UserTasksService,
     UserTasksWorker,
     EntityLinksService,
     CreateEntityWorker,
     ProcessMiningService,
     FormDefinitionsService,
+    IncidentService,
   ],
   exports: [
     BpmnService,
@@ -86,6 +94,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
     CreateEntityWorker,
     ProcessMiningService,
     FormDefinitionsService,
+    IncidentService,
   ],
 })
 export class BpmnModule {}

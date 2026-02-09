@@ -13,6 +13,8 @@ import { ProcessInstanceStatus, ProcessInstance } from './entities/process-insta
 import { ProcessActivityLog } from './entities/process-activity-log.entity';
 import { UserTasksWorker } from './user-tasks/user-tasks.worker';
 import { CreateEntityWorker } from './entity-links/create-entity.worker';
+import { IncidentService } from './incidents/incident.service';
+import { AiAssistantService } from '../ai/services/ai-assistant.service';
 
 @Injectable()
 export class BpmnWorkersService implements OnModuleInit {
@@ -29,6 +31,8 @@ export class BpmnWorkersService implements OnModuleInit {
   private auditLogService?: AuditLogService;
   private eventsGateway?: EventsGateway;
   private aiClassifierService?: any;
+  private aiAssistantService?: any;
+  private incidentService?: IncidentService;
   private userTasksWorker?: UserTasksWorker;
   private createEntityWorker?: CreateEntityWorker;
 
@@ -77,6 +81,18 @@ export class BpmnWorkersService implements OnModuleInit {
       });
     } catch {
       this.logger.warn('AiClassifierService not available for workers');
+    }
+
+    try {
+      this.aiAssistantService = this.moduleRef.get('AiAssistantService', { strict: false });
+    } catch {
+      this.logger.warn('AiAssistantService not available for workers');
+    }
+
+    try {
+      this.incidentService = this.moduleRef.get(IncidentService, { strict: false });
+    } catch {
+      this.logger.warn('IncidentService not available for workers');
     }
 
     try {
@@ -143,6 +159,27 @@ export class BpmnWorkersService implements OnModuleInit {
   }
 
   /**
+   * Fail a job and mark as incident when retries exhausted
+   */
+  private async failJobWithIncidentCheck(
+    job: any,
+    errorMessage: string,
+  ) {
+    const newRetries = job.retries - 1;
+    if (newRetries <= 0 && this.incidentService) {
+      try {
+        await this.incidentService.markAsIncident(
+          String(job.processInstanceKey),
+          errorMessage,
+        );
+      } catch (e) {
+        this.logger.warn(`Failed to mark incident: ${e.message}`);
+      }
+    }
+    return job.fail({ errorMessage, retries: newRetries });
+  }
+
+  /**
    * Called by BpmnService after Zeebe connection is established
    */
   setZeebeClient(client: ReturnType<Camunda8['getZeebeGrpcApiClient']>) {
@@ -165,9 +202,11 @@ export class BpmnWorkersService implements OnModuleInit {
     this.registerClassifyEntityWorker();
     this.registerUserTasksWorker();
     this.registerCreateEntityWorker();
+    this.registerSuggestAssigneeWorker();
+    this.registerCheckDuplicateWorker();
 
     this.logger.log(
-      'BPMN workers registered: update-entity-status, send-notification, send-email, log-activity, set-assignee, process-completed, classify-entity, io.camunda.zeebe:userTask, create-entity',
+      'BPMN workers registered: update-entity-status, send-notification, send-email, log-activity, set-assignee, process-completed, classify-entity, io.camunda.zeebe:userTask, create-entity, suggest-assignee, check-duplicate',
     );
   }
 
@@ -205,10 +244,7 @@ export class BpmnWorkersService implements OnModuleInit {
             `Failed to update entity status: ${error.message}`,
             error.stack,
           );
-          return job.fail({
-            errorMessage: error.message,
-            retries: job.retries - 1,
-          });
+          return this.failJobWithIncidentCheck(job, error.message);
         }
       },
     });
@@ -381,10 +417,7 @@ export class BpmnWorkersService implements OnModuleInit {
             `Failed to set assignee: ${error.message}`,
             error.stack,
           );
-          return job.fail({
-            errorMessage: error.message,
-            retries: job.retries - 1,
-          });
+          return this.failJobWithIncidentCheck(job, error.message);
         }
       },
     });
@@ -461,10 +494,7 @@ export class BpmnWorkersService implements OnModuleInit {
         try {
           if (!this.userTasksWorker) {
             this.logger.warn('UserTasksWorker not available, failing job');
-            return job.fail({
-              errorMessage: 'UserTasksWorker not available',
-              retries: job.retries - 1,
-            });
+            return this.failJobWithIncidentCheck(job, 'UserTasksWorker not available');
           }
 
           const result = await this.userTasksWorker.handleUserTask({
@@ -493,10 +523,7 @@ export class BpmnWorkersService implements OnModuleInit {
             `Failed to handle user task: ${error.message}`,
             error.stack,
           );
-          return job.fail({
-            errorMessage: error.message,
-            retries: job.retries - 1,
-          });
+          return this.failJobWithIncidentCheck(job, error.message);
         }
       },
     });
@@ -518,10 +545,7 @@ export class BpmnWorkersService implements OnModuleInit {
         try {
           if (!this.createEntityWorker) {
             this.logger.warn('CreateEntityWorker not available, failing job');
-            return job.fail({
-              errorMessage: 'CreateEntityWorker not available',
-              retries: job.retries - 1,
-            });
+            return this.failJobWithIncidentCheck(job, 'CreateEntityWorker not available');
           }
 
           const result = await this.createEntityWorker.handleCreateEntity({
@@ -542,9 +566,115 @@ export class BpmnWorkersService implements OnModuleInit {
             `Failed to create entity: ${error.message}`,
             error.stack,
           );
-          return job.fail({
-            errorMessage: error.message,
-            retries: job.retries - 1,
+          return this.failJobWithIncidentCheck(job, error.message);
+        }
+      },
+    });
+  }
+
+  /**
+   * Worker: Suggest assignee using AI assistant
+   * Calls AiAssistantService to find the best expert for the entity
+   * Variables: { entityId: string }
+   */
+  private registerSuggestAssigneeWorker() {
+    this.zeebeClient!.createWorker({
+      taskType: 'suggest-assignee',
+      taskHandler: async (job) => {
+        const startTime = Date.now();
+        const { entityId } = job.variables as { entityId: string };
+
+        this.logger.log(`[Worker] suggest-assignee: entity=${entityId}`);
+
+        try {
+          if (this.aiAssistantService && entityId) {
+            const assistance = await this.aiAssistantService.getAssistance(entityId);
+
+            if (assistance.suggestedExperts?.length > 0) {
+              const topExpert = assistance.suggestedExperts[0];
+              this.logger.log(
+                `Entity ${entityId} suggested assignee: ${topExpert.name}`,
+              );
+              await this.logElementExecution(job, 'success', startTime);
+              return job.complete({
+                hasSuggestion: true,
+                suggestedAssigneeName: topExpert.name,
+                suggestedAssigneeManagerId: topExpert.managerId || 0,
+                suggestedAssigneeDepartment: topExpert.department || '',
+              });
+            }
+          }
+          this.logger.warn(
+            'AiAssistantService not available or no suggestions, skipping',
+          );
+          await this.logElementExecution(job, 'success', startTime);
+          return job.complete({
+            hasSuggestion: false,
+          });
+        } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
+          this.logger.error(
+            `Failed to suggest assignee: ${error.message}`,
+            error.stack,
+          );
+          return job.complete({
+            hasSuggestion: false,
+            error: error.message,
+          });
+        }
+      },
+    });
+  }
+
+  /**
+   * Worker: Check for duplicate entities using AI assistant
+   * Calls AiAssistantService to find similar cases (similarity > 0.95 = duplicate)
+   * Variables: { entityId: string }
+   */
+  private registerCheckDuplicateWorker() {
+    this.zeebeClient!.createWorker({
+      taskType: 'check-duplicate',
+      taskHandler: async (job) => {
+        const startTime = Date.now();
+        const { entityId } = job.variables as { entityId: string };
+
+        this.logger.log(`[Worker] check-duplicate: entity=${entityId}`);
+
+        try {
+          if (this.aiAssistantService && entityId) {
+            const assistance = await this.aiAssistantService.getAssistance(entityId);
+            const duplicate = assistance.similarCases?.find(
+              (c: any) => c.similarity > 0.95,
+            );
+
+            if (duplicate) {
+              this.logger.log(
+                `Entity ${entityId} is a potential duplicate of request ${duplicate.requestId} (similarity: ${duplicate.similarity})`,
+              );
+              await this.logElementExecution(job, 'success', startTime);
+              return job.complete({
+                isDuplicate: true,
+                duplicateRequestId: duplicate.requestId,
+                duplicateSimilarity: duplicate.similarity,
+              });
+            }
+          }
+          await this.logElementExecution(job, 'success', startTime);
+          return job.complete({
+            isDuplicate: false,
+            duplicateRequestId: 0,
+            duplicateSimilarity: 0,
+          });
+        } catch (error) {
+          await this.logElementExecution(job, 'failed', startTime);
+          this.logger.error(
+            `Failed to check duplicate: ${error.message}`,
+            error.stack,
+          );
+          return job.complete({
+            isDuplicate: false,
+            duplicateRequestId: 0,
+            duplicateSimilarity: 0,
           });
         }
       },

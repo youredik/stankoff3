@@ -204,6 +204,10 @@ export interface RelatedContext {
   }>;
   /** Количество обращений клиента */
   customerTotalRequests?: number;
+  /** Среднее время решения заявок клиента (часы) */
+  avgResolutionTimeHours?: number;
+  /** Основные темы/категории обращений */
+  topCategories?: string[];
 }
 
 /**

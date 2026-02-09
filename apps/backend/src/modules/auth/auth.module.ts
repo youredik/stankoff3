@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { KeycloakService } from './keycloak.service';
 import { KeycloakAdminService } from './keycloak-admin.service';
+import { DevAuthController } from './dev-auth.controller';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { KeycloakAdminService } from './keycloak-admin.service';
     JwtAuthGuard,
     RolesGuard,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, DevAuthController],
   exports: [AuthService, KeycloakService, KeycloakAdminService, JwtModule, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

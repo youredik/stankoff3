@@ -15,6 +15,9 @@ import {
   ProcessInstance,
   ProcessInstanceStatus,
 } from './entities/process-instance.entity';
+import { ProcessDefinitionVersion } from './entities/process-definition-version.entity';
+import { ProcessActivityLog } from './entities/process-activity-log.entity';
+import { UserTask } from './entities/user-task.entity';
 import { BpmnWorkersService } from './bpmn-workers.service';
 import { ConnectorsService } from '../connectors/connectors.service';
 
@@ -34,6 +37,12 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     private processDefinitionRepository: Repository<ProcessDefinition>,
     @InjectRepository(ProcessInstance)
     private processInstanceRepository: Repository<ProcessInstance>,
+    @InjectRepository(ProcessDefinitionVersion)
+    private versionRepository: Repository<ProcessDefinitionVersion>,
+    @InjectRepository(ProcessActivityLog)
+    private activityLogRepository: Repository<ProcessActivityLog>,
+    @InjectRepository(UserTask)
+    private userTaskRepository: Repository<UserTask>,
     @Inject(forwardRef(() => BpmnWorkersService))
     private workersService: BpmnWorkersService,
     @Inject(forwardRef(() => ConnectorsService))
@@ -244,7 +253,11 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     return this.processDefinitionRepository.save(definition);
   }
 
-  async deployDefinition(id: string): Promise<ProcessDefinition> {
+  async deployDefinition(
+    id: string,
+    changelog?: string,
+    deployedById?: string,
+  ): Promise<ProcessDefinition> {
     const definition = await this.findDefinition(id);
 
     if (!this.isConnected || !this.zeebeClient) {
@@ -262,6 +275,17 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
       definition.version = deployedProcess.version;
       definition.deployedAt = new Date();
       await this.processDefinitionRepository.save(definition);
+
+      // Save version snapshot
+      const versionSnapshot = this.versionRepository.create({
+        processDefinitionId: definition.id,
+        version: definition.version,
+        bpmnXml: definition.bpmnXml,
+        deployedKey: definition.deployedKey,
+        deployedById: deployedById || definition.createdById,
+        changelog,
+      });
+      await this.versionRepository.save(versionSnapshot);
     }
 
     this.logger.log(
@@ -269,6 +293,52 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     );
 
     return definition;
+  }
+
+  // ==================== Version History ====================
+
+  async getVersionHistory(definitionId: string): Promise<ProcessDefinitionVersion[]> {
+    return this.versionRepository.find({
+      where: { processDefinitionId: definitionId },
+      relations: ['deployedBy'],
+      order: { version: 'DESC' },
+    });
+  }
+
+  async getVersion(
+    definitionId: string,
+    version: number,
+  ): Promise<ProcessDefinitionVersion> {
+    const v = await this.versionRepository.findOne({
+      where: { processDefinitionId: definitionId, version },
+      relations: ['deployedBy'],
+    });
+    if (!v) {
+      throw new NotFoundException(
+        `Version ${version} not found for definition ${definitionId}`,
+      );
+    }
+    return v;
+  }
+
+  async rollbackToVersion(
+    definitionId: string,
+    version: number,
+    userId?: string,
+  ): Promise<ProcessDefinition> {
+    const versionData = await this.getVersion(definitionId, version);
+    const definition = await this.findDefinition(definitionId);
+
+    // Update definition BPMN XML to the old version
+    definition.bpmnXml = versionData.bpmnXml;
+    await this.processDefinitionRepository.save(definition);
+
+    // Deploy the old version
+    return this.deployDefinition(
+      definitionId,
+      `Rollback to version ${version}`,
+      userId,
+    );
   }
 
   async deleteDefinition(id: string): Promise<void> {
@@ -396,6 +466,126 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     );
 
     this.logger.log(`Cancelled process instance ${processInstanceKey}`);
+  }
+
+  // ==================== Timeline ====================
+
+  async getInstanceTimeline(instanceId: string): Promise<{
+    timestamp: string;
+    type: string;
+    actor?: string;
+    description: string;
+    details?: Record<string, any>;
+  }[]> {
+    const instance = await this.processInstanceRepository.findOne({
+      where: { id: instanceId },
+      relations: ['startedBy'],
+    });
+    if (!instance) {
+      throw new NotFoundException(`Process instance ${instanceId} not found`);
+    }
+
+    const timeline: {
+      timestamp: string;
+      type: string;
+      actor?: string;
+      description: string;
+      details?: Record<string, any>;
+    }[] = [];
+
+    // 1. Instance started
+    timeline.push({
+      timestamp: instance.startedAt.toISOString(),
+      type: 'process:started',
+      actor: instance.startedBy
+        ? `${instance.startedBy.firstName} ${instance.startedBy.lastName}`
+        : undefined,
+      description: 'Процесс запущен',
+    });
+
+    // 2. Activity logs (worker executions)
+    const activityLogs = await this.activityLogRepository
+      .createQueryBuilder('log')
+      .where('log.processInstanceId = :instanceId', { instanceId })
+      .orderBy('log.startedAt', 'ASC')
+      .getMany();
+
+    for (const log of activityLogs) {
+      timeline.push({
+        timestamp: log.startedAt.toISOString(),
+        type: `worker:${log.status}`,
+        description: `${log.workerType || log.elementId} — ${log.status === 'success' ? 'успешно' : 'ошибка'}`,
+        details: {
+          elementId: log.elementId,
+          elementType: log.elementType,
+          durationMs: log.durationMs,
+          workerType: log.workerType,
+        },
+      });
+    }
+
+    // 3. User tasks
+    const userTasks = await this.userTaskRepository
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.assignee', 'assignee')
+      .leftJoinAndSelect('task.completedBy', 'completedBy')
+      .where('task.processInstanceId = :instanceId', { instanceId })
+      .orderBy('task.createdAt', 'ASC')
+      .getMany();
+
+    for (const task of userTasks) {
+      timeline.push({
+        timestamp: task.createdAt.toISOString(),
+        type: 'task:created',
+        description: `Задача "${task.elementName || task.elementId}" создана`,
+      });
+
+      if (task.claimedAt) {
+        timeline.push({
+          timestamp: task.claimedAt.toISOString(),
+          type: 'task:claimed',
+          actor: task.assignee
+            ? `${task.assignee.firstName} ${task.assignee.lastName}`
+            : undefined,
+          description: `Задача "${task.elementName || task.elementId}" взята в работу`,
+        });
+      }
+
+      if (task.completedAt) {
+        timeline.push({
+          timestamp: task.completedAt.toISOString(),
+          type: 'task:completed',
+          actor: task.completedBy
+            ? `${task.completedBy.firstName} ${task.completedBy.lastName}`
+            : undefined,
+          description: `Задача "${task.elementName || task.elementId}" завершена`,
+          details: task.formData ? { formData: task.formData } : undefined,
+        });
+      }
+    }
+
+    // 4. Instance completed / terminated
+    if (instance.completedAt) {
+      const endType = instance.status === ProcessInstanceStatus.COMPLETED
+        ? 'process:completed'
+        : instance.status === ProcessInstanceStatus.TERMINATED
+          ? 'process:terminated'
+          : 'process:incident';
+      timeline.push({
+        timestamp: instance.completedAt.toISOString(),
+        type: endType,
+        description: instance.status === ProcessInstanceStatus.COMPLETED
+          ? 'Процесс завершён'
+          : instance.status === ProcessInstanceStatus.TERMINATED
+            ? 'Процесс отменён'
+            : 'Инцидент',
+      });
+    }
+
+    // Sort by timestamp
+    timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    return timeline;
   }
 
   // ==================== Statistics ====================

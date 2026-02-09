@@ -11,6 +11,7 @@ import {
   X,
   AlertTriangle,
   AlertOctagon,
+  Sparkles,
 } from 'lucide-react';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -25,6 +26,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
   workspace: Briefcase,
   sla_warning: AlertTriangle,
   sla_breach: AlertOctagon,
+  ai_suggestion: Sparkles,
 };
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
@@ -36,6 +38,7 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   workspace: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-900/40',
   sla_warning: 'text-amber-500 bg-amber-100 dark:bg-amber-900/40',
   sla_breach: 'text-red-500 bg-red-100 dark:bg-red-900/40',
+  ai_suggestion: 'text-teal-500 bg-teal-100 dark:bg-teal-900/40',
 };
 
 export function ToastContainer() {

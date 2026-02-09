@@ -74,10 +74,10 @@ Stankoff Portal - это корпоративная система управл�
 > **Кастомные поля:** Поля, определённые в структуре workspace (sections → fields), автоматически отображаются при просмотре и создании сущности. Системные поля (status, title, assignee, priority) обрабатываются отдельно. Значения кастомных полей хранятся в `entity.data` (JSONB). Рендеринг полей — через `fieldRegistry` (единый dispatch, 13 типов). Правила видимости и динамической обязательности (Rule Engine) вычисляются на клиенте через `lib/field-rules.ts`.
 
 **Entity**
-- `CommentEditor.tsx` - Rich text редактор с Tiptap, @mentions и вложениями
+- `CommentEditor.tsx` - Rich text редактор с Tiptap, @mentions, вложениями и AI кнопкой генерации ответа
 - `LinkedEntities.tsx` - Управление связями между сущностями
 - `ActivityPanel.tsx` - История активности по сущности (создание, изменения, комментарии) — хелперы экспортируются для переиспользования
-- `AiAssistantTab.tsx` - Вкладка AI помощника (похожие случаи, эксперты, контекст, рекомендации)
+- `AiAssistantTab.tsx` - Вкладка AI помощника (похожие случаи, эксперты, контекст клиента, рекомендации, генерация черновика с вставкой в редактор)
 
 **Entity Timeline** (`components/entity/timeline/`)
 - `EntityTimeline.tsx` - Объединённый хронологический таймлайн комментариев и аудит-событий
@@ -149,10 +149,13 @@ Stankoff Portal - это корпоративная система управл�
 - `ProcessMiningDashboard.tsx` - Дашборд аналитики Process Mining (статистика workspace, топ процессов по объёму/длительности, временной анализ, распределение по статусам, детальный анализ выбранного процесса)
 
 **BPMN Tasks (Пользовательские задачи)**
-- `tasks/TaskInbox.tsx` - Inbox пользовательских задач с фильтрами (мои/доступные/все) и поиском
-- `tasks/TaskCard.tsx` - Карточка задачи в списке (статус, приоритет, срок, исполнитель)
+- `tasks/TaskInbox.tsx` - Inbox пользовательских задач с фильтрами (мои/доступные/все), поиском, серверной пагинацией (infinite scroll), сортировкой (дата/приоритет/дедлайн), мультиселектом и batch-операциями (массовый claim/delegate)
+- `tasks/TaskCard.tsx` - Карточка задачи в списке (статус, приоритет, срок, исполнитель, чекбокс для мультиселекта)
 - `tasks/TaskDetail.tsx` - Детальный просмотр задачи с формой, комментариями и историей
 - `tasks/TaskActions.tsx` - Кнопки действий (взять/отказаться/завершить/делегировать)
+
+**BPMN Incidents (Управление инцидентами)**
+- `IncidentPanel.tsx` - Панель инцидентов workspace (список зависших процессов с ошибками, кнопки «Повторить»/«Отменить», навигация к связанной сущности)
 
 **BPMN Forms (Динамические формы)**
 - `forms/DynamicForm.tsx` - Компонент формы на основе JSON Schema с валидацией и поддержкой различных типов полей (text, number, boolean, select, date, textarea)
@@ -272,7 +275,7 @@ interface WorkspaceStore {
 
 **useNotificationStore**
 ```typescript
-type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace' | 'sla_warning' | 'sla_breach';
+type NotificationType = 'entity' | 'comment' | 'status' | 'assignment' | 'mention' | 'workspace' | 'sla_warning' | 'sla_breach' | 'ai_suggestion';
 
 interface AppNotification {
   id: string;
@@ -425,6 +428,10 @@ interface PresenceState {
 - `sla:batch-update` - Batch обновления SLA таймеров (каждые 10 сек, сохраняется в useSlaStore)
 - `task:created` - Новая user task создана (обновляет inboxCount через useTaskStore)
 - `task:updated` - User task обновлена (claim/unclaim/complete/delegate/cancel, обновляет inboxCount)
+- `task:reminder` - Напоминание о приближающемся дедлайне задачи (за 1 час, отправляется assignee/candidates)
+- `task:overdue` - Уведомление о просроченной задаче (отправляется assignee/candidates)
+- `process:incident` - Процесс зависнул с ошибкой (worker retries исчерпаны, отправляется в workspace)
+- `ai:classification:ready` - AI классификация завершена (создаёт уведомление `ai_suggestion` при confidence >= 0.7)
 - `auth:refresh` - Client → Server: обновление JWT токена без разрыва WebSocket соединения
 
 > **Proactive token refresh:** Фронтенд автоматически обновляет access token за 60 секунд до истечения (без ожидания 401). При обновлении токена отправляет `auth:refresh` событие серверу для переаутентификации WebSocket без reconnect.
@@ -460,13 +467,14 @@ function useFocusTrap(
 #### Модули
 
 **AuthModule**
-JWT аутентификация с Passport.js + Keycloak SSO.
+JWT аутентификация с Passport.js + Keycloak SSO. Dev Auth Bypass для локальной разработки.
 
 ```
 auth/
 ├── auth.module.ts
 ├── auth.controller.ts       # login, logout, refresh, me, keycloak/*
 ├── auth.service.ts          # validateUser, login, refreshTokens
+├── dev-auth.controller.ts   # Dev Auth Bypass (AUTH_DEV_MODE=true, NODE_ENV!=production)
 ├── keycloak.service.ts      # Keycloak OIDC (логин через SSO)
 ├── keycloak-admin.service.ts # Keycloak Admin API (импорт пользователей)
 ├── strategies/
@@ -894,14 +902,19 @@ bpmn/
 ├── entities/
 │   ├── process-definition.entity.ts
 │   ├── process-instance.entity.ts
+│   ├── process-definition-version.entity.ts  # История версий процесса
 │   ├── process-activity-log.entity.ts  # Логирование элементов (heat map)
-│   ├── user-task.entity.ts      # User task + UserTaskComment
+│   ├── user-task.entity.ts      # User task + UserTaskComment (+ reminderSentAt, overdueSentAt)
 │   ├── user-group.entity.ts     # Группы пользователей
 │   └── form-definition.entity.ts # Определения форм
+├── incidents/
+│   ├── incident.controller.ts   # API инцидентов (список, retry, cancel)
+│   └── incident.service.ts      # Логика инцидентов (автодетект, retry)
 ├── user-tasks/
-│   ├── user-tasks.controller.ts # API inbox, claim, complete, delegate
-│   ├── user-tasks.service.ts    # Логика работы с user tasks
-│   └── user-tasks.worker.ts     # Обработчик Zeebe user task jobs
+│   ├── user-tasks.controller.ts # API inbox, claim, complete, delegate, batch ops
+│   ├── user-tasks.service.ts    # Логика работы с user tasks + пагинация
+│   ├── user-tasks.worker.ts     # Обработчик Zeebe user task jobs
+│   └── user-task-deadline.scheduler.ts # Cron (5 мин): напоминания и overdue уведомления
 ├── entity-links/
 │   ├── entity-links.controller.ts
 │   ├── entity-links.service.ts
@@ -938,6 +951,17 @@ interface ProcessInstance {
   updatedAt: Date;
 }
 
+interface ProcessDefinitionVersion {
+  id: string;
+  processDefinitionId: string;
+  version: number;
+  bpmnXml: string;
+  deployedKey?: string;
+  deployedById?: string;
+  changelog?: string;
+  deployedAt: Date;
+}
+
 interface ProcessActivityLog {
   id: string;
   processInstanceId: string;  // FK → ProcessInstance
@@ -959,7 +983,7 @@ interface ProcessActivityLog {
 - Process Instance: создание и отслеживание экземпляров
 - Message Correlation: отправка сообщений в процессы
 
-**Zeebe Workers (9 штук в `BpmnWorkersService`):**
+**Zeebe Workers (11 штук в `BpmnWorkersService`):**
 
 | Worker Type | Назначение | Завершение |
 |---|---|---|
@@ -972,6 +996,8 @@ interface ProcessActivityLog {
 | `process-completed` | Пометка ProcessInstance как completed | Мгновенное |
 | `io.camunda.zeebe:userTask` | **User task** — создаёт задачу в inbox | Отложенное (job.forward) |
 | `create-entity` | Создание связанной сущности (cross-workspace) | Мгновенное |
+| `suggest-assignee` | AI-подбор исполнителя через AiAssistantService | Мгновенное |
+| `check-duplicate` | AI-проверка дубликатов (similarity > 0.95) | Мгновенное |
 
 **User Task Flow (отложенное завершение):**
 1. Zeebe активирует job → worker вызывает `UserTasksWorker.handleUserTask()` → создаёт `UserTask` в БД
@@ -980,9 +1006,42 @@ interface ProcessActivityLog {
 4. `UserTasksService.complete()` → вызывает `BpmnWorkersService.completeUserTaskJob(jobKey, formData)`
 5. `completeUserTaskJob()` вызывает `zeebeClient.completeJob({ jobKey, variables })` → Zeebe продолжает процесс
 
+**Incident Management:**
+- Workers автоматически определяют инциденты: если `job.retries <= 0` → `IncidentService.markAsIncident()`
+- Статус процесса обновляется на `incident`, ошибка сохраняется в `variables.lastError`
+- WebSocket `process:incident` уведомляет workspace об инциденте
+- Retry: сбрасывает статус на `active`, очищает ошибку. Cancel: терминирует процесс через Zeebe
+
+**Process Versioning:**
+- При каждом deploy создаётся запись `ProcessDefinitionVersion` со snapshot BPMN XML
+- История версий: `GET /definition/:id/versions` — все версии с changelog и автором
+- Откат: `POST /definition/:id/rollback/:version` — восстанавливает XML старой версии и re-deploy
+
+**Deadline Notifications (UserTaskDeadlineScheduler):**
+- Cron каждые 5 мин проверяет задачи с приближающимся дедлайном (< 1 час) и просроченные
+- Отправляет WebSocket `task:reminder` / `task:overdue` assignee или candidateUsers
+- Дедупликация через поля `reminderSentAt`, `overdueSentAt` в UserTask entity
+
 **BPMN шаблоны:**
-- 12 шаблонов в `templates/`, все user tasks имеют `<zeebe:taskDefinition type="io.camunda.zeebe:userTask" />`
+- 13 шаблонов в `templates/`, все user tasks имеют `<zeebe:taskDefinition type="io.camunda.zeebe:userTask" />`
 - Метаданные (name, description, category) в `BpmnTemplatesService` (hardcoded map)
+- **Boundary Timer Events:** non-interrupting timers для автоэскалации:
+  - `service-support-v2.bpmn`: 4ч таймер на задаче → уведомление руководителю
+  - `claims-management.bpmn`: 5 дней на расследование → эскалация руководителю
+  - `multi-level-approval.bpmn`: 24ч таймер на каждом уровне → напоминание согласователю
+
+**Message Correlation (BPMN ↔ комментарии):**
+- При добавлении комментария от не-исполнителя (клиента) — публикуются Zeebe messages:
+  - `client-response` (для `service-support-v2.bpmn` Event-Based Gateway)
+  - `customer-response` (для `support-ticket.bpmn`)
+- Correlation key: `entityId`
+- Если ни один процесс не ожидает message — сообщение игнорируется (TTL 60с)
+
+**Webhook Security (HMAC-SHA256):**
+- Webhook триггеры поддерживают два метода аутентификации:
+  - **HMAC-SHA256** (рекомендуется): заголовок `X-Webhook-Signature: sha256=<hex>` — timing-safe сравнение
+  - **Plain secret** (legacy): заголовок `X-Webhook-Secret: <ключ>` — timing-safe сравнение
+- Фронтенд `TriggerForm`: генерация ключа, копирование URL и секрета
 
 **SlaModule**
 Модуль управления SLA (Service Level Agreement) для отслеживания сроков выполнения заявок.
@@ -1297,7 +1356,8 @@ UI-компоненты для AI функций располагаются в `
 
 | Компонент | Описание |
 |-----------|----------|
-| `AiClassificationPanel` | Панель AI классификации в карточке сущности (категория, приоритет, навыки, уверенность) |
+| `AiInsightsPanel` | Компактные AI подсказки в правом сайдбаре: похожие решения, эксперты, рекомендации. Автозагрузка при открытии заявки. |
+| `AiClassificationPanel` | Панель AI классификации в карточке сущности (категория, приоритет, навыки, уверенность). Автообновляется через WebSocket при автоклассификации. |
 
 **Использование:**
 ```tsx
@@ -1321,6 +1381,28 @@ import { AiClassificationPanel } from '@/components/ai';
 - Обоснование классификации
 - Провайдер/модель AI
 - Кнопки "Применить" и "Переклассифицировать"
+- Автообновление через WebSocket событие `ai:classification:ready` при автоклассификации
+
+**Автоклассификация при создании заявки:**
+При создании новой entity, backend автоматически запускает AI классификацию в фоне (fire-and-forget). Результат отправляется через WebSocket `ai:classification:ready`. `AiClassificationPanel` подписывается на это событие через `CustomEvent` и автоматически отображает результат.
+
+**AI Insights Panel (компактные подсказки):**
+```tsx
+import { AiInsightsPanel } from '@/components/ai/AiInsightsPanel';
+
+<AiInsightsPanel
+  entityId={entity.id}
+  onShowDetails={() => setActiveTab('ai')}  // переключить на вкладку AI
+/>
+```
+
+Панель показывает (в правом сайдбаре, 280px):
+- До 2 текстовых рекомендаций (suggestedActions)
+- До 3 похожих решённых случаев (с %, ссылкой на legacy)
+- До 2 экспертов (с количеством релевантных случаев)
+- Кнопку "Подробнее" для перехода на вкладку AI помощника
+
+**In-memory кэш:** `AiAssistantService.getAssistance()` кэширует результаты на 5 мин (max 200 записей). Метод `invalidateCache(entityId)` для сброса.
 
 | `AiUsageDashboard` | Дашборд статистики использования AI (запросы, токены, провайдеры, операции) |
 
@@ -1463,9 +1545,13 @@ geocoding/
 | GET | /api/bpmn/definitions?workspaceId=:id | Список определений процессов |
 | GET | /api/bpmn/definitions/:id | Детали определения процесса |
 | POST | /api/bpmn/definitions | Создать/обновить определение процесса |
-| POST | /api/bpmn/definitions/:id/deploy | Развернуть процесс в Zeebe |
+| POST | /api/bpmn/definitions/:id/deploy | Развернуть процесс в Zeebe (body: { changelog? }) |
+| GET | /api/bpmn/definition/:id/versions | История версий процесса |
+| GET | /api/bpmn/definition/:id/versions/:version | Конкретная версия с BPMN XML |
+| POST | /api/bpmn/definition/:id/rollback/:version | Откатить на указанную версию |
 | GET | /api/bpmn/instances/workspace/:workspaceId | Экземпляры процессов workspace |
 | GET | /api/bpmn/instances/entity/:entityId | Экземпляры процессов для сущности |
+| GET | /api/bpmn/instances/:instanceId/timeline | Унифицированный timeline экземпляра (activity logs + user tasks + lifecycle) |
 | POST | /api/bpmn/instances | Запустить экземпляр процесса |
 | POST | /api/bpmn/instances/:id/message | Отправить сообщение в процесс |
 | GET | /api/bpmn/statistics/definition/:id | Статистика по определению процесса |
@@ -1478,8 +1564,8 @@ geocoding/
 | DELETE | /api/bpmn/triggers/:id | Удалить триггер |
 | GET | /api/bpmn/triggers/:id/executions | История выполнения триггера |
 | POST | /api/bpmn/webhooks/:workspaceId/:triggerId | Webhook endpoint для триггеров |
-| GET | /api/bpmn/tasks/inbox | Задачи пользователя (inbox) |
-| GET | /api/bpmn/tasks | Поиск/фильтрация задач |
+| GET | /api/bpmn/tasks/inbox | Задачи пользователя (inbox) с пагинацией (page, perPage, sortBy, sortOrder) |
+| GET | /api/bpmn/tasks | Поиск/фильтрация задач с пагинацией |
 | GET | /api/bpmn/tasks/statistics?workspaceId=:id | Статистика по задачам |
 | GET | /api/bpmn/tasks/:id | Детали задачи с формой |
 | GET | /api/bpmn/tasks/:id/comments | Комментарии задачи |
@@ -1487,6 +1573,8 @@ geocoding/
 | POST | /api/bpmn/tasks/:id/unclaim | Отпустить задачу |
 | POST | /api/bpmn/tasks/:id/complete | Завершить задачу с данными формы |
 | POST | /api/bpmn/tasks/:id/delegate | Делегировать задачу |
+| POST | /api/bpmn/tasks/batch/claim | Массовый claim задач ({ taskIds: string[] }) |
+| POST | /api/bpmn/tasks/batch/delegate | Массовое делегирование ({ taskIds, targetUserId }) |
 | POST | /api/bpmn/tasks/:id/comments | Добавить комментарий к задаче |
 | GET | /api/bpmn/forms?workspaceId=:id | Список определений форм |
 | GET | /api/bpmn/forms/:id | Детали определения формы |
@@ -1505,6 +1593,10 @@ geocoding/
 | GET | /api/bpmn/templates/category/:category | Шаблоны по категории |
 | GET | /api/bpmn/templates/categories | Список категорий с количеством |
 | GET | /api/bpmn/templates/search?q=:query | Поиск шаблонов по названию/тегам |
+| GET | /api/bpmn/incidents?workspaceId=:id | Список инцидентов (зависших процессов) |
+| GET | /api/bpmn/incidents/count?workspaceId=:id | Количество инцидентов (для badge) |
+| POST | /api/bpmn/incidents/:id/retry | Повторить инцидент (сброс статуса на active) |
+| POST | /api/bpmn/incidents/:id/cancel | Отменить инцидент (terminate process) |
 | GET | /api/bpmn/mining/definitions/:id/stats | Process Mining статистика процесса |
 | GET | /api/bpmn/mining/definitions/:id/time-analysis | Анализ времени (дни недели, часы) |
 | GET | /api/bpmn/mining/definitions/:id/element-stats | Per-element статистика для heat map |
@@ -2635,12 +2727,13 @@ CREATE INDEX ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops);
 - `GET /api/ai/assist/:entityId` - Получить AI помощь для заявки
   - Похожие решённые случаи с ссылками на legacy
   - Рекомендуемые эксперты на основе истории
-  - Связанный контекст (контрагенты, сделки)
+  - Связанный контекст (контрагенты, сделки, средний срок решения, топ-категории)
   - Рекомендуемые действия
 - `POST /api/ai/assist/:entityId/suggest-response` - Сгенерировать черновик ответа
   - Использует RAG для поиска похожих решённых случаев
   - Генерирует черновик ответа на русском языке
   - Возвращает источники с процентом схожести
+  - Черновик можно вставить прямо в редактор комментария через кнопку AI в тулбаре
 
 **Статистика использования:**
 - `GET /api/ai/usage/stats` - Статистика использования AI

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { X, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
 import type { ProcessTrigger, ProcessDefinition, TriggerType, TriggerConditions } from '@/types';
 import { triggersApi, CreateTriggerDto, UpdateTriggerDto } from '@/lib/api/triggers';
 
@@ -69,8 +69,26 @@ export function TriggerForm({
   const [isActive, setIsActive] = useState(trigger?.isActive ?? true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const deployedDefinitions = definitions.filter((d) => d.deployedKey);
+
+  const webhookUrl = trigger?.id
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/bpmn/triggers/webhook/${trigger.id}`
+    : null;
+
+  const copyToClipboard = useCallback(async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }, []);
+
+  const generateSecret = useCallback(() => {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const secret = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
+    updateCondition('secret', secret);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,17 +311,76 @@ export function TriggerForm({
           )}
 
           {triggerType === 'webhook' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Секретный ключ
-              </label>
-              <input
-                type="text"
-                value={conditions.secret || ''}
-                onChange={(e) => updateCondition('secret', e.target.value)}
-                placeholder="Опционально"
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
+            <div className="space-y-3">
+              {/* Webhook URL (only shown for existing triggers) */}
+              {webhookUrl && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Webhook URL
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={webhookUrl}
+                      readOnly
+                      className="flex-1 px-3 py-2 text-sm font-mono bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(webhookUrl, 'url')}
+                      className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      title="Копировать URL"
+                    >
+                      {copiedField === 'url' ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-gray-500" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Secret */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Секретный ключ (HMAC-SHA256)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={conditions.secret || ''}
+                    onChange={(e) => updateCondition('secret', e.target.value)}
+                    placeholder="Опционально — для подписи запросов"
+                    className="flex-1 px-3 py-2 text-sm font-mono bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={generateSecret}
+                    className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    title="Сгенерировать ключ"
+                  >
+                    <RefreshCw className="w-4 h-4 text-gray-500" />
+                  </button>
+                  {conditions.secret && (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(conditions.secret!, 'secret')}
+                      className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      title="Копировать ключ"
+                    >
+                      {copiedField === 'secret' ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-gray-500" />
+                      )}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Отправляйте заголовок <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">X-Webhook-Signature: sha256=&lt;hmac&gt;</code> или <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">X-Webhook-Secret: &lt;ключ&gt;</code>
+                </p>
+              </div>
             </div>
           )}
 

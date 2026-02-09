@@ -19,6 +19,7 @@ import { EntityService } from './entity.service';
 import { CreateEntityDto } from './dto/create-entity.dto';
 import { UpdateEntityDto } from './dto/update-entity.dto';
 import { KanbanQueryDto, ColumnLoadMoreDto } from './dto/kanban-query.dto';
+import { TableQueryDto } from './dto/table-query.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole, User } from '../user/user.entity';
@@ -126,6 +127,22 @@ export class EntityController {
     });
 
     return { results };
+  }
+
+  @Get('table')
+  async findForTable(
+    @Query() query: TableQueryDto,
+    @CurrentUser() user: User,
+  ) {
+    const access = await this.workspaceService.checkAccess(
+      query.workspaceId,
+      user.id,
+      user.role,
+    );
+    if (!access) {
+      throw new ForbiddenException('Нет доступа к этому рабочему месту');
+    }
+    return this.entityService.findForTable(query);
   }
 
   @Get(':id')

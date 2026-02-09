@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Inbox,
   Filter,
@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Users,
   AlertTriangle,
+  Loader2,
+  ArrowUpDown,
 } from 'lucide-react';
 import type { UserTask, UserTaskStatus, UserTaskFilter } from '@/types';
 import { tasksApi } from '@/lib/api/tasks';
@@ -23,6 +25,9 @@ interface TaskInboxProps {
 }
 
 type TabType = 'my' | 'available' | 'all';
+type SortOption = 'priority' | 'createdAt' | 'dueDate';
+
+const TASKS_PER_PAGE = 20;
 
 const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'my', label: 'Мои задачи', icon: Inbox },
@@ -38,54 +43,120 @@ const statusFilters: { value: UserTaskStatus | ''; label: string }[] = [
   { value: 'delegated', label: 'Делегированные' },
 ];
 
+const sortOptions: { value: SortOption; label: string }[] = [
+  { value: 'priority', label: 'По приоритету' },
+  { value: 'dueDate', label: 'По дедлайну' },
+  { value: 'createdAt', label: 'По дате создания' },
+];
+
 export function TaskInbox({
   workspaceId,
   onTaskSelect,
   showFilters = true,
 }: TaskInboxProps) {
   const [tasks, setTasks] = useState<UserTask[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('my');
   const [statusFilter, setStatusFilter] = useState<UserTaskStatus | ''>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('priority');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchLoading, setIsBatchLoading] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (pageNum = 1, append = false) => {
     try {
-      setIsLoading(true);
+      if (!append) {
+        setIsLoading(true);
+      }
       setError(null);
 
-      let data: UserTask[];
-
       if (activeTab === 'my') {
-        // Inbox - задачи назначенные текущему пользователю
-        data = await tasksApi.getInbox(workspaceId);
+        const result = await tasksApi.getInbox({
+          workspaceId,
+          page: pageNum,
+          perPage: TASKS_PER_PAGE,
+          sortBy,
+        });
+        if (append) {
+          setTasks((prev) => [...prev, ...result.items]);
+        } else {
+          setTasks(result.items);
+        }
+        setTotal(result.total);
+        setPage(result.page);
+        setHasMore(result.page < result.totalPages);
       } else {
-        // Все или доступные задачи
-        const filters: UserTaskFilter = { workspaceId };
+        const filters: UserTaskFilter = {
+          workspaceId,
+          page: pageNum,
+          perPage: TASKS_PER_PAGE,
+          sortBy,
+        };
         if (statusFilter) {
           filters.status = statusFilter;
         }
-        data = await tasksApi.getTasks(filters);
+        const result = await tasksApi.getTasks(filters);
+        if (append) {
+          setTasks((prev) => [...prev, ...result.items]);
+        } else {
+          setTasks(result.items);
+        }
+        setTotal(result.total);
+        setPage(result.page);
+        setHasMore(result.page < result.totalPages);
       }
-
-      setTasks(data);
     } catch (err) {
       setError('Не удалось загрузить задачи');
       console.error('Failed to fetch tasks:', err);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [activeTab, workspaceId, statusFilter]);
+  }, [activeTab, workspaceId, statusFilter, sortBy]);
+
+  // Reset and fetch on filter/tab change
+  useEffect(() => {
+    setTasks([]);
+    setPage(1);
+    fetchTasks(1, false);
+  }, [fetchTasks]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    await fetchTasks(page + 1, true);
+  }, [fetchTasks, page, hasMore, isLoadingMore]);
+
+  // Infinite scroll handler
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || isLoadingMore || !hasMore) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      handleLoadMore();
+    }
+  }, [handleLoadMore, isLoadingMore, hasMore]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchTasks();
+    setTasks([]);
+    setPage(1);
+    await fetchTasks(1, false);
     setIsRefreshing(false);
   };
 
@@ -100,7 +171,19 @@ export function TaskInbox({
     }
   };
 
-  // Filter tasks by search query
+  const handleSelectToggle = useCallback((taskId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Filter tasks by search query (client-side, on loaded data)
   const filteredTasks = tasks.filter((task) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -112,7 +195,55 @@ export function TaskInbox({
     );
   });
 
-  // Group tasks by status for display
+  const selectableTasks = filteredTasks.filter((t) => t.status === 'created');
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedIds.size === selectableTasks.length && selectableTasks.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableTasks.map((t) => t.id)));
+    }
+  }, [selectableTasks, selectedIds.size]);
+
+  const handleBatchClaim = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBatchLoading(true);
+    try {
+      const result = await tasksApi.batchClaim(Array.from(selectedIds));
+      if (result.succeeded.length > 0) {
+        setSelectedIds(new Set());
+        await fetchTasks(1, false);
+      }
+      if (result.failed.length > 0) {
+        console.warn('Some tasks failed to claim:', result.failed);
+      }
+    } catch (err) {
+      console.error('Batch claim failed:', err);
+    } finally {
+      setIsBatchLoading(false);
+    }
+  };
+
+  const handleBatchDelegate = async (targetUserId: string) => {
+    if (selectedIds.size === 0) return;
+    setIsBatchLoading(true);
+    try {
+      const result = await tasksApi.batchDelegate(Array.from(selectedIds), targetUserId);
+      if (result.succeeded.length > 0) {
+        setSelectedIds(new Set());
+        await fetchTasks(1, false);
+      }
+      if (result.failed.length > 0) {
+        console.warn('Some tasks failed to delegate:', result.failed);
+      }
+    } catch (err) {
+      console.error('Batch delegate failed:', err);
+    } finally {
+      setIsBatchLoading(false);
+    }
+  };
+
+  // Count overdue in loaded tasks
   const overdueCount = filteredTasks.filter(
     (t) =>
       t.dueDate &&
@@ -134,6 +265,11 @@ export function TaskInbox({
             <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 rounded">
               <AlertTriangle className="w-3 h-3" />
               {overdueCount} просрочено
+            </span>
+          )}
+          {total > 0 && (
+            <span className="text-xs text-gray-500">
+              ({total})
             </span>
           )}
         </div>
@@ -194,11 +330,57 @@ export function TaskInbox({
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
+
+          {/* Sort */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="appearance-none pl-3 pr-8 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+      )}
+
+      {/* Batch toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-teal-50 dark:bg-teal-900/20 border-b border-teal-200 dark:border-teal-800">
+          <button
+            onClick={handleSelectAll}
+            className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
+          >
+            {selectedIds.size === selectableTasks.length ? 'Снять всё' : 'Выбрать все'}
+          </button>
+          <span className="text-sm text-teal-700 dark:text-teal-300 font-medium">
+            Выбрано: {selectedIds.size}
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleBatchClaim}
+              disabled={isBatchLoading}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isBatchLoading ? 'Обработка...' : 'Взять выбранные'}
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              Отмена
+            </button>
+          </div>
         </div>
       )}
 
       {/* Task list */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full" />
@@ -232,8 +414,17 @@ export function TaskInbox({
                 task={task}
                 onClick={onTaskSelect}
                 onClaim={task.status === 'created' ? handleClaim : undefined}
+                selectable={task.status === 'created'}
+                selected={selectedIds.has(task.id)}
+                onSelectToggle={handleSelectToggle}
               />
             ))}
+            {isLoadingMore && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
+                <span className="ml-2 text-sm text-gray-500">Загрузка...</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -241,7 +432,7 @@ export function TaskInbox({
       {/* Footer with count */}
       {filteredTasks.length > 0 && (
         <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200 dark:border-gray-700">
-          Показано {filteredTasks.length} из {tasks.length} задач
+          Показано {filteredTasks.length} из {total} задач
         </div>
       )}
     </div>

@@ -112,6 +112,13 @@ export class UserTask {
   @Column({ type: 'timestamptz', nullable: true })
   followUpDate: Date | null;
 
+  // Deadline notification tracking (to avoid duplicate sends)
+  @Column({ type: 'timestamptz', nullable: true })
+  reminderSentAt: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  overdueSentAt: Date | null;
+
   @Column({ type: 'int', default: 50 })
   priority: number;
 

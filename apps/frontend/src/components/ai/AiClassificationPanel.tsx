@@ -98,6 +98,20 @@ export function AiClassificationPanel({
       .finally(() => setIsLoading(false));
   }, [entityId]);
 
+  // Слушаем WebSocket событие автоклассификации
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { entityId: eid } = (e as CustomEvent).detail;
+      if (eid === entityId) {
+        aiApi.getClassification(entityId).then((data) => {
+          if (data) setClassification(data);
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener('ai:classification:ready', handler);
+    return () => window.removeEventListener('ai:classification:ready', handler);
+  }, [entityId]);
+
   // Запустить классификацию
   const handleClassify = useCallback(async () => {
     if (!title) return;

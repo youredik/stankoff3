@@ -4,7 +4,8 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import type { Editor } from '@tiptap/react';
 import { createPortal } from 'react-dom';
 import {
   Bold,
@@ -16,13 +17,18 @@ import {
   FileText,
   Film,
   Loader2,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { filesApi } from '@/lib/api/files';
+import { aiApi } from '@/lib/api/ai';
 import type { User, UploadedAttachment } from '@/types';
 
 interface CommentEditorProps {
   users: User[];
   onSubmit: (content: string, attachments?: UploadedAttachment[]) => void;
+  entityId?: string;
+  onEditorReady?: (editor: Editor) => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -39,7 +45,7 @@ function isVideoMimeType(mimeType: string): boolean {
   return mimeType.startsWith('video/');
 }
 
-export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
+export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: CommentEditorProps) {
   const [mentionState, setMentionState] = useState<{
     items: User[];
     clientRect: () => DOMRect | null;
@@ -50,6 +56,10 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // AI draft state
+  const [aiDraft, setAiDraft] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -162,6 +172,32 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
     editor.commands.clearContent();
     setAttachments([]);
   }, [editor, onSubmit, attachments]);
+
+  // Expose editor to parent
+  useEffect(() => {
+    if (editor && onEditorReady) onEditorReady(editor);
+  }, [editor, onEditorReady]);
+
+  // AI: generate response suggestion
+  const handleAiSuggest = useCallback(async () => {
+    if (!entityId || aiLoading) return;
+    setAiLoading(true);
+    try {
+      const response = await aiApi.suggestResponse(entityId);
+      setAiDraft(response.draft);
+    } catch {
+      setAiDraft(null);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [entityId, aiLoading]);
+
+  // AI: insert draft into editor
+  const handleInsertDraft = useCallback(() => {
+    if (!aiDraft || !editor) return;
+    editor.chain().focus().insertContent(aiDraft).run();
+    setAiDraft(null);
+  }, [aiDraft, editor]);
 
   const handleLinkClick = () => {
     const url = window.prompt('Введите URL:');
@@ -296,6 +332,43 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
         accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
       />
 
+      {/* AI Draft Block */}
+      {aiDraft && (
+        <div className="px-3 py-2.5 border-t border-gray-100 dark:border-gray-700 bg-teal-50 dark:bg-teal-900/20">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-teal-500" />
+              <span className="text-xs font-medium text-teal-700 dark:text-teal-300">AI предлагает:</span>
+            </div>
+            <button
+              onClick={() => setAiDraft(null)}
+              className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed mb-2 line-clamp-4">
+            {aiDraft}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleInsertDraft}
+              className="px-2.5 py-1 bg-teal-500 text-white rounded text-xs font-medium hover:bg-teal-600 transition-colors"
+            >
+              Вставить
+            </button>
+            <button
+              onClick={handleAiSuggest}
+              disabled={aiLoading}
+              className="px-2.5 py-1 text-teal-600 dark:text-teal-400 rounded text-xs font-medium hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 inline mr-1 ${aiLoading ? 'animate-spin' : ''}`} />
+              Другой вариант
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
         <div className="flex items-center gap-0.5">
@@ -347,6 +420,20 @@ export function CommentEditor({ users, onSubmit }: CommentEditorProps) {
               <Paperclip className="w-4 h-4 text-gray-600 dark:text-gray-400" />
             )}
           </button>
+          {entityId && (
+            <button
+              onClick={handleAiSuggest}
+              disabled={aiLoading}
+              className="p-1.5 rounded hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors disabled:opacity-50 ml-0.5"
+              title="AI: предложить ответ"
+            >
+              {aiLoading ? (
+                <Loader2 className="w-4 h-4 text-teal-500 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-teal-500" />
+              )}
+            </button>
+          )}
           <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">@ — упоминание</span>
         </div>
         <button

@@ -98,6 +98,8 @@ export interface RelatedContext {
     url: string;
   }>;
   customerTotalRequests?: number;
+  avgResolutionTimeHours?: number;
+  topCategories?: string[];
 }
 
 export interface AiAssistantResponse {

@@ -282,6 +282,23 @@ describe('EventsGateway', () => {
     });
   });
 
+  describe('AI events', () => {
+    it('emitAiClassificationReady должен отправлять событие', () => {
+      const data = {
+        entityId: 'entity-1',
+        workspaceId: 'ws-1',
+        classification: {
+          category: 'technical_support',
+          priority: 'high',
+          skills: ['mechanical'],
+          confidence: 0.92,
+        },
+      };
+      gateway.emitAiClassificationReady(data);
+      expect(mockServer.emit).toHaveBeenCalledWith('ai:classification:ready', data);
+    });
+  });
+
   describe('handleMessage', () => {
     it('должен возвращать подтверждение', () => {
       const result = gateway.handleMessage({} as any, {});

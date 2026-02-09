@@ -30,4 +30,23 @@ export const authApi = {
     // В браузере используем относительный путь для работы через rewrites
     return '/api/auth/keycloak/login';
   },
+
+  getDevUsers: async (): Promise<DevUser[]> => {
+    const { data } = await apiClient.get<DevUser[]>('/auth/dev/users');
+    return data;
+  },
+
+  devLogin: async (email: string): Promise<RefreshResponse> => {
+    const { data } = await apiClient.post<RefreshResponse>('/auth/dev/login', { email });
+    return data;
+  },
 };
+
+export interface DevUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  avatar: string | null;
+}

@@ -181,6 +181,20 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('task:updated', task);
   }
 
+  // AI: автоклассификация завершена
+  emitAiClassificationReady(data: {
+    entityId: string;
+    workspaceId: string;
+    classification: {
+      category: string;
+      priority: string;
+      skills: string[];
+      confidence: number;
+    };
+  }) {
+    this.server.emit('ai:classification:ready', data);
+  }
+
   // Обновление токена без разрыва соединения
   @SubscribeMessage('auth:refresh')
   handleAuthRefresh(client: AuthenticatedSocket, payload: { token: string }): { success: boolean } {

@@ -27,7 +27,7 @@ import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { Entity, FieldOption } from '@/types';
-import type { EntityFilters } from '@/lib/api/entities';
+import { filtersToApi } from '@/lib/utils/filters';
 
 interface KanbanBoardProps {
   workspaceId: string;
@@ -40,16 +40,6 @@ const DEFAULT_COLUMNS: FieldOption[] = [
   { id: 'testing', label: 'Тестирование', color: '#8B5CF6' },
   { id: 'done', label: 'Готово', color: '#10B981' },
 ];
-
-function filtersToApi(filters: FilterState): EntityFilters {
-  return {
-    search: filters.search || undefined,
-    assigneeId: filters.assigneeIds.length > 0 ? filters.assigneeIds : undefined,
-    priority: filters.priorities.length > 0 ? filters.priorities : undefined,
-    dateFrom: filters.dateFrom || undefined,
-    dateTo: filters.dateTo || undefined,
-  };
-}
 
 export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const router = useRouter();

@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_SmartRouting" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="smart-routing" name="Умная маршрутизация" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Заявка создана">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- AI классификация -->
+    <bpmn:serviceTask id="Task_Classify" name="AI классификация">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="classify-entity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Проверка на дубликат -->
+    <bpmn:serviceTask id="Task_CheckDuplicate" name="Проверка дубликата">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="check-duplicate" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Шлюз: дубликат? -->
+    <bpmn:exclusiveGateway id="Gateway_Duplicate" name="Дубликат?">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_IsDuplicate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NotDuplicate</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- Ветка дубликата: уведомление и завершение -->
+    <bpmn:serviceTask id="Task_NotifyDuplicate" name="Уведомить о дубликате">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= creatorId" target="userId" />
+          <zeebe:input source="= string-join(&quot;Обнаружен возможный дубликат заявки #&quot;, string(duplicateRequestId))" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_IsDuplicate</bpmn:incoming>
+      <bpmn:outgoing>Flow_DuplicateEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Ветка нормальной обработки: AI предложение исполнителя -->
+    <bpmn:serviceTask id="Task_SuggestAssignee" name="AI подбор исполнителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="suggest-assignee" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NotDuplicate</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Шлюз: высокий приоритет? -->
+    <bpmn:exclusiveGateway id="Gateway_Priority" name="Высокий приоритет?">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_HighPriority</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NormalPriority</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- Высокий приоритет: user task на проверку назначения -->
+    <bpmn:userTask id="Task_ReviewAssignment" name="Проверка назначения">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
+        <zeebe:formDefinition formKey="camunda-forms:bpmn:review-assignment-form" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_HighPriority</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- Назначение исполнителя (после ручной проверки) -->
+    <bpmn:serviceTask id="Task_SetAssigneeManual" name="Назначить исполнителя">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="set-assignee" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= assigneeId" target="assigneeId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Нормальный приоритет: автоназначение если есть предложение -->
+    <bpmn:serviceTask id="Task_SetAssigneeAuto" name="Автоназначение">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="set-assignee" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= if hasSuggestion then suggestedAssigneeManagerId else null" target="assigneeId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NormalPriority</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Логирование маршрутизации -->
+    <bpmn:serviceTask id="Task_LogRouting" name="Записать маршрутизацию">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="log-activity" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+          <zeebe:input source="= &quot;entity_updated&quot;" target="action" />
+          <zeebe:input source="= {&quot;description&quot;: &quot;AI маршрутизация завершена&quot;}" target="details" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- Процесс завершён -->
+    <bpmn:serviceTask id="Task_Complete" name="Завершение процесса">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="process-completed" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:incoming>Flow_DuplicateEnd</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="Завершено">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- Sequence flows -->
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_Classify" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Classify" targetRef="Task_CheckDuplicate" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_CheckDuplicate" targetRef="Gateway_Duplicate" />
+    <bpmn:sequenceFlow id="Flow_IsDuplicate" name="Дубликат" sourceRef="Gateway_Duplicate" targetRef="Task_NotifyDuplicate">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= isDuplicate = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotDuplicate" name="Уникальная" sourceRef="Gateway_Duplicate" targetRef="Task_SuggestAssignee">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= isDuplicate = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DuplicateEnd" sourceRef="Task_NotifyDuplicate" targetRef="Task_Complete" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_SuggestAssignee" targetRef="Gateway_Priority" />
+    <bpmn:sequenceFlow id="Flow_HighPriority" name="Высокий" sourceRef="Gateway_Priority" targetRef="Task_ReviewAssignment">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= aiPriority = "high" or aiPriority = "critical"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NormalPriority" name="Обычный" sourceRef="Gateway_Priority" targetRef="Task_SetAssigneeAuto">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= aiPriority != "high" and aiPriority != "critical"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_ReviewAssignment" targetRef="Task_SetAssigneeManual" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_SetAssigneeManual" targetRef="Task_LogRouting" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_SetAssigneeAuto" targetRef="Task_LogRouting" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_LogRouting" targetRef="Task_Complete" />
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_Complete" targetRef="EndEvent_1" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="smart-routing">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="130" y="245" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Classify_di" bpmnElement="Task_Classify">
+        <dc:Bounds x="240" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckDuplicate_di" bpmnElement="Task_CheckDuplicate">
+        <dc:Bounds x="390" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Duplicate_di" bpmnElement="Gateway_Duplicate" isMarkerVisible="true">
+        <dc:Bounds x="545" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="546" y="171" width="49" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyDuplicate_di" bpmnElement="Task_NotifyDuplicate">
+        <dc:Bounds x="650" y="310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SuggestAssignee_di" bpmnElement="Task_SuggestAssignee">
+        <dc:Bounds x="650" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Priority_di" bpmnElement="Gateway_Priority" isMarkerVisible="true">
+        <dc:Bounds x="805" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="786" y="171" width="89" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReviewAssignment_di" bpmnElement="Task_ReviewAssignment">
+        <dc:Bounds x="910" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetAssigneeManual_di" bpmnElement="Task_SetAssigneeManual">
+        <dc:Bounds x="1060" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetAssigneeAuto_di" bpmnElement="Task_SetAssigneeAuto">
+        <dc:Bounds x="910" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_LogRouting_di" bpmnElement="Task_LogRouting">
+        <dc:Bounds x="1210" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Complete_di" bpmnElement="Task_Complete">
+        <dc:Bounds x="1360" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="1512" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1499" y="245" width="62" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="188" y="220" />
+        <di:waypoint x="240" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="340" y="220" />
+        <di:waypoint x="390" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="490" y="220" />
+        <di:waypoint x="545" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IsDuplicate_di" bpmnElement="Flow_IsDuplicate">
+        <di:waypoint x="570" y="245" />
+        <di:waypoint x="570" y="350" />
+        <di:waypoint x="650" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotDuplicate_di" bpmnElement="Flow_NotDuplicate">
+        <di:waypoint x="595" y="220" />
+        <di:waypoint x="650" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DuplicateEnd_di" bpmnElement="Flow_DuplicateEnd">
+        <di:waypoint x="750" y="350" />
+        <di:waypoint x="1410" y="350" />
+        <di:waypoint x="1410" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="750" y="220" />
+        <di:waypoint x="805" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_HighPriority_di" bpmnElement="Flow_HighPriority">
+        <di:waypoint x="830" y="195" />
+        <di:waypoint x="830" y="140" />
+        <di:waypoint x="910" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NormalPriority_di" bpmnElement="Flow_NormalPriority">
+        <di:waypoint x="830" y="245" />
+        <di:waypoint x="830" y="300" />
+        <di:waypoint x="910" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="1010" y="140" />
+        <di:waypoint x="1060" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="1160" y="140" />
+        <di:waypoint x="1185" y="140" />
+        <di:waypoint x="1185" y="220" />
+        <di:waypoint x="1210" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="1010" y="300" />
+        <di:waypoint x="1185" y="300" />
+        <di:waypoint x="1185" y="220" />
+        <di:waypoint x="1210" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1310" y="220" />
+        <di:waypoint x="1360" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_di" bpmnElement="Flow_End">
+        <di:waypoint x="1460" y="220" />
+        <di:waypoint x="1512" y="220" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

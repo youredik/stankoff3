@@ -316,6 +316,33 @@ export function useWebSocket() {
       useTaskStore.getState().fetchInboxCount();
     });
 
+    // AI: автоклассификация завершена
+    socket.on('ai:classification:ready', (data: {
+      entityId: string;
+      workspaceId: string;
+      classification: {
+        category: string;
+        priority: string;
+        skills: string[];
+        confidence: number;
+      };
+    }) => {
+      window.dispatchEvent(
+        new CustomEvent('ai:classification:ready', { detail: data }),
+      );
+
+      // Уведомление при высокой уверенности
+      const { category, priority, confidence } = data.classification;
+      if (confidence >= 0.7) {
+        useNotificationStore.getState().addNotification({
+          text: `AI определил: категория «${category}», приоритет «${priority}» (${Math.round(confidence * 100)}%)`,
+          type: 'ai_suggestion',
+          entityId: data.entityId,
+          workspaceId: data.workspaceId,
+        });
+      }
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;

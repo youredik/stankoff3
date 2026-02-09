@@ -22,6 +22,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
 import { AutomationModule } from '../automation/automation.module';
 import { BpmnModule } from '../bpmn/bpmn.module';
 import { SlaModule } from '../sla/sla.module';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SlaModule } from '../sla/sla.module';
     forwardRef(() => AuditLogModule),
     forwardRef(() => AutomationModule),
     forwardRef(() => BpmnModule),
+    forwardRef(() => AiModule),
     SlaModule,
   ],
   providers: [EntityService, CommentService, RecommendationsService, OgPreviewService, FieldValidationService, FormulaEvaluatorService],

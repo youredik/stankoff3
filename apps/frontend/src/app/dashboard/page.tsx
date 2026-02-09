@@ -22,7 +22,12 @@ const AnalyticsDashboard = dynamic(
   { ssr: false },
 );
 
-export type DashboardView = 'kanban' | 'analytics';
+const TableView = dynamic(
+  () => import('@/components/table/TableView').then((m) => m.TableView),
+  { ssr: false },
+);
+
+export type DashboardView = 'kanban' | 'table' | 'analytics';
 
 function DashboardContent() {
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
@@ -32,7 +37,7 @@ function DashboardContent() {
   useEffect(() => {
     // Restore view preference
     const savedView = localStorage.getItem(VIEW_KEY) as DashboardView;
-    if (savedView === 'kanban' || savedView === 'analytics') {
+    if (savedView === 'kanban' || savedView === 'table' || savedView === 'analytics') {
       setCurrentView(savedView);
     }
 
@@ -83,6 +88,11 @@ function DashboardContent() {
           {currentView === 'kanban' && selectedWorkspace && (
             <div className="relative p-6">
               <KanbanBoard workspaceId={selectedWorkspace} />
+            </div>
+          )}
+          {currentView === 'table' && selectedWorkspace && (
+            <div className="relative p-6">
+              <TableView workspaceId={selectedWorkspace} />
             </div>
           )}
           {currentView === 'analytics' && (

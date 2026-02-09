@@ -3,21 +3,38 @@ import type {
   UserTask,
   UserTaskFilter,
   UserTaskComment,
+  PaginatedResult,
 } from '@/types';
 
+export interface InboxParams {
+  workspaceId?: string;
+  includeCompleted?: boolean;
+  page?: number;
+  perPage?: number;
+  sortBy?: 'createdAt' | 'priority' | 'dueDate';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
 export const tasksApi = {
-  // Inbox - получить задачи для текущего пользователя
-  getInbox: (workspaceId?: string) =>
+  // Inbox - получить задачи для текущего пользователя (с пагинацией)
+  getInbox: (params?: InboxParams) =>
     apiClient
-      .get<UserTask[]>('/bpmn/tasks/inbox', {
-        params: workspaceId ? { workspaceId } : undefined,
+      .get<PaginatedResult<UserTask>>('/bpmn/tasks/inbox', {
+        params: params ? {
+          workspaceId: params.workspaceId,
+          includeCompleted: params.includeCompleted ? 'true' : undefined,
+          page: params.page,
+          perPage: params.perPage,
+          sortBy: params.sortBy,
+          sortOrder: params.sortOrder,
+        } : undefined,
       })
       .then((r) => r.data),
 
-  // Получить задачи с фильтрами
+  // Получить задачи с фильтрами (с пагинацией)
   getTasks: (filters: UserTaskFilter) =>
     apiClient
-      .get<UserTask[]>('/bpmn/tasks', { params: filters })
+      .get<PaginatedResult<UserTask>>('/bpmn/tasks', { params: filters })
       .then((r) => r.data),
 
   // Получить одну задачу
@@ -52,6 +69,24 @@ export const tasksApi = {
   reassign: (taskId: string, assigneeId: string) =>
     apiClient
       .post<UserTask>(`/bpmn/tasks/${taskId}/reassign`, { assigneeId })
+      .then((r) => r.data),
+
+  // Batch claim — взять несколько задач
+  batchClaim: (taskIds: string[]) =>
+    apiClient
+      .post<{ succeeded: string[]; failed: { id: string; reason: string }[] }>(
+        '/bpmn/tasks/batch/claim',
+        { taskIds },
+      )
+      .then((r) => r.data),
+
+  // Batch delegate — делегировать несколько задач
+  batchDelegate: (taskIds: string[], targetUserId: string) =>
+    apiClient
+      .post<{ succeeded: string[]; failed: { id: string; reason: string }[] }>(
+        '/bpmn/tasks/batch/delegate',
+        { taskIds, targetUserId },
+      )
       .then((r) => r.data),
 
   // Комментарии к задаче

@@ -9,6 +9,7 @@ import { User } from '../user/user.entity';
 import { CreateEntityDto } from './dto/create-entity.dto';
 import { UpdateEntityDto } from './dto/update-entity.dto';
 import { KanbanQueryDto, ColumnLoadMoreDto } from './dto/kanban-query.dto';
+import { TableQueryDto } from './dto/table-query.dto';
 import { EventsGateway } from '../websocket/events.gateway';
 import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -19,6 +20,7 @@ import { TriggerType } from '../automation/automation-rule.entity';
 import { TriggersService } from '../bpmn/triggers/triggers.service';
 import { TriggerType as BpmnTriggerType } from '../bpmn/entities/process-trigger.entity';
 import { SlaService } from '../sla/sla.service';
+import { ClassifierService } from '../ai/services/classifier.service';
 import { FieldValidationService } from './field-validation.service';
 import { FormulaEvaluatorService } from './formula-evaluator.service';
 
@@ -49,6 +51,9 @@ export class EntityService {
     @Inject(forwardRef(() => TriggersService))
     private triggersService: TriggersService,
     private slaService: SlaService,
+    @Optional()
+    @Inject(forwardRef(() => ClassifierService))
+    private classifierService: ClassifierService,
     private fieldValidationService: FieldValidationService,
     private formulaEvaluatorService: FormulaEvaluatorService,
   ) {
@@ -127,6 +132,65 @@ export class EntityService {
 
     const [items, total] = await qb.getManyAndCount();
     return { items, total, hasMore: query.offset + items.length < total };
+  }
+
+  async findForTable(query: TableQueryDto): Promise<{
+    items: WorkspaceEntity[];
+    total: number;
+    page: number;
+    perPage: number;
+    totalPages: number;
+  }> {
+    const page = query.page || 1;
+    const perPage = query.perPage || 25;
+
+    const qb = this.entityRepository
+      .createQueryBuilder('entity')
+      .leftJoinAndSelect('entity.assignee', 'assignee')
+      .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId });
+
+    this.applyKanbanFilters(qb, query);
+
+    if (query.status?.length) {
+      qb.andWhere('entity.status IN (:...statuses)', { statuses: query.status });
+    }
+
+    this.applyTableSort(qb, query.sortBy || 'createdAt', query.sortOrder || 'DESC');
+
+    qb.skip((page - 1) * perPage).take(perPage);
+
+    const [items, total] = await qb.getManyAndCount();
+    const totalPages = Math.ceil(total / perPage);
+
+    return { items, total, page, perPage, totalPages };
+  }
+
+  private applyTableSort(
+    qb: SelectQueryBuilder<WorkspaceEntity>,
+    sortBy: string,
+    sortOrder: 'ASC' | 'DESC',
+  ): void {
+    const sortMap: Record<string, string> = {
+      createdAt: 'entity.createdAt',
+      updatedAt: 'entity.updatedAt',
+      title: 'entity.title',
+      customId: 'entity.customId',
+      status: 'entity.status',
+      commentCount: 'entity.commentCount',
+      lastActivityAt: 'entity.lastActivityAt',
+    };
+
+    if (sortBy === 'priority') {
+      qb.orderBy(
+        `CASE "entity"."priority" WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END`,
+        sortOrder,
+      );
+    } else if (sortBy === 'assignee') {
+      qb.orderBy('assignee.firstName', sortOrder, 'NULLS LAST');
+    } else {
+      const column = sortMap[sortBy] || 'entity.createdAt';
+      qb.orderBy(column, sortOrder, 'NULLS LAST');
+    }
   }
 
   private applyKanbanFilters(
@@ -363,7 +427,51 @@ export class EntityService {
       this.logger.error(`SLA creation error: ${err.message}`);
     }
 
+    // AI: автоклассификация в фоне (fire-and-forget)
+    if (this.classifierService) {
+      this.runAutoClassification(saved, actorId).catch((err) => {
+        this.logger.error(`Auto-classification error for entity ${saved.id}: ${err.message}`);
+      });
+    }
+
     return saved;
+  }
+
+  /**
+   * Автоклассификация entity через AI (fire-and-forget)
+   */
+  private async runAutoClassification(
+    entity: WorkspaceEntity,
+    actorId?: string,
+  ): Promise<void> {
+    if (!entity.title || entity.title.length < 5) return;
+
+    const description = (entity.data as Record<string, unknown>)?.description;
+
+    const classification = await this.classifierService.classifyAndSave(
+      entity.id,
+      {
+        title: entity.title,
+        description: typeof description === 'string' ? description : '',
+        workspaceId: entity.workspaceId,
+      },
+      actorId,
+    );
+
+    this.eventsGateway.emitAiClassificationReady({
+      entityId: entity.id,
+      workspaceId: entity.workspaceId,
+      classification: {
+        category: classification.category,
+        priority: classification.priority,
+        skills: classification.skills as string[],
+        confidence: classification.confidence,
+      },
+    });
+
+    this.logger.log(
+      `Auto-classification completed for entity ${entity.id}: ${classification.category} (${classification.confidence})`,
+    );
   }
 
   async update(id: string, dto: UpdateEntityDto, actorId?: string): Promise<WorkspaceEntity> {

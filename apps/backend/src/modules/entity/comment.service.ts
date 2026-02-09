@@ -10,6 +10,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { AuditActionType } from '../audit-log/audit-log.entity';
 import { TriggersService } from '../bpmn/triggers/triggers.service';
 import { TriggerType as BpmnTriggerType } from '../bpmn/entities/process-trigger.entity';
+import { BpmnService } from '../bpmn/bpmn.service';
 import { SlaService } from '../sla/sla.service';
 
 // Response attachment type with signed URLs
@@ -44,6 +45,9 @@ export class CommentService {
     @Optional()
     @Inject(forwardRef(() => TriggersService))
     private triggersService: TriggersService,
+    @Optional()
+    @Inject(forwardRef(() => BpmnService))
+    private bpmnService: BpmnService,
     private slaService: SlaService,
   ) {}
 
@@ -173,6 +177,27 @@ export class CommentService {
           );
         } catch (err) {
           this.logger.error(`BPMN trigger error on comment create: ${err.message}`);
+        }
+      }
+
+      // BPMN message correlation: уведомить ожидающие процессы о комментарии
+      // Публикуем только если комментарий НЕ от исполнителя (т.е. от клиента)
+      if (this.bpmnService && entity.assigneeId && entity.assigneeId !== dto.authorId) {
+        try {
+          // service-support-v2: Event-Based Gateway ожидает "client-response"
+          await this.bpmnService.sendMessage('client-response', entityId, {
+            commentId: saved.id,
+            authorId: dto.authorId,
+          });
+          // support-ticket: ожидает "customer-response"
+          await this.bpmnService.sendMessage('customer-response', entityId, {
+            commentId: saved.id,
+            authorId: dto.authorId,
+          });
+          this.logger.debug(`BPMN messages published for entity ${entityId} comment`);
+        } catch (err) {
+          // Не критично — процесс может не ожидать message в этот момент
+          this.logger.debug(`BPMN message publish (non-critical): ${err.message}`);
         }
       }
 

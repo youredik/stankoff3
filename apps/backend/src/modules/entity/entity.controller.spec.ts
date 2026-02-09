@@ -48,6 +48,7 @@ describe('EntityController', () => {
       remove: jest.fn(),
       removeTestData: jest.fn(),
       search: jest.fn(),
+      findForTable: jest.fn(),
       exportToCsv: jest.fn(),
       exportToJson: jest.fn(),
       importFromCsv: jest.fn(),
@@ -287,6 +288,58 @@ describe('EntityController', () => {
       const result = await controller.search('test', '10', mockUser);
 
       expect(result.results).toEqual([]);
+    });
+  });
+
+  describe('findForTable', () => {
+    it('должен вернуть табличные данные', async () => {
+      workspaceService.checkAccess.mockResolvedValue(true);
+      entityService.findForTable.mockResolvedValue({
+        items: [mockEntity],
+        total: 1,
+        page: 1,
+        perPage: 25,
+        totalPages: 1,
+      });
+
+      const result = await controller.findForTable(
+        { workspaceId: 'ws-1' } as any,
+        mockUser,
+      );
+
+      expect(result.items).toEqual([mockEntity]);
+      expect(result.total).toBe(1);
+      expect(result.totalPages).toBe(1);
+    });
+
+    it('должен выбросить ForbiddenException при отсутствии доступа', async () => {
+      workspaceService.checkAccess.mockResolvedValue(false);
+
+      await expect(
+        controller.findForTable({ workspaceId: 'ws-1' } as any, mockUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('должен передать query параметры в сервис', async () => {
+      workspaceService.checkAccess.mockResolvedValue(true);
+      entityService.findForTable.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 2,
+        perPage: 10,
+        totalPages: 0,
+      });
+
+      const query = {
+        workspaceId: 'ws-1',
+        page: 2,
+        perPage: 10,
+        sortBy: 'title',
+        sortOrder: 'ASC' as const,
+      };
+      await controller.findForTable(query as any, mockUser);
+
+      expect(entityService.findForTable).toHaveBeenCalledWith(query);
     });
   });
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Entity, Comment, User, UploadedAttachment } from '@/types';
-import { entitiesApi, type EntityFilters, type KanbanColumnData } from '@/lib/api/entities';
+import { entitiesApi, type EntityFilters, type KanbanColumnData, type TableQueryParams } from '@/lib/api/entities';
 import { commentsApi } from '@/lib/api/comments';
 import { usersApi } from '@/lib/api/users';
 import { useWorkspaceStore } from './useWorkspaceStore';
@@ -20,6 +20,16 @@ interface EntityStore {
   kanbanWorkspaceId: string | null;
   totalAll: number;
 
+  // Table state
+  tableItems: Entity[];
+  tableLoading: boolean;
+  tableTotal: number;
+  tablePage: number;
+  tablePerPage: number;
+  tableTotalPages: number;
+  tableSortBy: string;
+  tableSortOrder: 'ASC' | 'DESC';
+
   // Backward compat flat list (derived from kanbanColumns)
   entities: Entity[];
   loading: boolean;
@@ -32,6 +42,11 @@ interface EntityStore {
   fetchKanban: (workspaceId: string, filters?: EntityFilters) => Promise<void>;
   loadMoreColumn: (statusId: string) => Promise<void>;
   setKanbanFilters: (filters: EntityFilters) => void;
+
+  // Table actions
+  fetchTable: (workspaceId: string, params?: TableQueryParams) => Promise<void>;
+  setTableSort: (sortBy: string, sortOrder: 'ASC' | 'DESC') => void;
+  setTablePage: (page: number) => void;
 
   // Legacy actions (still used by some components)
   fetchEntities: (workspaceId: string) => Promise<void>;
@@ -69,6 +84,15 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
   kanbanFilters: {},
   kanbanWorkspaceId: null,
   totalAll: 0,
+
+  tableItems: [],
+  tableLoading: false,
+  tableTotal: 0,
+  tablePage: 1,
+  tablePerPage: 25,
+  tableTotalPages: 0,
+  tableSortBy: 'createdAt',
+  tableSortOrder: 'DESC',
 
   entities: [],
   loading: false,
@@ -162,6 +186,38 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
     if (kanbanWorkspaceId) {
       fetchKanban(kanbanWorkspaceId, filters);
     }
+  },
+
+  fetchTable: async (workspaceId: string, params?: TableQueryParams) => {
+    set({ tableLoading: true });
+    try {
+      const { tablePage, tablePerPage, tableSortBy, tableSortOrder } = get();
+      const data = await entitiesApi.getTable(workspaceId, {
+        page: params?.page ?? tablePage,
+        perPage: params?.perPage ?? tablePerPage,
+        sortBy: params?.sortBy ?? tableSortBy,
+        sortOrder: params?.sortOrder ?? tableSortOrder,
+        ...params,
+      });
+      set({
+        tableItems: data.items,
+        tableTotal: data.total,
+        tablePage: data.page,
+        tablePerPage: data.perPage,
+        tableTotalPages: data.totalPages,
+        tableLoading: false,
+      });
+    } catch {
+      set({ tableLoading: false });
+    }
+  },
+
+  setTableSort: (sortBy: string, sortOrder: 'ASC' | 'DESC') => {
+    set({ tableSortBy: sortBy, tableSortOrder: sortOrder, tablePage: 1 });
+  },
+
+  setTablePage: (page: number) => {
+    set({ tablePage: page });
   },
 
   // Legacy — redirect to fetchKanban

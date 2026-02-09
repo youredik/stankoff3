@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, LayoutGrid, BarChart3, Menu, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, LayoutGrid, BarChart3, List, Menu, LogOut, ChevronDown } from 'lucide-react';
 import { NotificationPanel } from './NotificationPanel';
 import { GlobalSearch } from './GlobalSearch';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -9,7 +9,7 @@ import { useNotificationStore } from '@/store/useNotificationStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
 
-export type DashboardView = 'kanban' | 'analytics';
+export type DashboardView = 'kanban' | 'table' | 'analytics';
 
 interface HeaderProps {
   currentView?: DashboardView;
@@ -71,6 +71,17 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
               >
                 <LayoutGrid className="w-4 h-4" />
                 <span>Канбан</span>
+              </button>
+              <button
+                onClick={() => onViewChange('table')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  currentView === 'table'
+                    ? 'bg-primary-500 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                <span>Таблица</span>
               </button>
               <button
                 onClick={() => onViewChange('analytics')}

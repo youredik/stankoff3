@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserTasksService } from './user-tasks.service';
 import {
@@ -55,6 +55,8 @@ describe('UserTasksService', () => {
     completionResult: null,
     history: [],
     processVariables: {},
+    reminderSentAt: null,
+    overdueSentAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
@@ -67,8 +69,10 @@ describe('UserTasksService', () => {
     where: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     addOrderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
     getMany: jest.fn(),
+    getManyAndCount: jest.fn(),
     getOne: jest.fn(),
   };
 
@@ -118,6 +122,15 @@ describe('UserTasksService', () => {
           useValue: {
             emitTaskCreated: jest.fn(),
             emitTaskUpdated: jest.fn(),
+          },
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            transaction: jest.fn((fn) => fn({
+              find: jest.fn().mockResolvedValue([]),
+              save: jest.fn(),
+            })),
           },
         },
       ],
@@ -397,12 +410,15 @@ describe('UserTasksService', () => {
   });
 
   describe('findTasks', () => {
-    it('должен фильтровать задачи по workspace', async () => {
-      mockQueryBuilder.getMany.mockResolvedValue([mockTask]);
+    it('должен фильтровать задачи по workspace и возвращать пагинированный результат', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTask], 1]);
 
       const result = await service.findTasks({ workspaceId: 'ws-1' });
 
-      expect(result).toEqual([mockTask]);
+      expect(result.items).toEqual([mockTask]);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.totalPages).toBe(1);
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'task.workspaceId = :workspaceId',
         { workspaceId: 'ws-1' },
@@ -410,7 +426,7 @@ describe('UserTasksService', () => {
     });
 
     it('должен фильтровать по нескольким статусам', async () => {
-      mockQueryBuilder.getMany.mockResolvedValue([mockTask]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTask], 1]);
 
       await service.findTasks({
         status: [UserTaskStatus.CREATED, UserTaskStatus.CLAIMED],
@@ -420,6 +436,18 @@ describe('UserTasksService', () => {
         'task.status IN (:...statuses)',
         { statuses: [UserTaskStatus.CREATED, UserTaskStatus.CLAIMED] },
       );
+    });
+
+    it('должен поддерживать пагинацию', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockTask], 50]);
+
+      const result = await service.findTasks({}, { page: 3, perPage: 10 });
+
+      expect(result.page).toBe(3);
+      expect(result.perPage).toBe(10);
+      expect(result.totalPages).toBe(5);
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(20);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
     });
   });
 });

@@ -9,8 +9,8 @@ import {
   Request,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { IsOptional, IsString, IsNumberString } from 'class-validator';
-import { UserTasksService, TaskFilter } from './user-tasks.service';
+import { IsOptional, IsString, IsNumberString, IsIn } from 'class-validator';
+import { UserTasksService, TaskFilter, PaginationParams } from './user-tasks.service';
 import { UserTaskStatus } from '../entities/user-task.entity';
 
 class TaskFilterDto {
@@ -36,7 +36,21 @@ class TaskFilterDto {
 
   @IsOptional()
   @IsNumberString()
-  limit?: number;
+  page?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  perPage?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['createdAt', 'priority', 'dueDate'])
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['ASC', 'DESC'])
+  sortOrder?: string;
 }
 
 class CompleteTaskDto {
@@ -45,6 +59,15 @@ class CompleteTaskDto {
 
 class DelegateTaskDto {
   toUserId: string;
+}
+
+class BatchClaimDto {
+  taskIds: string[];
+}
+
+class BatchDelegateDto {
+  taskIds: string[];
+  targetUserId: string;
 }
 
 class AddCommentDto {
@@ -57,25 +80,36 @@ export class UserTasksController {
 
   /**
    * Get user's task inbox
-   * GET /api/bpmn/tasks/inbox?workspaceId=xxx&includeCompleted=false
+   * GET /api/bpmn/tasks/inbox?workspaceId=xxx&includeCompleted=false&page=1&perPage=20&sortBy=priority&sortOrder=DESC
    */
   @Get('inbox')
   async getInbox(
     @Request() req: any,
     @Query('workspaceId') workspaceId?: string,
     @Query('includeCompleted') includeCompleted?: string,
+    @Query('page') page?: string,
+    @Query('perPage') perPage?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
   ) {
     const userId = req.user.id;
+    const pagination: PaginationParams = {
+      page: page ? parseInt(page, 10) : undefined,
+      perPage: perPage ? parseInt(perPage, 10) : undefined,
+      sortBy: sortBy as PaginationParams['sortBy'],
+      sortOrder: sortOrder as PaginationParams['sortOrder'],
+    };
     return this.tasksService.getInbox(
       userId,
       workspaceId,
       includeCompleted === 'true',
+      pagination,
     );
   }
 
   /**
    * Search/filter tasks
-   * GET /api/bpmn/tasks?workspaceId=xxx&status=created&...
+   * GET /api/bpmn/tasks?workspaceId=xxx&status=created&page=1&perPage=20&sortBy=createdAt&sortOrder=DESC
    */
   @Get()
   async findTasks(@Query() query: TaskFilterDto) {
@@ -92,7 +126,14 @@ export class UserTasksController {
       filter.status = statuses.length === 1 ? statuses[0] : statuses;
     }
 
-    return this.tasksService.findTasks(filter, query.limit || 100);
+    const pagination: PaginationParams = {
+      page: query.page ? parseInt(query.page, 10) : undefined,
+      perPage: query.perPage ? parseInt(query.perPage, 10) : undefined,
+      sortBy: query.sortBy as PaginationParams['sortBy'],
+      sortOrder: query.sortOrder as PaginationParams['sortOrder'],
+    };
+
+    return this.tasksService.findTasks(filter, pagination);
   }
 
   /**
@@ -102,6 +143,28 @@ export class UserTasksController {
   @Get('statistics')
   async getStatistics(@Query('workspaceId', ParseUUIDPipe) workspaceId: string) {
     return this.tasksService.getTaskStatistics(workspaceId);
+  }
+
+  /**
+   * Batch claim tasks
+   * POST /api/bpmn/tasks/batch/claim
+   */
+  @Post('batch/claim')
+  async batchClaim(@Body() dto: BatchClaimDto, @Request() req: any) {
+    return this.tasksService.batchClaim(dto.taskIds, req.user.id);
+  }
+
+  /**
+   * Batch delegate tasks
+   * POST /api/bpmn/tasks/batch/delegate
+   */
+  @Post('batch/delegate')
+  async batchDelegate(@Body() dto: BatchDelegateDto, @Request() req: any) {
+    return this.tasksService.batchDelegate(
+      dto.taskIds,
+      req.user.id,
+      dto.targetUserId,
+    );
   }
 
   /**

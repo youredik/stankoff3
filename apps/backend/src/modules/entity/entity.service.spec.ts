@@ -685,6 +685,175 @@ describe('EntityService', () => {
     });
   });
 
+  describe('findForTable', () => {
+    const createMockQb = (overrides: Record<string, any> = {}) => ({
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+      getMany: jest.fn().mockResolvedValue([]),
+      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      ...overrides,
+    });
+
+    it('должен вернуть пагинированный список entities', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[mockEntity], 50]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const result = await service.findForTable({
+        workspaceId: 'ws-1',
+        page: 2,
+        perPage: 25,
+      });
+
+      expect(result.items).toEqual([mockEntity]);
+      expect(result.total).toBe(50);
+      expect(result.page).toBe(2);
+      expect(result.perPage).toBe(25);
+      expect(result.totalPages).toBe(2);
+      expect(mockQb.skip).toHaveBeenCalledWith(25);
+      expect(mockQb.take).toHaveBeenCalledWith(25);
+    });
+
+    it('должен использовать значения по умолчанию', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const result = await service.findForTable({ workspaceId: 'ws-1' });
+
+      expect(result.page).toBe(1);
+      expect(result.perPage).toBe(25);
+      expect(result.totalPages).toBe(0);
+      expect(mockQb.skip).toHaveBeenCalledWith(0);
+      expect(mockQb.take).toHaveBeenCalledWith(25);
+    });
+
+    it('должен применять сортировку по title ASC', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForTable({
+        workspaceId: 'ws-1',
+        sortBy: 'title',
+        sortOrder: 'ASC',
+      });
+
+      expect(mockQb.orderBy).toHaveBeenCalledWith('entity.title', 'ASC', 'NULLS LAST');
+    });
+
+    it('должен применять сортировку по priority', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForTable({
+        workspaceId: 'ws-1',
+        sortBy: 'priority',
+        sortOrder: 'ASC',
+      });
+
+      expect(mockQb.orderBy).toHaveBeenCalledWith(
+        expect.stringContaining('CASE'),
+        'ASC',
+      );
+    });
+
+    it('должен применять сортировку по assignee', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForTable({
+        workspaceId: 'ws-1',
+        sortBy: 'assignee',
+        sortOrder: 'ASC',
+      });
+
+      expect(mockQb.orderBy).toHaveBeenCalledWith('assignee.firstName', 'ASC', 'NULLS LAST');
+    });
+
+    it('должен фильтровать по status[]', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForTable({
+        workspaceId: 'ws-1',
+        status: ['new', 'in_progress'],
+      });
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.status IN (:...statuses)',
+        { statuses: ['new', 'in_progress'] },
+      );
+    });
+
+    it('должен переиспользовать фильтры канбана (search, assigneeId, priority, date)', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      await service.findForTable({
+        workspaceId: 'ws-1',
+        search: 'test',
+        assigneeId: ['user-1'],
+        priority: ['high'],
+        dateFrom: '2026-01-01',
+        dateTo: '2026-12-31',
+      });
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('LOWER(entity.title)'),
+        expect.objectContaining({ search: '%test%' }),
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.assigneeId IN (:...assigneeIds)',
+        { assigneeIds: ['user-1'] },
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.priority IN (:...priorities)',
+        { priorities: ['high'] },
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'entity.createdAt >= :dateFrom',
+        { dateFrom: '2026-01-01' },
+      );
+    });
+
+    it('должен корректно считать totalPages', async () => {
+      const mockQb = createMockQb({
+        getManyAndCount: jest.fn().mockResolvedValue([[mockEntity], 51]),
+      });
+      entityRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const result = await service.findForTable({
+        workspaceId: 'ws-1',
+        perPage: 25,
+      });
+
+      expect(result.totalPages).toBe(3); // ceil(51/25) = 3
+    });
+  });
+
   describe('exportToCsv', () => {
     it('должен экспортировать entities в CSV формат', async () => {
       const entityWithAssignee = { ...mockEntity, assignee: mockUser };
@@ -766,6 +935,29 @@ describe('EntityService', () => {
       const result = await service.importFromCsv('ws-1', csv, 'user-1');
 
       expect(result.imported).toBe(1);
+    });
+  });
+
+  describe('auto-classification', () => {
+    it('не должен падать если classifierService не доступен (undefined)', async () => {
+      // ClassifierService не замокан в основном beforeEach (undefined из-за @Optional)
+      // create() должен работать без ошибок
+      const mockManager = {
+        findOne: jest.fn()
+          .mockResolvedValueOnce(mockWorkspace)
+          .mockResolvedValueOnce({ name: 'entity_number', value: 5 }),
+        create: jest.fn().mockReturnValue(mockEntity),
+        save: jest.fn().mockResolvedValue(mockEntity),
+        createQueryBuilder: jest.fn(),
+      };
+      dataSource.transaction.mockImplementation(async (cb) => cb(mockManager as any));
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      automationService.executeRules.mockResolvedValue(undefined);
+
+      const dto = { workspaceId: 'ws-1', title: 'Test Entity', status: 'new', data: {} };
+      const result = await service.create(dto, 'user-1');
+
+      expect(result).toEqual(mockEntity);
     });
   });
 });

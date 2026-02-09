@@ -26,6 +26,14 @@ import {
 export class AiAssistantService {
   private readonly logger = new Logger(AiAssistantService.name);
 
+  // In-memory кэш для результатов getAssistance (TTL 5 мин)
+  private readonly cache = new Map<
+    string,
+    { data: AiAssistantResponse; expiresAt: number }
+  >();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000;
+  private readonly CACHE_MAX_SIZE = 200;
+
   constructor(
     @InjectRepository(WorkspaceEntity)
     private readonly entityRepository: Repository<WorkspaceEntity>,
@@ -51,6 +59,12 @@ export class AiAssistantService {
         similarCases: [],
         suggestedExperts: [],
       };
+    }
+
+    // Проверяем кэш
+    const cached = this.cache.get(entityId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
     }
 
     // Получаем entity
@@ -105,7 +119,7 @@ export class AiAssistantService {
       // Извлекаем ключевые слова
       const keywords = this.extractKeywords(searchResults);
 
-      return {
+      const result: AiAssistantResponse = {
         available: true,
         similarCases,
         suggestedExperts,
@@ -113,6 +127,17 @@ export class AiAssistantService {
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
         keywords: keywords.length > 0 ? keywords : undefined,
       };
+
+      // Сохраняем в кэш
+      this.cache.set(entityId, {
+        data: result,
+        expiresAt: Date.now() + this.CACHE_TTL_MS,
+      });
+      if (this.cache.size > this.CACHE_MAX_SIZE) {
+        this.cleanupCache();
+      }
+
+      return result;
     } catch (error) {
       this.logger.error(`Ошибка AI помощника: ${error.message}`);
       return {
@@ -120,6 +145,25 @@ export class AiAssistantService {
         similarCases: [],
         suggestedExperts: [],
       };
+    }
+  }
+
+  /**
+   * Сброс кэша для entity (при обновлении)
+   */
+  invalidateCache(entityId: string): void {
+    this.cache.delete(entityId);
+  }
+
+  /**
+   * Удаление истёкших записей кэша
+   */
+  private cleanupCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache) {
+      if (entry.expiresAt < now) {
+        this.cache.delete(key);
+      }
     }
   }
 
@@ -306,6 +350,38 @@ export class AiAssistantService {
       if (context.counterpartyName && context.deals) {
         break;
       }
+    }
+
+    // Среднее время решения и основные категории (из всех результатов)
+    const resolutionTimes: number[] = [];
+    const categoryCount = new Map<string, number>();
+
+    for (const result of results) {
+      if (result.sourceType !== 'legacy_request') continue;
+      const metadata = result.metadata || {};
+
+      if (metadata.resolutionTimeHours && typeof metadata.resolutionTimeHours === 'number') {
+        resolutionTimes.push(metadata.resolutionTimeHours);
+      }
+      if (metadata.subject && typeof metadata.subject === 'string') {
+        // Извлекаем основную тему из subject (первые 2-3 слова)
+        const words = metadata.subject.split(/\s+/).slice(0, 3).join(' ');
+        if (words.length >= 3) {
+          categoryCount.set(words, (categoryCount.get(words) || 0) + 1);
+        }
+      }
+    }
+
+    if (resolutionTimes.length > 0) {
+      const avg = resolutionTimes.reduce((a, b) => a + b, 0) / resolutionTimes.length;
+      context.avgResolutionTimeHours = Math.round(avg * 10) / 10;
+    }
+
+    if (categoryCount.size > 0) {
+      context.topCategories = Array.from(categoryCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([cat]) => cat);
     }
 
     return context;

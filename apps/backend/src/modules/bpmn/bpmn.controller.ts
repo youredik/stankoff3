@@ -66,8 +66,38 @@ export class BpmnController {
   @Post('definition/:id/deploy')
   async deployDefinition(
     @Param('id') id: string,
+    @Body() body: { changelog?: string } = {},
+    @Request() req: any,
   ): Promise<ProcessDefinition> {
-    return this.bpmnService.deployDefinition(id);
+    return this.bpmnService.deployDefinition(id, body?.changelog, req.user?.id);
+  }
+
+  // ==================== Version History ====================
+
+  @Get('definition/:id/versions')
+  async getVersionHistory(@Param('id') id: string) {
+    return this.bpmnService.getVersionHistory(id);
+  }
+
+  @Get('definition/:id/versions/:version')
+  async getVersion(
+    @Param('id') id: string,
+    @Param('version') version: string,
+  ) {
+    return this.bpmnService.getVersion(id, parseInt(version, 10));
+  }
+
+  @Post('definition/:id/rollback/:version')
+  async rollbackToVersion(
+    @Param('id') id: string,
+    @Param('version') version: string,
+    @Request() req: any,
+  ) {
+    return this.bpmnService.rollbackToVersion(
+      id,
+      parseInt(version, 10),
+      req.user?.id,
+    );
   }
 
   // ==================== Process Instances ====================
@@ -77,6 +107,13 @@ export class BpmnController {
     @Param('workspaceId') workspaceId: string,
   ): Promise<ProcessInstance[]> {
     return this.bpmnService.findInstancesByWorkspace(workspaceId);
+  }
+
+  @Get('instances/:instanceId/timeline')
+  async getInstanceTimeline(
+    @Param('instanceId') instanceId: string,
+  ) {
+    return this.bpmnService.getInstanceTimeline(instanceId);
   }
 
   @Get('instances/entity/:entityId')

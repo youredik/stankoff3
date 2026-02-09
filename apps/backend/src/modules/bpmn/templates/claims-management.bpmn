@@ -137,6 +137,32 @@
       <bpmn:outgoing>Flow_ToSetRCA</bpmn:outgoing>
     </bpmn:userTask>
 
+    <!-- Boundary Timer: 5 дней на расследование → эскалация (non-interrupting) -->
+    <bpmn:boundaryEvent id="BoundaryTimer_Investigate5d" name="5 дней на расследование" cancelActivity="false" attachedToRef="Task_Investigate">
+      <bpmn:outgoing>Flow_InvestigateTimerToNotify</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_Investigate5d">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Task_NotifyInvestigationDelay" name="Эскалация: расследование затянулось">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= claimsHeadId" target="userId" />
+          <zeebe:input source="= &quot;Расследование рекламации длится более 5 дней. Требуется контроль.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_InvestigateTimerToNotify</bpmn:incoming>
+      <bpmn:outgoing>Flow_InvestigateTimerEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_InvestigateTimerEscalation" name="Эскалация расследования">
+      <bpmn:incoming>Flow_InvestigateTimerEnd</bpmn:incoming>
+    </bpmn:endEvent>
+
     <!-- Статус: Анализ причин -->
     <bpmn:serviceTask id="Task_SetRCA" name="Статус: Анализ причин">
       <bpmn:extensionElements>
@@ -309,6 +335,10 @@
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_ToInvestigate" sourceRef="Task_SetInvestigation" targetRef="Task_Investigate" />
     <bpmn:sequenceFlow id="Flow_ToSetRCA" sourceRef="Task_Investigate" targetRef="Task_SetRCA" />
+
+    <!-- Boundary Timer: 5 дней эскалация расследования -->
+    <bpmn:sequenceFlow id="Flow_InvestigateTimerToNotify" sourceRef="BoundaryTimer_Investigate5d" targetRef="Task_NotifyInvestigationDelay" />
+    <bpmn:sequenceFlow id="Flow_InvestigateTimerEnd" sourceRef="Task_NotifyInvestigationDelay" targetRef="End_InvestigateTimerEscalation" />
     <bpmn:sequenceFlow id="Flow_ToRCA" sourceRef="Task_SetRCA" targetRef="Task_RCA" />
     <bpmn:sequenceFlow id="Flow_ToSeverityGw" sourceRef="Task_RCA" targetRef="Gateway_Severity" />
 

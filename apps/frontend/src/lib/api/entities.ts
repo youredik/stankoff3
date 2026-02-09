@@ -21,6 +21,22 @@ export interface EntityFilters {
   dateTo?: string;
 }
 
+export interface TableResponse {
+  items: Entity[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+}
+
+export interface TableQueryParams extends EntityFilters {
+  page?: number;
+  perPage?: number;
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC';
+  status?: string[];
+}
+
 export const entitiesApi = {
   getByWorkspace: (workspaceId: string) =>
     apiClient
@@ -62,6 +78,19 @@ export const entitiesApi = {
           },
         },
       )
+      .then((r) => r.data),
+
+  getTable: (workspaceId: string, params?: TableQueryParams) =>
+    apiClient
+      .get<TableResponse>('/entities/table', {
+        params: {
+          workspaceId,
+          ...params,
+          assigneeId: params?.assigneeId?.join(',') || undefined,
+          priority: params?.priority?.join(',') || undefined,
+          status: params?.status?.join(',') || undefined,
+        },
+      })
       .then((r) => r.data),
 
   getById: (id: string) =>

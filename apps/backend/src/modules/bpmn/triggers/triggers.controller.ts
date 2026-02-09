@@ -7,10 +7,14 @@ import {
   Body,
   Param,
   Query,
+  Req,
   UseGuards,
   Headers,
   UnauthorizedException,
+  RawBodyRequest,
 } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../user/user.entity';
@@ -119,13 +123,15 @@ export class WebhookTriggersController {
   constructor(private readonly triggersService: TriggersService) {}
 
   /**
-   * Handle incoming webhook
+   * Handle incoming webhook with HMAC-SHA256 or plain secret validation
    */
   @Post(':triggerId')
   async handleWebhook(
     @Param('triggerId') triggerId: string,
     @Body() body: any,
+    @Req() req: Request,
     @Headers('x-webhook-secret') secret?: string,
+    @Headers('x-webhook-signature') signature?: string,
   ) {
     const trigger = await this.triggersService.findOne(triggerId);
 
@@ -134,10 +140,16 @@ export class WebhookTriggersController {
       throw new UnauthorizedException('Not a webhook trigger');
     }
 
-    // Validate secret if configured
+    // Validate authentication if secret is configured
     if (trigger.conditions.secret) {
-      if (secret !== trigger.conditions.secret) {
-        throw new UnauthorizedException('Invalid webhook secret');
+      if (signature) {
+        // HMAC-SHA256 validation (preferred): X-Webhook-Signature: sha256=<hex>
+        this.validateHmacSignature(trigger.conditions.secret, signature, req.body);
+      } else if (secret) {
+        // Fallback: plain secret comparison (X-Webhook-Secret header)
+        this.validatePlainSecret(trigger.conditions.secret, secret);
+      } else {
+        throw new UnauthorizedException('Missing webhook authentication');
       }
     }
 
@@ -153,5 +165,52 @@ export class WebhookTriggersController {
     );
 
     return { success: true };
+  }
+
+  /**
+   * Validate HMAC-SHA256 signature.
+   * Expected header format: sha256=<hex_digest>
+   */
+  private validateHmacSignature(
+    secret: string,
+    signatureHeader: string,
+    body: any,
+  ): void {
+    const prefix = 'sha256=';
+    if (!signatureHeader.startsWith(prefix)) {
+      throw new UnauthorizedException('Invalid signature format. Expected: sha256=<hex>');
+    }
+
+    const receivedSig = signatureHeader.slice(prefix.length);
+    const payload = typeof body === 'string' ? body : JSON.stringify(body);
+    const expectedSig = createHmac('sha256', secret)
+      .update(payload)
+      .digest('hex');
+
+    // Timing-safe comparison to prevent timing attacks
+    const receivedBuf = Buffer.from(receivedSig, 'hex');
+    const expectedBuf = Buffer.from(expectedSig, 'hex');
+
+    if (
+      receivedBuf.length !== expectedBuf.length ||
+      !timingSafeEqual(receivedBuf, expectedBuf)
+    ) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
+  }
+
+  /**
+   * Validate plain secret (legacy, kept for backwards compatibility)
+   */
+  private validatePlainSecret(expected: string, received: string): void {
+    const expectedBuf = Buffer.from(expected);
+    const receivedBuf = Buffer.from(received);
+
+    if (
+      expectedBuf.length !== receivedBuf.length ||
+      !timingSafeEqual(expectedBuf, receivedBuf)
+    ) {
+      throw new UnauthorizedException('Invalid webhook secret');
+    }
   }
 }

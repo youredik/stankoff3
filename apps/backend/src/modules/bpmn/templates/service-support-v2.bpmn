@@ -138,6 +138,32 @@
       <bpmn:outgoing>Flow_ToDecision</bpmn:outgoing>
     </bpmn:userTask>
 
+    <!-- Boundary Timer: 4 часа без активности → уведомление руководителю (non-interrupting) -->
+    <bpmn:boundaryEvent id="BoundaryTimer_Work4h" name="4ч без активности" cancelActivity="false" attachedToRef="Task_Work">
+      <bpmn:outgoing>Flow_WorkTimerToNotify</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_Work4h">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT4H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Task_NotifySupervisorDelay" name="Уведомить руководителя: задержка">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-notification" />
+        <zeebe:ioMapping>
+          <zeebe:input source="= l1SupervisorId" target="userId" />
+          <zeebe:input source="= &quot;Заявка в работе более 4 часов без решения. Требуется внимание.&quot;" target="message" />
+          <zeebe:input source="= entityId" target="entityId" />
+          <zeebe:input source="= workspaceId" target="workspaceId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_WorkTimerToNotify</bpmn:incoming>
+      <bpmn:outgoing>Flow_WorkTimerEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_WorkTimerEscalation" name="Эскалация отправлена">
+      <bpmn:incoming>Flow_WorkTimerEnd</bpmn:incoming>
+    </bpmn:endEvent>
+
     <!-- Развилка: Решение -->
     <bpmn:exclusiveGateway id="Gateway_Decision" name="Решение">
       <bpmn:incoming>Flow_ToDecision</bpmn:incoming>
@@ -406,6 +432,10 @@
     <bpmn:sequenceFlow id="Flow_ToSetInProgress" sourceRef="Task_NotifyAssignee" targetRef="Task_SetInProgress" />
     <bpmn:sequenceFlow id="Flow_ToWork" sourceRef="Task_SetInProgress" targetRef="Task_Work" />
     <bpmn:sequenceFlow id="Flow_ToDecision" sourceRef="Task_Work" targetRef="Gateway_Decision" />
+
+    <!-- Boundary Timer: 4ч эскалация -->
+    <bpmn:sequenceFlow id="Flow_WorkTimerToNotify" sourceRef="BoundaryTimer_Work4h" targetRef="Task_NotifySupervisorDelay" />
+    <bpmn:sequenceFlow id="Flow_WorkTimerEnd" sourceRef="Task_NotifySupervisorDelay" targetRef="End_WorkTimerEscalation" />
 
     <!-- Ветка: Нужна информация -->
     <bpmn:sequenceFlow id="Flow_NeedInfo" name="Нужна информация" sourceRef="Gateway_Decision" targetRef="Task_SetWaitingClient">
