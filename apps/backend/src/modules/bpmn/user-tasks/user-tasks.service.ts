@@ -83,7 +83,7 @@ export class UserTasksService {
     // Filter by candidate groups - user must be member of at least one group
     if (filter.candidateGroups && filter.candidateGroups.length > 0) {
       qb.andWhere(
-        '(task.candidateGroups && ARRAY[:...groups]::varchar[] OR task.assigneeId IS NOT NULL)',
+        '(task.candidateGroups && ARRAY[:...groups]::text[] OR task.assigneeId IS NOT NULL)',
         { groups: filter.candidateGroups },
       );
     }
@@ -124,7 +124,7 @@ export class UserTasksService {
     // 2. User is in candidateUsers array, OR
     // 3. User is member of a candidate group
     qb.andWhere(
-      '(task.assigneeId = :userId OR :userId = ANY(task.candidateUsers) OR task.candidateGroups && ARRAY[:...groups]::varchar[])',
+      '(task.assigneeId = :userId OR :userId = ANY(task.candidateUsers) OR task.candidateGroups && ARRAY[:...groups]::text[])',
       { userId, groups: groupNames.length > 0 ? groupNames : ['__none__'] },
     );
 

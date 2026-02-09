@@ -154,10 +154,11 @@ export class EntityService {
   }
 
   private applyKanbanSort(qb: SelectQueryBuilder<WorkspaceEntity>): void {
-    qb.orderBy(
+    qb.addSelect(
       `CASE "priority" WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END`,
-      'ASC',
+      'priority_order',
     )
+      .orderBy('"priority_order"', 'ASC')
       .addOrderBy('entity.createdAt', 'DESC');
   }
 
