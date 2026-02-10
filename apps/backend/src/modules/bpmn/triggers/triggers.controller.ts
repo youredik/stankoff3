@@ -16,6 +16,7 @@ import {
 import { createHmac, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Public } from '../../auth/decorators/public.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../user/user.entity';
 import { TriggersService } from './triggers.service';
@@ -116,8 +117,9 @@ export class TriggersController {
 }
 
 /**
- * Controller for webhook triggers (no auth required)
+ * Controller for webhook triggers (no auth required — uses HMAC/secret validation)
  */
+@Public()
 @Controller('bpmn/triggers/webhook')
 export class WebhookTriggersController {
   constructor(private readonly triggersService: TriggersService) {}

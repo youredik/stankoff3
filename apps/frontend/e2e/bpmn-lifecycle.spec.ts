@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { sidebar } from './helpers/selectors';
+import { selectFirstWorkspace, navigateToProcesses, dismissToasts } from './helpers/test-utils';
 
 /**
  * BPMN Lifecycle E2E Tests
@@ -14,77 +16,13 @@ import { test, expect } from '@playwright/test';
  * docker compose -f docker-compose.camunda.yml up -d
  */
 
-// Хелперы
-const navigateToWorkspace = async (page: any) => {
-  await page.goto('/');
-  await page.waitForTimeout(1000);
-  const workspaceButton = page.locator('aside .group button').first();
-  const hasWorkspace = await workspaceButton.isVisible().catch(() => false);
-  if (hasWorkspace) {
-    await workspaceButton.click();
-    await page.waitForTimeout(500);
-    return true;
-  }
-  return false;
-};
-
-const navigateToProcesses = async (page: any, workspaceId?: string) => {
-  if (workspaceId) {
-    await page.goto(`/workspace/${workspaceId}/processes`);
-  } else {
-    // Navigate through UI
-    await page.goto('/');
-    await page.waitForTimeout(1000);
-
-    // Find workspace in sidebar and look for processes link
-    const workspaceItem = page.locator('aside .group').first();
-    const hasWorkspace = await workspaceItem.isVisible().catch(() => false);
-
-    if (!hasWorkspace) {
-      return false;
-    }
-
-    // Click on workspace first
-    await workspaceItem.locator('button').first().click();
-    await page.waitForTimeout(500);
-
-    // Look for processes link in header or sidebar
-    const processesLink = page.getByText(/Бизнес-процессы|Процессы|Processes/i);
-    const hasProcesses = await processesLink.isVisible().catch(() => false);
-
-    if (hasProcesses) {
-      await processesLink.click();
-      await page.waitForTimeout(1000);
-      return true;
-    }
-  }
-
-  await page.waitForTimeout(1000);
-  return true;
-};
-
-const waitForToastsToDisappear = async (page: any) => {
-  const maxAttempts = 10;
-  for (let i = 0; i < maxAttempts; i++) {
-    const closeButton = page.locator('.fixed.top-4.right-4 button').first();
-    const isVisible = await closeButton.isVisible().catch(() => false);
-    if (isVisible) {
-      await closeButton.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(100);
-    } else {
-      break;
-    }
-  }
-  await page.waitForTimeout(300);
-};
-
 // ============================================================================
 // ТЕСТЫ СТАТУСА CAMUNDA/ZEEBE
 // ============================================================================
 test.describe('BPMN Health Status', () => {
   test('Проверка статуса подключения к Camunda', async ({ page }) => {
     // Navigate to any workspace first, then to processes
-    const hasWorkspace = await navigateToWorkspace(page);
+    const hasWorkspace = await selectFirstWorkspace(page);
     if (!hasWorkspace) {
       test.skip();
       return;
@@ -115,9 +53,9 @@ test.describe('BPMN Health Status', () => {
     expect(isConnected || isDisconnected).toBe(true);
 
     if (isConnected) {
-      console.log('✅ Camunda/Zeebe is connected');
+      console.log('Camunda/Zeebe is connected');
     } else {
-      console.log('⚠️ Camunda/Zeebe is not connected - some tests may be limited');
+      console.log('Camunda/Zeebe is not connected - some tests may be limited');
     }
   });
 });
@@ -127,7 +65,7 @@ test.describe('BPMN Health Status', () => {
 // ============================================================================
 test.describe('Process Definitions List', () => {
   test('Просмотр списка определений процессов', async ({ page }) => {
-    const hasWorkspace = await navigateToWorkspace(page);
+    const hasWorkspace = await selectFirstWorkspace(page);
     if (!hasWorkspace) {
       test.skip();
       return;
@@ -158,7 +96,7 @@ test.describe('Process Definitions List', () => {
   });
 
   test('Переключение между вкладками Определения и Экземпляры', async ({ page }) => {
-    const hasWorkspace = await navigateToWorkspace(page);
+    const hasWorkspace = await selectFirstWorkspace(page);
     if (!hasWorkspace) {
       test.skip();
       return;
@@ -202,7 +140,7 @@ test.describe('Process Definition Lifecycle', () => {
 
     test.beforeAll(async ({ browser }) => {
       const page = await browser.newPage();
-      const hasWorkspace = await navigateToWorkspace(page);
+      const hasWorkspace = await selectFirstWorkspace(page);
 
       if (hasWorkspace) {
         const url = page.url();
@@ -387,7 +325,7 @@ test.describe('Process Definition Lifecycle', () => {
 // ============================================================================
 test.describe('Process Templates', () => {
   test('Просмотр доступных шаблонов', async ({ page }) => {
-    const hasWorkspace = await navigateToWorkspace(page);
+    const hasWorkspace = await selectFirstWorkspace(page);
     if (!hasWorkspace) {
       test.skip();
       return;
@@ -436,7 +374,7 @@ test.describe('Process Templates', () => {
 // ============================================================================
 test.describe('Process Instances', () => {
   test('Просмотр списка экземпляров', async ({ page }) => {
-    const hasWorkspace = await navigateToWorkspace(page);
+    const hasWorkspace = await selectFirstWorkspace(page);
     if (!hasWorkspace) {
       test.skip();
       return;
@@ -475,13 +413,13 @@ test.describe('Process Instances', () => {
 // ============================================================================
 test.describe('BPMN Integration with Entity', () => {
   test('Проверка возможности запуска процесса из карточки заявки', async ({ page }) => {
-    const hasWorkspace = await navigateToWorkspace(page);
+    const hasWorkspace = await selectFirstWorkspace(page);
     if (!hasWorkspace) {
       test.skip();
       return;
     }
 
-    await waitForToastsToDisappear(page);
+    await dismissToasts(page);
 
     // Create entity first
     const uniqueName = `BPMN Test Entity ${Date.now()}`;

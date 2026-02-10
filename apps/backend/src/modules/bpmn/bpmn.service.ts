@@ -386,7 +386,8 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
       bpmnProcessId: definition.processId,
       variables: {
         ...variables,
-        entityId: options.entityId,
+        // entityId из options имеет приоритет; если не передан — оставляем из variables
+        ...(options.entityId !== undefined ? { entityId: options.entityId } : {}),
         workspaceId: definition.workspaceId,
       },
     });

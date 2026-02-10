@@ -184,6 +184,7 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-entity-title"
+          data-testid="create-entity-modal"
           className={`bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-[90vw] max-h-[85vh] flex flex-col ${
             hasCustomFields ? 'w-[600px]' : 'w-[440px]'
           }`}
@@ -209,6 +210,7 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
                 id="entity-title"
                 name="title"
                 type="text"
+                data-testid="create-entity-title-input"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmit()}
@@ -289,6 +291,7 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
             <button
               onClick={handleSubmit}
               disabled={!title.trim() || submitting || requiredFieldsMissing}
+              data-testid="create-entity-submit"
               className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Создаём…' : 'Создать заявку'}

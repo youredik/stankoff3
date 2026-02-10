@@ -245,6 +245,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     return (
       <div
         key={workspace.id}
+        data-testid="sidebar-workspace-item"
         className={`group relative flex items-center rounded transition-colors ${
           selectedWorkspace === workspace.id
             ? 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-500/30'
@@ -253,6 +254,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
       >
         <button
           onClick={() => handleWorkspaceChange(workspace.id)}
+          data-testid="sidebar-workspace-button"
           className={`flex-1 flex items-center gap-3 px-3 py-2 cursor-pointer ${
             selectedWorkspace === workspace.id
               ? 'text-primary-600 dark:text-primary-400'
@@ -281,6 +283,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                 setMenuOpen(menuOpen === workspace.id ? null : workspace.id);
               }}
               aria-label="Меню рабочего места"
+              data-testid="sidebar-workspace-menu"
               className="p-1.5 mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
             >
               <MoreVertical className="w-4 h-4" />
@@ -378,7 +381,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     const isEditing = editingSectionId === section.id;
 
     return (
-      <div key={section.id} className="mb-2">
+      <div key={section.id} data-testid="sidebar-section" className="mb-2">
         {/* Заголовок раздела */}
         <div className="group flex items-center gap-1 px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800/50">
           {isEditing ? (
@@ -409,6 +412,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
           ) : (
             <button
               onClick={() => toggleSectionCollapsed(section.id)}
+              data-testid="sidebar-section-toggle"
               className="flex-1 flex items-center gap-1 text-left cursor-pointer"
             >
               <span className="p-0.5 text-gray-400">
@@ -538,6 +542,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
       )}
 
       <aside
+        data-testid="sidebar"
         className={`
           fixed lg:static inset-y-0 left-0 z-50
           w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
@@ -564,6 +569,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
               <button
                 onClick={() => handleCreateWorkspace()}
                 disabled={creating}
+                data-testid="sidebar-create-workspace"
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-500 text-white text-sm font-medium rounded hover:bg-primary-600 transition-colors disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" />
@@ -617,6 +623,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                 router.push('/tasks');
                 close();
               }}
+              data-testid="sidebar-inbox-button"
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer ${
                 pathname === '/tasks'
                   ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
@@ -626,7 +633,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
               <div className="relative">
                 <Inbox className="w-5 h-5" />
                 {inboxCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary-500 text-white text-[10px] font-semibold flex items-center justify-center rounded-full px-1">
+                  <span data-testid="sidebar-inbox-count" className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary-500 text-white text-[10px] font-semibold flex items-center justify-center rounded-full px-1">
                     {inboxCount > 9 ? '9+' : inboxCount}
                   </span>
                 )}
@@ -658,6 +665,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
               </div>
               <button
                 onClick={() => router.push('/admin/users')}
+                data-testid="sidebar-admin-link"
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
               >
                 <Users className="w-5 h-5" />
@@ -680,6 +688,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             <button
               onClick={handleLogout}
               aria-label="Выйти из системы"
+              data-testid="sidebar-logout"
               className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
               title="Выйти"
             >

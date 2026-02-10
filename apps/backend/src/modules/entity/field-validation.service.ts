@@ -27,17 +27,28 @@ interface ValidationError {
   message: string;
 }
 
+// Системные поля — хранятся в DTO верхнего уровня, а не в data
+const SYSTEM_FIELD_TYPES = ['status'];
+const SYSTEM_FIELD_IDS = ['title', 'assignee', 'priority'];
+
 @Injectable()
 export class FieldValidationService {
   /**
-   * Валидирует data по полям workspace.
+   * Валидирует data по кастомным полям workspace.
+   * Системные поля (title, status, assignee, priority) исключены — они в DTO.
    * Бросает BadRequestException если есть ошибки.
    */
   validateEntityData(
     data: Record<string, any>,
     sections: WorkspaceSections[],
   ): void {
-    const fields = sections.flatMap((s) => s.fields);
+    const fields = sections
+      .flatMap((s) => s.fields)
+      .filter(
+        (f) =>
+          !SYSTEM_FIELD_TYPES.includes(f.type) &&
+          !SYSTEM_FIELD_IDS.includes(f.id),
+      );
     const errors = this.validate(data, fields);
 
     if (errors.length > 0) {

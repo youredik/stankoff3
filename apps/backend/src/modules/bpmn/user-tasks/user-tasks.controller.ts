@@ -9,7 +9,7 @@ import {
   Request,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { IsOptional, IsString, IsNumberString, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsNumberString, IsIn, IsObject, IsArray, IsUUID } from 'class-validator';
 import { UserTasksService, TaskFilter, PaginationParams } from './user-tasks.service';
 import { UserTaskStatus } from '../entities/user-task.entity';
 
@@ -54,23 +54,33 @@ class TaskFilterDto {
 }
 
 class CompleteTaskDto {
-  formData: Record<string, any>;
+  @IsOptional()
+  @IsObject()
+  formData?: Record<string, any>;
 }
 
 class DelegateTaskDto {
+  @IsUUID()
   toUserId: string;
 }
 
 class BatchClaimDto {
+  @IsArray()
+  @IsUUID(undefined, { each: true })
   taskIds: string[];
 }
 
 class BatchDelegateDto {
+  @IsArray()
+  @IsUUID(undefined, { each: true })
   taskIds: string[];
+
+  @IsUUID()
   targetUserId: string;
 }
 
 class AddCommentDto {
+  @IsString()
   content: string;
 }
 

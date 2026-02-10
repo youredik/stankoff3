@@ -131,6 +131,7 @@ describe('UserTasksService', () => {
               find: jest.fn().mockResolvedValue([]),
               save: jest.fn(),
             })),
+            query: jest.fn().mockResolvedValue([{ role: 'employee' }]),
           },
         },
       ],

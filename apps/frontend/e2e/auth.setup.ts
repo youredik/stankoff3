@@ -3,28 +3,23 @@ import path from 'path';
 
 export const STORAGE_STATE = path.join(__dirname, '../.auth/user.json');
 
-// ВРЕМЕННО ОТКЛЮЧЕНО: тесты авторизации не совместимы с Keycloak SSO
-// Страница /login теперь автоматически редиректит на Keycloak без формы email/password
-setup.skip('authenticate', async ({ page }) => {
-  // Переходим на страницу логина
+setup('authenticate', async ({ page }) => {
+  // Переходим на страницу логина (dev mode показывает карточки пользователей)
   await page.goto('/login');
 
-  // Ждём загрузки формы
-  await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10000 });
+  // Ждём загрузки карточек dev-пользователей
+  await expect(page.getByText('Выберите пользователя для входа')).toBeVisible({ timeout: 15000 });
 
-  // Заполняем форму
-  await page.fill('input[type="email"]', 'admin@stankoff.ru');
-  await page.fill('input[type="password"]', 'password');
-
-  // Отправляем форму
-  await page.click('button[type="submit"]');
+  // Кликаем на admin пользователя
+  const adminCard = page.locator('button').filter({ hasText: 'admin@stankoff.ru' });
+  await adminCard.click();
 
   // Ждём редиректа на dashboard
   await page.waitForURL('**/dashboard', { timeout: 15000 });
 
-  // Проверяем что авторизация успешна
+  // Проверяем что авторизация успешна — sidebar виден
   await expect(page.locator('aside')).toBeVisible({ timeout: 10000 });
 
-  // Сохраняем состояние авторизации
+  // Сохраняем состояние авторизации (cookies + localStorage)
   await page.context().storageState({ path: STORAGE_STATE });
 });

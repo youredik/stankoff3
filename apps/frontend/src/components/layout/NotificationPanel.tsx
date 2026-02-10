@@ -83,7 +83,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
     <>
       {/* Backdrop for closing on outside click */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-6 top-16 w-96 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 shadow-xl z-50">
+      <div data-testid="notification-panel" className="absolute right-6 top-16 w-96 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 shadow-xl z-50">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bell className="w-5 h-5 text-gray-400" />
@@ -98,6 +98,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
           {unreadCount > 0 && (
             <button
               onClick={markAllRead}
+              data-testid="notification-mark-all-read"
               className="text-xs text-primary-400 hover:text-primary-300 cursor-pointer"
             >
               Прочитать все
@@ -170,6 +171,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
           return (
             <div
               key={notif.id}
+              data-testid="notification-item"
               onClick={() => handleNotificationClick(notif.id, notif.entityId)}
               className={`p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer flex items-start gap-3 transition-colors ${
                 notif.urgent && !notif.read

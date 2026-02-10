@@ -186,7 +186,7 @@ export function FilterPanel({
     <>
       <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
 
-      <div className="fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-900 shadow-xl z-50 flex flex-col">
+      <div data-testid="filter-panel" className="fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-900 shadow-xl z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">
@@ -196,6 +196,7 @@ export function FilterPanel({
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}
+                data-testid="filter-reset-button"
                 className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 cursor-pointer"
               >
                 Сбросить
@@ -241,6 +242,7 @@ export function FilterPanel({
                     value={filters.search}
                     onChange={(e) => updateFilter('search', e.target.value)}
                     placeholder="Поиск по названию..."
+                    data-testid="filter-search-input"
                     className={inputClass}
                   />
                 </div>

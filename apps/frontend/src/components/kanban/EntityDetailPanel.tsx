@@ -328,15 +328,17 @@ export function EntityDetailPanel() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="entity-detail-title"
+          data-testid="entity-detail-panel"
           className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-xl w-[95vw] h-[95vh] flex flex-col pointer-events-auto"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
+              <span data-testid="entity-custom-id" className="text-xs font-mono bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
                 {selectedEntity.customId}
               </span>
               <span
+                data-testid="entity-priority-section"
                 className={`text-xs font-medium px-2 py-1 rounded border ${priorityColor}`}
               >
                 {priorityLabel}
@@ -353,6 +355,7 @@ export function EntityDetailPanel() {
             <button
               onClick={deselectEntity}
               aria-label="Закрыть панель"
+              data-testid="entity-close-button"
               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
             >
               <X className="w-5 h-5 text-gray-400" />
@@ -364,7 +367,7 @@ export function EntityDetailPanel() {
             {/* Left column: title, description, custom fields */}
             <div className="flex-1 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
               <div className="p-6">
-                <h2 id="entity-detail-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <h2 id="entity-detail-title" data-testid="entity-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   {selectedEntity.title}
                 </h2>
 
@@ -408,7 +411,7 @@ export function EntityDetailPanel() {
             </div>
 
             {/* Center column: comments & history */}
-            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <div data-testid="entity-comments-section" className="flex-1 flex flex-col overflow-hidden min-w-0">
               {/* Tabs */}
               <div className="flex items-center gap-4 px-6 pt-4 border-b border-gray-200 dark:border-gray-700">
                 <button
@@ -479,7 +482,7 @@ export function EntityDetailPanel() {
             <div className="w-[280px] flex-shrink-0 border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-y-auto">
               <div className="p-5 space-y-5">
                 {/* Status */}
-                <div>
+                <div data-testid="entity-status-section">
                   <p className="text-xs font-medium text-gray-500 uppercase mb-2">
                     Статус
                   </p>
@@ -516,7 +519,7 @@ export function EntityDetailPanel() {
                 </div>
 
                 {/* Assignee */}
-                <div>
+                <div data-testid="entity-assignee-section">
                   <p className="text-xs font-medium text-gray-500 uppercase mb-2">
                     Исполнитель
                   </p>

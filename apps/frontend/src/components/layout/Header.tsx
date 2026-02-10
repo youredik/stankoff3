@@ -43,7 +43,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
+    <header data-testid="header" className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
       <div className="px-4 lg:px-6 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Mobile menu button */}
@@ -63,6 +63,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
             <div className="flex items-center gap-1 mx-6 p-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
               <button
                 onClick={() => onViewChange('kanban')}
+                data-testid="view-toggle-kanban"
                 className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                   currentView === 'kanban'
                     ? 'bg-primary-500 text-white'
@@ -74,6 +75,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
               </button>
               <button
                 onClick={() => onViewChange('table')}
+                data-testid="view-toggle-table"
                 className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                   currentView === 'table'
                     ? 'bg-primary-500 text-white'
@@ -85,6 +87,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
               </button>
               <button
                 onClick={() => onViewChange('analytics')}
+                data-testid="view-toggle-analytics"
                 className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                   currentView === 'analytics'
                     ? 'bg-primary-500 text-white'
@@ -126,6 +129,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
+                data-testid="user-menu-button"
                 className="flex items-center gap-3 px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
               >
                 <div className="w-8 h-8 bg-primary-500 rounded flex items-center justify-center">

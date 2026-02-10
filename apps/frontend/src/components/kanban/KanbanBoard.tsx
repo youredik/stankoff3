@@ -178,7 +178,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   }
 
   return (
-    <div>
+    <div data-testid="kanban-board">
       <div>
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -200,6 +200,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                 onClick={() => setShowFilters(true)}
                 aria-label="Открыть фильтры"
                 aria-expanded={showFilters}
+                data-testid="kanban-filter-button"
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors cursor-pointer backdrop-blur-sm ${
                   activeFilterCount > 0
                     ? 'border-primary-300 dark:border-primary-700 bg-primary-50/80 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
@@ -238,6 +239,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                 <button
                   onClick={() => setShowCreateModal(true)}
                   aria-label="Создать новую заявку"
+                  data-testid="kanban-new-entity-button"
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
                 >
                   <Plus className="w-5 h-5" />
@@ -249,7 +251,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         </div>
 
         {!canEditEntities && currentRole && (
-          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+          <div data-testid="kanban-view-mode-badge" className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
             <Eye className="w-4 h-4" />
             <span className="text-sm">Режим просмотра — вы можете просматривать заявки, но не можете их редактировать</span>
           </div>

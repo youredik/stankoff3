@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../user/user.entity';
+import { User, UserRole } from '../user/user.entity';
 import { OnboardingService } from './onboarding.service';
 import {
   CreateTourDto,
@@ -30,13 +30,6 @@ import { OnboardingStep } from './entities/onboarding-step.entity';
 import { OnboardingProgress } from './entities/onboarding-progress.entity';
 import { OnboardingQuiz } from './entities/onboarding-quiz.entity';
 
-interface CurrentUserPayload {
-  sub: string;
-  email: string;
-  role?: string;
-  department?: string;
-}
-
 @Controller('onboarding')
 export class OnboardingController {
   private readonly logger = new Logger(OnboardingController.name);
@@ -52,15 +45,15 @@ export class OnboardingController {
    */
   @Get('status')
   async getMyStatus(
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<UserOnboardingStatusResponse> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
     return this.onboardingService.getUserOnboardingStatus(
-      user.sub,
+      user.id,
       user.role,
-      user.department,
+      user.department ?? undefined,
     );
   }
 
@@ -71,15 +64,15 @@ export class OnboardingController {
    */
   @Get('auto-start')
   async getAutoStartTours(
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<OnboardingTour[]> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
     return this.onboardingService.getAutoStartTours(
-      user.sub,
+      user.id,
       user.role,
-      user.department,
+      user.department ?? undefined,
     );
   }
 
@@ -101,12 +94,12 @@ export class OnboardingController {
   @Post('tours/:tourId/start')
   async startTour(
     @Param('tourId') tourId: string,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<OnboardingProgress> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
-    return this.onboardingService.startTour(user.sub, tourId);
+    return this.onboardingService.startTour(user.id, tourId);
   }
 
   /**
@@ -118,12 +111,12 @@ export class OnboardingController {
   async completeStep(
     @Param('tourId') tourId: string,
     @Body() dto: CompleteStepDto,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<OnboardingProgress> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
-    return this.onboardingService.completeStep(user.sub, tourId, dto);
+    return this.onboardingService.completeStep(user.id, tourId, dto);
   }
 
   /**
@@ -134,12 +127,12 @@ export class OnboardingController {
   @Post('tours/:tourId/skip')
   async skipTour(
     @Param('tourId') tourId: string,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<OnboardingProgress> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
-    return this.onboardingService.skipTour(user.sub, tourId);
+    return this.onboardingService.skipTour(user.id, tourId);
   }
 
   /**
@@ -151,12 +144,12 @@ export class OnboardingController {
   async submitQuiz(
     @Param('tourId') tourId: string,
     @Body() dto: SubmitQuizDto,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<QuizResultResponse> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
-    return this.onboardingService.submitQuiz(user.sub, tourId, dto);
+    return this.onboardingService.submitQuiz(user.id, tourId, dto);
   }
 
   /**

@@ -10,6 +10,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { User } from '../user/user.entity';
 import { ClassifierService } from './services/classifier.service';
 import { KnowledgeBaseService } from './services/knowledge-base.service';
 import { RagIndexerService, IndexingStats } from './services/rag-indexer.service';
@@ -28,11 +29,6 @@ import {
   GeneratedResponseDto,
 } from './dto/ai.dto';
 import { AiClassification } from './entities/ai-classification.entity';
-
-interface CurrentUserPayload {
-  sub: string;
-  email: string;
-}
 
 @Controller('ai')
 export class AiController {
@@ -73,7 +69,7 @@ export class AiController {
   @Post('classify')
   async classify(
     @Body() dto: ClassifyRequestDto,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<ClassifyResponseDto> {
     if (!this.classifierService.isAvailable()) {
       throw new HttpException(
@@ -83,7 +79,7 @@ export class AiController {
     }
 
     try {
-      return await this.classifierService.classify(dto, user?.sub);
+      return await this.classifierService.classify(dto, user?.id);
     } catch (error) {
       this.logger.error(`Ошибка классификации: ${error}`);
       throw new HttpException(
@@ -102,7 +98,7 @@ export class AiController {
   async classifyAndSave(
     @Param('entityId') entityId: string,
     @Body() dto: ClassifyRequestDto,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<AiClassification> {
     if (!this.classifierService.isAvailable()) {
       throw new HttpException(
@@ -112,7 +108,7 @@ export class AiController {
     }
 
     try {
-      return await this.classifierService.classifyAndSave(entityId, dto, user?.sub);
+      return await this.classifierService.classifyAndSave(entityId, dto, user?.id);
     } catch (error) {
       this.logger.error(`Ошибка классификации entity ${entityId}: ${error}`);
       throw new HttpException(
@@ -150,15 +146,15 @@ export class AiController {
   @Post('classification/:entityId/apply')
   async applyClassification(
     @Param('entityId') entityId: string,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<AiClassification | null> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
 
     const result = await this.classifierService.applyClassification(
       entityId,
-      user.sub,
+      user.id,
     );
 
     if (!result) {
@@ -182,7 +178,7 @@ export class AiController {
   @Post('search')
   async search(
     @Body() dto: SearchRequestDto,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<SearchResultDto> {
     if (!this.knowledgeBaseService.isAvailable()) {
       throw new HttpException(
@@ -198,7 +194,7 @@ export class AiController {
         sourceType: dto.sourceType as 'entity' | 'comment' | 'document' | 'faq' | 'legacy_request',
         limit: dto.limit,
         minSimilarity: dto.minSimilarity,
-        userId: user?.sub,
+        userId: user?.id,
       });
 
       // Добавляем legacy ссылки к результатам
@@ -319,9 +315,9 @@ export class AiController {
   @Post('indexer/start')
   async startIndexing(
     @Body() options: { batchSize?: number; maxRequests?: number },
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<{ message: string; status: IndexingStats }> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
 
@@ -377,14 +373,14 @@ export class AiController {
   @Post('indexer/reindex/:requestId')
   async reindexRequest(
     @Param('requestId') requestId: string,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<{
     requestId: number;
     chunksCreated: number;
     success: boolean;
     error?: string;
   }> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
 
@@ -419,9 +415,9 @@ export class AiController {
   @Get('assist/:entityId')
   async getAssistance(
     @Param('entityId') entityId: string,
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<AiAssistantResponse> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
 
@@ -440,9 +436,9 @@ export class AiController {
   async suggestResponse(
     @Param('entityId') entityId: string,
     @Body() body: { additionalContext?: string },
-    @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser() user: User,
   ): Promise<GeneratedResponseDto> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
 
@@ -472,9 +468,9 @@ export class AiController {
     @Query('days') days?: string,
     @Query('provider') provider?: string,
     @Query('operation') operation?: string,
-    @CurrentUser() user?: CurrentUserPayload,
+    @CurrentUser() user?: User,
   ): Promise<UsageStatsDto> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
 
@@ -504,7 +500,7 @@ export class AiController {
     @Query('limit') limit?: string,
     @Query('provider') provider?: string,
     @Query('operation') operation?: string,
-    @CurrentUser() user?: CurrentUserPayload,
+    @CurrentUser() user?: User,
   ): Promise<Array<{
     id: string;
     provider: string;
@@ -518,7 +514,7 @@ export class AiController {
     createdAt: Date;
     userName?: string;
   }>> {
-    if (!user?.sub) {
+    if (!user?.id) {
       throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
     }
 

@@ -148,6 +148,7 @@ export function GlobalSearch() {
       <div className="flex-1 max-w-xl">
         <button
           onClick={() => setIsOpen(true)}
+          data-testid="global-search-trigger"
           className="w-full relative group"
         >
           <div className="relative">
@@ -187,6 +188,7 @@ export function GlobalSearch() {
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Поиск по номеру или названию заявки..."
+                  data-testid="global-search-input"
                   className="flex-1 text-base outline-none bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-500"
                 />
                 <button
@@ -199,7 +201,7 @@ export function GlobalSearch() {
               </div>
 
               {/* Results */}
-              <div ref={resultsRef} className="max-h-[400px] overflow-y-auto" role="listbox" aria-label="Результаты поиска">
+              <div ref={resultsRef} data-testid="global-search-results" className="max-h-[400px] overflow-y-auto" role="listbox" aria-label="Результаты поиска">
                 {query.length < 2 ? (
                   <div className="p-8 text-center text-gray-500 text-sm">
                     Введите минимум 2 символа для поиска

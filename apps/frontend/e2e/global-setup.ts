@@ -6,21 +6,21 @@ async function globalSetup(_config: FullConfig) {
   console.log('\n🧹 Очистка тестовых данных перед запуском тестов...');
 
   try {
-    // Сначала аутентифицируемся для получения токена
-    const loginResponse = await fetch(`${API_URL}/auth/login`, {
+    // Аутентифицируемся через dev login (без пароля)
+    const loginResponse = await fetch(`${API_URL}/auth/dev/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@stankoff.ru', password: 'password' }),
+      body: JSON.stringify({ email: 'admin@stankoff.ru' }),
     });
 
     if (!loginResponse.ok) {
-      console.warn('⚠️ Не удалось авторизоваться для очистки тестовых данных');
+      console.warn('⚠️ Не удалось авторизоваться для очистки тестовых данных (dev login)');
       return;
     }
 
     const { accessToken } = await loginResponse.json();
 
-    // Теперь вызываем cleanup с токеном
+    // Вызываем cleanup с токеном
     const response = await fetch(`${API_URL}/entities/cleanup/test-data`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },

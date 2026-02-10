@@ -543,6 +543,15 @@ export class UserTasksService {
   }
 
   private async canUserClaimTask(task: UserTask, userId: string): Promise<boolean> {
+    // Admin can claim any task (supervisory access)
+    const userRow = await this.dataSource.query(
+      'SELECT role FROM users WHERE id = $1',
+      [userId],
+    );
+    if (userRow?.[0]?.role === 'admin') {
+      return true;
+    }
+
     // User is already in candidate users
     if (task.candidateUsers?.includes(userId)) {
       return true;

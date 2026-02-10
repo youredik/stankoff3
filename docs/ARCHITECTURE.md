@@ -2998,6 +2998,54 @@ interface OnboardingStore {
 - 32 ТП entities + 12 РЕК entities → ~44 реальных Zeebe процессов
 - Guard: проверяет отсутствие секции "Сервис"
 
+## E2E тестирование BPMN (Playwright)
+
+### Структура
+
+```
+apps/frontend/e2e/
+├── helpers/
+│   └── test-utils.ts              # Общие хелперы (~40 функций для BPMN API)
+├── scenarios/                     # Полные workflow через реальный Zeebe
+│   ├── support-ticket.spec.ts
+│   ├── claims-management.spec.ts
+│   ├── incident-reopen.spec.ts
+│   ├── multi-level-approval.spec.ts
+│   └── smart-routing.spec.ts
+├── bpmn-user-tasks.spec.ts        # User task операции (18 тестов)
+├── bpmn-processes.spec.ts         # Process management + versioning (15 тестов)
+├── bpmn-mining.spec.ts            # Process Mining API (10 тестов)
+├── bpmn-triggers.spec.ts          # Реальные триггеры + webhook (17 тестов)
+├── bpmn-incidents.spec.ts         # Реальные инциденты через Zeebe (10 тестов)
+├── bpmn-forms.spec.ts             # CRUD определений форм (4 теста)
+├── bpmn-entity-links.spec.ts      # CRUD связей сущностей (4 теста)
+└── bpmn-lifecycle.spec.ts         # UI навигация по BPMN страницам
+```
+
+### Покрытие BPMN функционала
+
+| Область | Покрытие | Тесты |
+|---------|----------|-------|
+| User Tasks API (claim/unclaim/delegate/complete/batch/comments/inbox/statistics) | 100% | 18 |
+| Process Definitions (CRUD/deploy/versions/rollback/delete) | 100% | 15 |
+| Process Instances (start/cancel/timeline) | 100% | включены в processes |
+| Triggers (entity_created/status_changed/comment_added/webhook/conditions) | 90% | 17 |
+| Incidents (real Zeebe incidents: list/count/retry/cancel) | 100% | 10 |
+| Process Mining (stats/time-analysis/element-stats/workspace) | 100% | 10 |
+| Forms (CRUD) | 100% | 4 |
+| Entity Links (CRUD + spawn) | 100% | 4 |
+| Scenario Workflows (полные бизнес-процессы) | 100% | 5 сценариев |
+
+### Хелперы (test-utils.ts)
+
+Все BPMN хелперы используют dev-auth (`POST /auth/dev/login`) и возвращают `null` при ошибке:
+
+- **User Tasks:** `getInboxApi`, `claimTaskApi`, `unclaimTaskApi`, `completeTaskApi`, `delegateTaskApi`, `batchClaimApi`, `batchDelegateApi`, `addTaskCommentApi`, `getTaskCommentsApi`, `getTaskStatisticsApi`, `getTaskDetailApi`
+- **Processes:** `cancelProcessApi`, `getProcessTimelineApi`, `getProcessVersionsApi`, `deleteDefinitionApi`, `getDefinitionStatsApi`, `getWorkspaceBpmnStatsApi`
+- **Mining:** `getMiningStatsApi`, `getMiningTimeAnalysisApi`, `getMiningElementStatsApi`, `getMiningWorkspaceStatsApi`
+- **Incidents:** `getIncidentsApi`, `getIncidentCountApi`, `retryIncidentApi`, `cancelIncidentApi`, `waitForIncident`
+- **Triggers:** `getTriggerExecutionsApi`, `getRecentExecutionsApi`, `sendWebhookApi`, `updateEntityStatusApi`, `addCommentToEntityApi`
+
 ## Масштабирование
 
 ### Горизонтальное масштабирование

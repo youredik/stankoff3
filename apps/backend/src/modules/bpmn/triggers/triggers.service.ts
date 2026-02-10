@@ -308,6 +308,7 @@ export class TriggersService {
       return {
         entityId: context.entityId,
         workspaceId: context.workspaceId,
+        creatorId: context.userId || context.createdById,
         triggeredBy: context.userId || context.createdById,
         triggerType: context.triggerType,
       };
@@ -318,6 +319,11 @@ export class TriggersService {
       if (value !== undefined) {
         result[variableName] = value;
       }
+    }
+
+    // Always include creatorId if available (needed for BPMN user task assignments)
+    if (!result.creatorId && (context.userId || context.createdById)) {
+      result.creatorId = context.userId || context.createdById;
     }
 
     return result;
