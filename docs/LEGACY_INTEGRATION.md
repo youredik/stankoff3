@@ -6,77 +6,99 @@ Legacy система — это старая CRM на PHP + MariaDB, котор
 
 ## Подключение
 
+### Архитектура доступа
+
+Legacy БД (MariaDB) находится на **отдельном сервере** (185.186.143.38). Доступ ограничен **белым списком IP** — подключение возможно **только** с ВМ препрода (51.250.117.178).
+
+```
+┌─────────────────────────┐      ┌──────────────────────────┐
+│  Preprod VM              │      │  Legacy Server           │
+│  51.250.117.178          │      │  185.186.143.38          │
+│                          │      │                          │
+│  ┌───────────────────┐   │      │  ┌───────────────────┐   │
+│  │ NestJS Backend    │   │      │  │  Legacy PHP App   │   │
+│  │ (Docker Swarm)    │   │      │  │  (stankoff.ru)    │   │
+│  │                   │   │      │  │                   │   │
+│  │  ┌─────────────┐  │   │      │  │  ┌─────────────┐  │   │
+│  │  │ PostgreSQL  │  │   │      │  │  │  MariaDB    │  │   │
+│  │  │  (main DB)  │  │   │      │  │  │  (legacy)   │  │   │
+│  │  └─────────────┘  │   │      │  │  └──────┬──────┘  │   │
+│  │         │         │   │      │  └─────────┼─────────┘   │
+│  │  ┌──────┴──────┐  │   │      └────────────┼────────────┘
+│  │  │LegacyModule │──────── READ-ONLY ───────┘
+│  │  │ (TypeORM)   │  │   │   TCP 3306 (MySQL protocol)
+│  │  └─────────────┘  │   │   IP whitelisted
+│  └───────────────────┘   │
+└─────────────────────────┘
+```
+
+> **ВАЖНО:** Локальная разработка с legacy данными **невозможна** без доступа к удалённой БД. Дампы в legacy проекте (`/Users/ed/dev/stankoff/stankoff/dump/`) **устарели** и не содержат актуальных данных.
+
 ### Конфигурация (.env)
 
 ```env
-LEGACY_DB_HOST=localhost        # На препроде: IP legacy сервера
+# Preprod (реальные данные — доступ только с ВМ препрода)
+LEGACY_DB_HOST=185.186.143.38
 LEGACY_DB_PORT=3306
-LEGACY_DB_USER=stankoff
-LEGACY_DB_PASSWORD=stankoff
+LEGACY_DB_USER=dev
+LEGACY_DB_PASSWORD=rV7vO5rP2b
 LEGACY_DB_NAME=stankoff
+
+# Локальная разработка (устаревший дамп, не рекомендуется)
+# LEGACY_DB_HOST=localhost
+# LEGACY_DB_USER=stankoff
+# LEGACY_DB_PASSWORD=stankoff
 ```
 
-### Локальная разработка
+### Доступ к legacy БД для отладки
 
-Legacy БД разворачивается из проекта `/Users/ed/dev/stankoff/stankoff`:
+Прямой доступ к legacy БД возможен **только через SSH на препрод**:
 
 ```bash
-cd /Users/ed/dev/stankoff/stankoff
-docker compose up -d
+# Через backend контейнер (mysql2 клиент встроен)
+ssh youredik@51.250.117.178 'docker exec $(docker ps -q -f name=stankoff-preprod_backend) \
+  node -e "const m=require(\"mysql2/promise\");(async()=>{
+    const c=await m.createConnection({host:\"185.186.143.38\",port:3306,user:\"dev\",password:\"rV7vO5rP2b\",database:\"stankoff\"});
+    const[r]=await c.query(\"SHOW TABLES\");
+    console.log(JSON.stringify(r,null,2));
+    await c.end()
+  })()"'
+
+# Проверка health через API
+curl https://preprod.stankoff.ru/api/legacy/health
 ```
 
-MariaDB контейнер автоматически инициализируется дампами:
-- `dump/stankoff.sql` — основные данные
-- `dump/metrics.sql` — метрики
+### Код legacy проекта
 
-### Архитектура
+Исходный код legacy CRM (PHP) доступен локально: `/Users/ed/dev/stankoff/stankoff`
 
-```
-┌─────────────────┐      ┌─────────────────┐
-│  NestJS Backend │      │  Legacy PHP App │
-│                 │      │                 │
-│  ┌───────────┐  │      │  ┌───────────┐  │
-│  │ PostgreSQL│  │      │  │  MariaDB  │  │
-│  │  (main)   │  │      │  │ (legacy)  │  │
-│  └───────────┘  │      │  └───────────┘  │
-│        │        │      │        │        │
-│  ┌─────┴─────┐  │      └────────┼────────┘
-│  │LegacyModule│──────────READ───┘
-│  │(TypeORM)  │  │        ONLY
-│  └───────────┘  │
-└─────────────────┘
-```
+Это рабочий проект **stankoff.ru** — PHP + MariaDB, отдельный от нашего портала. Полезен для понимания бизнес-логики и структуры данных, но **не нужен** для запуска нашего backend.
 
 ---
 
 ## Статистика данных
 
-| Таблица | Записей | Описание |
-|---------|---------|----------|
-| `SS_customers` | **286,736** | Пользователи (клиенты + сотрудники) |
-| `manager` | **141** (87 активных) | ⭐ Сотрудники компании |
-| `department` | **13** | Отделы |
-| `managers_group` | **16** | Группы менеджеров по специализации |
-| `SS_products` | **27,549** | Товары (станки, оборудование) |
-| `SS_categories` | **1,608** (657 активных) | Категории товаров |
-| `counterparty` | **27,278** | Контрагенты (юр. лица) |
-| `QD_requests` | **344,612** | Обращения/заявки клиентов |
-| `QD_answers` | **2,322,514** | Ответы на обращения |
-| `order` | **28,556** | Заказы (новая система) |
-| `SS_orders` | **4** | Заказы (старая система, устаревшая) |
-| `call` | **1,169,173** | Звонки |
-| `deal` | **0** | Сделки (не используется) |
+> Данные получены с реальной legacy БД (185.186.143.38) на **2026-02-10**.
 
-### Сотрудники (важно!)
+| Таблица | Записей | Описание | Используется в коде |
+|---------|---------|----------|---------------------|
+| `QD_requests` | **358,115** | Обращения/заявки клиентов | ✅ Миграция + синхронизация |
+| `QD_answers` | **2,440,910** | Ответы на обращения | ✅ Миграция + синхронизация |
+| `QD_statuses` | **19,827** | История статусов заявок | ❌ Не используется |
+| `QD_attaches` | **1,835,373** | Вложения к заявкам/ответам | ❌ Не используется |
+| `SS_customers` | **296,488** | Пользователи (клиенты + сотрудники) | ✅ Поиск, маппинг |
+| `manager` | **147** | Сотрудники компании | ✅ Маппинг assignee |
+| `department` | **13** | Отделы | ✅ Справочник |
+| `managers_group` | **16** | Группы менеджеров по специализации | ❌ Entity не создана |
+| `SS_managers` | **8** | Менеджеры (старая таблица) | ❌ Не используется |
+| `SS_products` | **27,916** | Товары (станки, оборудование) | ✅ Picker UI |
+| `SS_categories` | **1,617** | Категории товаров | ✅ Picker фильтр |
+| `counterparty` | **29,059** | Контрагенты (юр. лица) | ✅ Picker UI |
+| `deal` | **0** | Сделки | ⚠️ Entity есть, данных нет |
+| `deal_stage` | **9** | Этапы воронки продаж | ⚠️ Entity есть, данных нет |
+| `customer` | **0** | Корпоративные клиенты | ❌ Не используется |
 
-| Метрика | Значение |
-|---------|----------|
-| Всего сотрудников | 141 |
-| Активных | **87** |
-| Неактивных (уволены) | 54 |
-| Могут принимать заявки | 51 |
-| Отделов | 13 |
-| Специализаций (групп) | 16 |
+> **Всего таблиц в legacy БД:** ~300+. Выше перечислены только таблицы, релевантные для портала.
 
 ---
 
@@ -85,59 +107,83 @@ MariaDB контейнер автоматически инициализируе
 ### SS_customers (Пользователи)
 
 ```sql
-customerID        INT PRIMARY KEY AUTO_INCREMENT
+customerID        INT(11) PRIMARY KEY AUTO_INCREMENT
+id                INT(11)              -- Дублирующий ID (legacy)
 first_name        VARCHAR(32)          -- Имя
 last_name         VARCHAR(32)          -- Фамилия
-Email             VARCHAR(64)          -- Email (регистр!)
+Email             VARCHAR(64)          -- ⚠️ Email (с БОЛЬШОЙ буквы!)
 phone             DECIMAL(20,0)        -- Телефон
+default_phone_id  BIGINT(20)           -- ID основного телефона
+default_email_id  BIGINT(20)           -- ID основного email
 is_manager        TINYINT(1)           -- 1 = сотрудник, 0 = клиент
-default_counterparty_id  INT           -- Связь с контрагентом
+default_counterparty_id INT(11)        -- Связь с контрагентом
 reg_datetime      DATETIME             -- Дата регистрации
+gender            VARCHAR(10)          -- Пол (MALE/FEMALE)
+position          VARCHAR(70)          -- Должность
+country           INT(10)              -- ID страны
+region            INT(10)              -- ID региона
+city              INT(10)              -- ID города
+level             VARCHAR(10)          -- Уровень доступа (user/adminman)
+user_is_admin     INT(11)              -- Флаг администратора
+language          VARCHAR(2)           -- Язык (ru/en)
+online            BIGINT(20)           -- Последняя активность (timestamp)
+hash              VARCHAR(25) UNIQUE   -- Хеш для ссылок
+-- Интеграции:
+chat2desk_id      BIGINT(20)           -- Chat2Desk ID
+has_whatsapp      TINYINT(1)           -- WhatsApp
+has_viber         TINYINT(1)           -- Viber
+yandex_metrika_client_id CHAR(25)      -- Яндекс.Метрика ID
+supplier_id       INT(11)              -- ID поставщика
 -- НЕТ колонок: enabled, last_login
 ```
 
+**Всего: 296,488 записей** (данные на 2026-02-10).
+
 **Особенности:**
-- `is_manager = 1` — сотрудник компании (всего 19 записей в SS_customers)
+- `is_manager = 1` — сотрудник компании
 - `is_manager = 0` — внешний клиент
-- Колонка `Email` с большой буквы (MySQL case-sensitive)
+- Колонка `Email` с **большой** буквы (MySQL case-sensitive!)
 - Нет флага `enabled` — все записи считаются активными
-- Дополнительные поля: `level` (adminman/user), `user_is_admin`, `online` (timestamp)
 
 > **ВАЖНО:** Основные данные о сотрудниках хранятся в таблице `manager`, а не в `SS_customers`!
 
 ### manager (Сотрудники) ⭐ ВАЖНО
 
 ```sql
-id                INT PRIMARY KEY AUTO_INCREMENT
-user_id           INT NOT NULL         -- Связь с SS_customers.customerID
-alias             VARCHAR(10)          -- Короткое имя (для @mention)
-department_id     TINYINT              -- ID отдела
-active            TINYINT(1)           -- 1 = активен, 0 = уволен/неактивен
-vacation          TINYINT(1)           -- 1 = в отпуске
-vacation_from     INT                  -- Начало отпуска (timestamp)
-vacation_to       INT                  -- Конец отпуска (timestamp)
-can_get_request   TINYINT(1)           -- Может принимать заявки
-can_sale          TINYINT(1)           -- Может продавать
-show_in_contacts  TINYINT(1)           -- Показывать в контактах
-sip               VARCHAR(100)         -- SIP номер
-telegram_id       BIGINT               -- Telegram ID
-sort_order        INT                  -- Порядок сортировки
+id                       INT(3) PRIMARY KEY AUTO_INCREMENT
+user_id                  INT(11) NOT NULL     -- Связь с SS_customers.customerID
+alias                    VARCHAR(10)          -- Короткое имя (для @mention)
+department_id            TINYINT(2)           -- ID отдела
+department_direction_id  TINYINT(2)           -- ID направления в отделе
+authentication_method    VARCHAR(20)          -- Метод аутентификации (sms)
+sms_phone_id             INT(20)              -- ID телефона для SMS
+sip                      VARCHAR(100)         -- SIP номер
+default_sip_id           INT(11)              -- ID SIP по умолчанию
+specialty                VARCHAR(255)         -- Специализация
+chat2desk_channel_id     BIGINT(20)           -- Chat2Desk канал
+bitrix24_user_id         INT(11)              -- Bitrix24 ID
+prostanki_id             BIGINT(20)           -- Простанки ID
+telegram_id              BIGINT(20)           -- Telegram ID
+vacation                 TINYINT(1)           -- 1 = в отпуске
+vacation_from            INT(11)              -- Начало отпуска (timestamp)
+vacation_to              INT(11)              -- Конец отпуска (timestamp)
+notify_new_requests      ENUM('0','1','2')    -- Уведомления о новых заявках
+notify_new_answers       ENUM('0','1','2')    -- Уведомления о новых ответах
+can_get_request          TINYINT(1)           -- Может принимать заявки
+can_sale                 TINYINT(1)           -- Может продавать
+show_in_contacts         TINYINT(1)           -- Показывать в контактах
+active                   TINYINT(1)           -- 1 = активен, 0 = уволен
+sort_order               INT(3)               -- Порядок сортировки
 ```
 
-**Статистика сотрудников:**
-| Метрика | Значение |
-|---------|----------|
-| Всего менеджеров | **141** |
-| Активных | **87** |
-| Неактивных (уволены) | **54** |
-| Могут принимать заявки | 51 |
-| Могут продавать | 36 |
+**Всего: 147 менеджеров** (данные на 2026-02-10).
 
 **Особенности:**
 - `active = 0` — сотрудник уволен или деактивирован
 - `vacation = 1` — сотрудник в отпуске (временно недоступен)
 - `can_get_request = 0` — не назначать на заявки (например, руководитель)
 - Связь с SS_customers через `user_id` → `customerID`
+- `department_direction_id` — направление внутри отдела (дополнительная классификация)
 
 ### department (Отделы)
 
@@ -196,76 +242,204 @@ is_active         TINYINT(1)           -- Активен в группе
 
 ### SS_products (Товары)
 
+> Таблица содержит ~86 колонок. Ниже перечислены основные, используемые в портале.
+
 ```sql
-productID         INT PRIMARY KEY AUTO_INCREMENT
+productID         INT(11) PRIMARY KEY AUTO_INCREMENT
 name              VARCHAR(255)         -- Название
 uri               VARCHAR(255)         -- URL slug
-Price             DECIMAL(20,2)        -- Цена (с большой буквы!)
-categoryID        INT                  -- ID категории
-default_supplier  INT                  -- ID поставщика
-in_stock          INT                  -- Количество на складе
+factory_name      VARCHAR(255)         -- Название завода-производителя
+Price             DECIMAL(20,2)        -- ⚠️ Цена (с БОЛЬШОЙ буквы!)
+base_price        DECIMAL(20,2)        -- Базовая цена
+fob_price         DECIMAL(20,2)        -- Цена FOB
+categoryID        INT(11)              -- ID категории
+default_supplier  INT(11)              -- ID поставщика
+in_stock          INT(11)              -- Количество на складе
 product_code      VARCHAR(25)          -- Артикул
-factory_name      VARCHAR(255)         -- Название завода
-enabled           INT                  -- 1 = активен
+enabled           INT(11)              -- 1 = активен
 brief_description MEDIUMTEXT           -- Краткое описание
-sort_order        INT                  -- Сортировка
+sort_order        INT(11)              -- Сортировка
+type              ENUM('1','2')        -- Тип товара
+show_price        TINYINT(1)           -- Показывать цену
+is_cart           TINYINT(1)           -- Можно в корзину
+commissioning     TINYINT(1)           -- Ввод в эксплуатацию
+warranty          TINYINT(2)           -- Гарантия (мес)
+-- Неиспользуемые но объёмные: description*, reviews_*, views_*, meta_*
 ```
 
+**Всего: 27,916 товаров** (данные на 2026-02-10).
+
 **Особенности:**
-- Колонка `Price` с большой буквы
+- Колонка `Price` с **большой** буквы
 - `enabled = 1` для активных товаров
 - НЕТ колонки `producerID` — вместо неё `default_supplier`
 
 ### SS_categories (Категории)
 
+> Таблица содержит ~43 колонки. Ниже основные.
+
 ```sql
-categoryID        INT PRIMARY KEY AUTO_INCREMENT
+categoryID        INT(11) PRIMARY KEY AUTO_INCREMENT
 name              VARCHAR(255)         -- Название
 uri               VARCHAR(255)         -- URL slug
-parent            INT                  -- ID родительской категории
-category_is_active INT                 -- 1 = активна (НЕ enabled!)
-sort_order        INT                  -- Сортировка
+parent            INT(11)              -- ID родительской категории
+category_is_active INT(1)              -- ⚠️ 1 = активна (НЕ "enabled"!)
+sort_order        INT(11)              -- Сортировка
+manager_id        INT(11)              -- Ответственный менеджер
+products_count    INT(11)              -- Кол-во товаров
+instock_count     INT(11)              -- Кол-во на складе
+type              VARCHAR(100)         -- Тип категории
+display_type      VARCHAR(20)          -- Тип отображения (standart)
+-- SEO: title, header_h1, meta_description, meta_keywords
+-- Описания: description, description1-3, extra_description
+-- Картинки: picture, big_picture, origin_picture, promo_picture
 ```
 
+**Всего: 1,617 категорий** (данные на 2026-02-10).
+
 **Особенности:**
-- Флаг активности: `category_is_active`, НЕ `enabled`
+- Флаг активности: `category_is_active`, **НЕ** `enabled`
 - `parent = NULL` или `0` — корневая категория
-- 657 активных категорий из 1,608
 
 ### counterparty (Контрагенты)
 
 ```sql
-id                INT PRIMARY KEY AUTO_INCREMENT
+id                INT(11) PRIMARY KEY AUTO_INCREMENT
 name              VARCHAR(255)         -- Полное название (ООО "Компания")
 inn               VARCHAR(15)          -- ИНН
-dadata_kpp        VARCHAR(9)           -- КПП (из DaData)
-dadata_ogrn       DECIMAL(15,0)        -- ОГРН (из DaData)
-dadata_address    TEXT                 -- Адрес (из DaData)
 director          VARCHAR(100)         -- Директор
-dadata_status     VARCHAR(12)          -- Статус юр. лица
 type              VARCHAR(10)          -- 'legal' | 'individual'
+is_foreign        TINYINT(1)           -- Иностранная компания
+-- DaData (обогащённые данные):
+dadata_kpp        VARCHAR(9)           -- КПП
+dadata_ogrn       DECIMAL(15,0)        -- ОГРН
+dadata_address    TEXT                 -- Юридический адрес
+dadata_post       VARCHAR(100)         -- Почтовый адрес
+dadata_status     VARCHAR(12)          -- Статус юр. лица (ACTIVE и т.д.)
+dadata_registration_date VARCHAR(20)   -- Дата регистрации
+dadata_liquidation_date  VARCHAR(20)   -- Дата ликвидации
+-- Банковские реквизиты:
+dadata_bank_name  TEXT                 -- Название банка
+dadata_bank_bik   VARCHAR(9)           -- БИК
+dadata_bank_korr  DECIMAL(20,0)        -- Корр. счёт
+dadata_bank_ras   DECIMAL(20,0)        -- Расч. счёт
+default_counterparty_bank_settlement_account_id INT(11)
+-- Финансы:
+capital           DECIMAL(20,0)        -- Уставной капитал
+finance_income    DECIMAL(20,0)        -- Доход
+finance_expense   DECIMAL(20,0)        -- Расход
+finance_revenue   DECIMAL(20,0)        -- Выручка
+finance_debt      DECIMAL(20,0)        -- Задолженность
+finance_penalty   DECIMAL(20,0)        -- Штрафы
+finance_year      YEAR                 -- Год отчётности
+employee_count    INT(11)              -- Количество сотрудников
+-- Для физ. лиц:
+passport_series   CHAR(4)              -- Серия паспорта
+passport_number   CHAR(6)              -- Номер паспорта
 ```
 
+**Всего: 29,059 контрагентов** (данные на 2026-02-10).
+
 **Особенности:**
-- Данные обогащены через DaData API (префикс `dadata_`)
+- Данные обогащены через **DaData API** (префикс `dadata_`)
 - НЕТ колонок: `kpp`, `ogrn`, `address` без префикса
-- НЕТ колонок: `created_at`, `updated_at`, `dadata_data`, `dadata_type`
+- НЕТ колонок: `created_at`, `updated_at`
 
 ### QD_requests (Обращения)
 
 ```sql
-id                INT PRIMARY KEY AUTO_INCREMENT
-customer_id       INT                  -- ID клиента (SS_customers)
-status_id         INT                  -- ID статуса
-manager_id        INT                  -- ID менеджера
-subject           VARCHAR(255)         -- Тема
-created_at        DATETIME             -- Создано
-updated_at        DATETIME             -- Обновлено
+RID               INT(11) PRIMARY KEY AUTO_INCREMENT  -- ⚠️ Не "id"!
+customerID        INT(11) NOT NULL     -- ID клиента (SS_customers.customerID)
+UID               INT(11)              -- ID пользователя (SS_customers.customerID)
+manager_id        INT(11)              -- ID менеджера (manager.id)
+manID             INT(11)              -- ID менеджера (SS_managers.managerID, устаревшее)
+creator_user_id   INT(11)              -- Кто создал заявку
+add_date          DATETIME             -- Дата создания
+update_date       DATETIME             -- Дата последнего обновления
+answer_date       TIMESTAMP            -- Дата последнего ответа
+subject           VARCHAR(255)         -- Тема заявки
+closed            TINYINT(1)           -- Статус: 0=открыта, 1=закрыта, -1=default
+pause             TINYINT(1)           -- На паузе
+type              VARCHAR(15)          -- Тип заявки
+transport_type    VARCHAR(20)          -- Канал связи (email, phone, whatsapp...)
+contact_channel_transport_id INT(11)   -- ID транспорта
+origins           VARCHAR(20)          -- Источник (self, email, site...)
+source_page       TEXT                 -- Страница-источник
+unread            ENUM('0','1')        -- Непрочитано менеджером
+clunread          ENUM('0','1')        -- Непрочитано клиентом
+comments          MEDIUMTEXT           -- Внутренние комментарии менеджера
+last_answer       BIGINT(20)           -- ID последнего ответа
+last_comment_id   BIGINT(20)           -- ID последнего комментария
+first_reaction_time TIMESTAMP          -- Время первой реакции (SLA)
+ontime_date       DATETIME             -- Запланированная дата ответа
+forgotten_date    TIMESTAMP            -- Дата "забытой" заявки
+-- Маркетинг/аналитика:
+utm_visit_id      INT(11)              -- UTM визит
+roistat_visit     INT(11)              -- Roistat визит
+adv               VARCHAR(20)          -- Рекламный источник
+action_position   VARCHAR(50)          -- Позиция действия
+-- Флаги:
+mailed            TINYINT(1)           -- Отправлено email
+mailopened        TINYINT(1)           -- Email открыт
+phoned            TINYINT(1)           -- Звонили
+sale              TINYINT(1)           -- Продажа
+-- Интеграции:
+chat2desk_id      BIGINT(20)           -- Chat2Desk ID
+hash              VARCHAR(30)          -- Хеш для клиентского доступа
+client_ip         VARCHAR(15)          -- IP клиента
 ```
 
-**Особенности:**
-- 344K+ обращений — основной массив данных для миграции
-- Связь через `QD_answers` — 2.3M ответов
+**КРИТИЧЕСКИ ВАЖНО для маппинга:**
+- PK = `RID` (не `id`!)
+- **НЕТ** колонок: `body`, `status_id`, `close_date`, `priority`
+- Статус заявки определяется только полем `closed` (0/1/-1)
+- `manager_id` → ссылка на `manager.id` (новая таблица)
+- `manID` → ссылка на `SS_managers.managerID` (устаревшая таблица)
+
+### QD_answers (Ответы)
+
+```sql
+AID               INT(11) PRIMARY KEY AUTO_INCREMENT  -- ⚠️ Не "id"!
+RID               INT(11) NOT NULL     -- ID заявки (QD_requests.RID)
+UID               INT(11)              -- ID пользователя (SS_customers.customerID)
+is_client         TINYINT(1)           -- 1=клиент, 0=сотрудник
+manID             INT(11) NOT NULL     -- ID менеджера (SS_managers.managerID)
+add_date          DATETIME             -- Дата создания
+text              MEDIUMTEXT           -- Текст ответа (может содержать HTML)
+subject           VARCHAR(255)         -- Тема
+type              VARCHAR(15)          -- Тип
+starter           INT(1)               -- Первое сообщение в заявке
+is_request        TINYINT(1)           -- Является запросом
+creator_user_id   INT(11)              -- Кто создал
+forward_from_answer_id INT(11)         -- Переслано из
+-- Каналы/интеграции:
+transport         VARCHAR(20)          -- Канал (email, whatsapp, telegram...)
+origins           VARCHAR(20)          -- Источник
+email_message_id  VARCHAR(255)         -- Email Message-ID
+email_original_body TEXT               -- Оригинальное тело email
+email_addresses   TEXT                 -- Email адреса
+messanger_number  DECIMAL(20,0)        -- Номер в мессенджере
+chat2desk_id      BIGINT(20)           -- Chat2Desk ID
+contact_channel_transport_id INT(11)   -- ID транспорта
+integration_account_id INT(11)         -- ID интеграции
+-- Маркетинг:
+utm_visit_id      INT(11)
+roistat_visit     INT(11)
+action_position   VARCHAR(50)
+adv               VARCHAR(20)
+-- Флаги:
+rating            INT(1)               -- Рейтинг ответа
+marked            INT(1)               -- Помечен
+mailed            INT(1)               -- Отправлен email
+request_answer_send_status_id TINYINT  -- Статус отправки
+```
+
+**КРИТИЧЕСКИ ВАЖНО:**
+- PK = `AID` (не `id`!)
+- FK к заявке = `RID` (не `requestId`!)
+- Поле `text` (в старой версии было `answer`)
+- **НЕТ** полей: `is_hidden`, `is_internal`
+- Есть `is_client` — определяет автора (клиент vs сотрудник)
 
 ---
 
@@ -534,8 +708,8 @@ KEYCLOAK_ADMIN_PASSWORD=admin-password
 - [x] Маппинг сотрудников по email (case-insensitive) из Users таблицы
 - [x] Системный пользователь `legacy-system@stankoff.ru` для внешних клиентов (286K)
 - [x] Workspace `Legacy CRM (Миграция)` с prefix `LEG` и настроенными секциями полей
-- [x] Маппинг статусов: closed=1→'closed', statusId 1→'new', 2→'in_progress', 3→'waiting', 4→'resolved'
-- [x] Маппинг приоритетов: 0→'low', 1→'medium', 2→'high', 3→'critical'
+- [x] Маппинг статусов: `closed=1`→`'closed'`, иначе→`'new'` (в legacy **нет** `status_id`, `priority`)
+- [x] В legacy нет приоритетов — все мигрируются как `'medium'`
 - [x] HTML-очистка ответов (legacy содержит HTML-разметку)
 - [x] Bulk INSERT через QueryRunner (не через EntityService — избегаем WebSocket, BPMN, SLA триггеры)
 - [x] `INSERT ... ON CONFLICT ("customId") DO NOTHING` — идемпотентность
@@ -615,26 +789,42 @@ curl -X POST https://preprod.stankoff.ru/api/legacy/sync/run-now
 ## Полезные команды
 
 ```bash
-# Запуск legacy БД локально
-cd /Users/ed/dev/stankoff/stankoff && docker compose up -d
+# Проверка подключения к legacy через API
+curl https://preprod.stankoff.ru/api/legacy/health
 
-# Проверка подключения
-curl http://localhost:3001/api/legacy/health
-
-# SQL запросы к legacy
-docker exec stankoff-mariadb-1 mariadb -ustankoff -pstankoff stankoff -e "SELECT COUNT(*) FROM SS_customers"
+# SQL запросы к реальной legacy БД (через SSH на препрод)
+ssh youredik@51.250.117.178 'docker exec $(docker ps -q -f name=stankoff-preprod_backend) \
+  node -e "const m=require(\"mysql2/promise\");(async()=>{
+    const c=await m.createConnection({host:\"185.186.143.38\",port:3306,user:\"dev\",password:\"rV7vO5rP2b\",database:\"stankoff\"});
+    const[r]=await c.query(\"SELECT COUNT(*) as cnt FROM SS_customers\");
+    console.log(r[0].cnt);
+    await c.end()
+  })()"'
 
 # Просмотр структуры таблицы
-docker exec stankoff-mariadb-1 mariadb -ustankoff -pstankoff stankoff -e "DESCRIBE SS_customers"
+# (заменить DESCRIBE SS_customers на нужную таблицу)
+ssh youredik@51.250.117.178 'docker exec $(docker ps -q -f name=stankoff-preprod_backend) \
+  node -e "const m=require(\"mysql2/promise\");(async()=>{
+    const c=await m.createConnection({host:\"185.186.143.38\",port:3306,user:\"dev\",password:\"rV7vO5rP2b\",database:\"stankoff\"});
+    const[r]=await c.query(\"DESCRIBE SS_customers\");
+    console.log(JSON.stringify(r,null,2));
+    await c.end()
+  })()"'
 
 # Тесты legacy модуля
 npm run test -- --testPathPattern="legacy"
 ```
 
+> **Примечание:** MySQL клиент НЕ установлен на препроде. Запросы выполняются через `node` + `mysql2` внутри backend контейнера.
+
 ---
 
 ## Контакты и ресурсы
 
-- Legacy проект: `/Users/ed/dev/stankoff/stankoff`
-- Docker compose: `compose.yml` в legacy проекте
-- Дампы БД: `dump/stankoff.sql`, `dump/metrics.sql`
+| Ресурс | Расположение | Описание |
+|--------|-------------|----------|
+| Legacy код (PHP) | `/Users/ed/dev/stankoff/stankoff` | Локальная копия исходников |
+| Legacy БД (MariaDB) | `185.186.143.38:3306` | Доступ только с IP препрода |
+| Препрод сервер | `51.250.117.178` | SSH: `youredik@...` |
+| Legacy CRM (веб) | `https://www.stankoff.ru/crm/` | Рабочая CRM |
+| Дампы БД (устарели) | `dump/stankoff.sql` в legacy проекте | Не использовать для разработки! |

@@ -1232,7 +1232,7 @@ interface RuleCondition {
 | GET | /api/dmn/evaluations/target/:type/:id | Вычисления для цели |
 
 **LegacyModule**
-Интеграция со старой CRM (MariaDB): read-only доступ, миграция данных, синхронизация. Подробная документация: [LEGACY_INTEGRATION.md](./LEGACY_INTEGRATION.md)
+Интеграция со старой CRM (MariaDB на 185.186.143.38): read-only доступ, миграция данных, синхронизация. Доступ ограничен белым списком IP — подключение только с ВМ препрода (51.250.117.178). Подробная документация: [LEGACY_INTEGRATION.md](./LEGACY_INTEGRATION.md)
 
 ```
 legacy/
@@ -1242,11 +1242,11 @@ legacy/
 ├── legacy-migration.controller.ts      # ⭐ REST API миграции данных
 ├── legacy-database.config.ts           # Конфигурация MySQL
 ├── entities/                           # TypeORM entities для legacy таблиц
-│   ├── legacy-customer.entity.ts       # SS_customers (286K записей)
-│   ├── legacy-product.entity.ts        # SS_products (27K записей)
-│   ├── legacy-category.entity.ts       # SS_categories (657 активных)
-│   ├── legacy-counterparty.entity.ts   # counterparty (27K записей)
-│   ├── legacy-manager.entity.ts        # manager (141 сотрудников)
+│   ├── legacy-customer.entity.ts       # SS_customers (~296K записей)
+│   ├── legacy-product.entity.ts        # SS_products (~28K записей)
+│   ├── legacy-category.entity.ts       # SS_categories (~1.6K, category_is_active)
+│   ├── legacy-counterparty.entity.ts   # counterparty (~29K записей)
+│   ├── legacy-manager.entity.ts        # manager (147 сотрудников)
 │   ├── legacy-department.entity.ts     # department (13 отделов)
 │   └── legacy-migration-log.entity.ts  # ⭐ Лог миграции (PostgreSQL!)
 ├── dto/
@@ -2965,38 +2965,70 @@ interface OnboardingStore {
 - **Маршрутизация техподдержки** — определяет L1/L2 и группу по приоритету и категории
 - **Оценка серьёзности рекламации** — определяет серьёзность и автоэскалацию по типу и сумме
 
-### Seed скрипты
+### Seed система (модульная)
 
-**`SeedService`** (seed.service.ts) — базовый seed:
-- Admin-пользователь (admin@stankoff.ru)
-- Запускается только если нет пользователей
+Seed данные основаны на **реальных сотрудниках** из legacy CRM (87 человек из 14 отделов).
 
-**`SeedShowcase`** (seed-showcase.ts) — полные демо-данные для всех функций:
-- **Требует Zeebe** — деплоит и запускает реальные BPMN процессы
-- 20 пользователей (HR: 7, Финансы: 7, Коммерческий: 6)
-- 3 секции (HR, Финансы, Коммерческий)
-- 4 workspace'а (OTP, FIN, PO, KP) с полными конфигурациями полей
-- 4 BPMN process definitions из шаблонов → деплой в Zeebe + 4 триггера (ENTITY_CREATED)
-- 8 SLA определений (2 на workspace) + SLA instances
-- 4 DMN таблицы (FIRST, COLLECT, RULE_ORDER)
-- 6 automation rules
-- ~140 entities (35 per workspace) с реалистичными данными
-- ~80 комментариев
-- ~140 реальных Zeebe процессов (запускаются батчами по 10, 200ms между батчами)
-- 15 entity links (cross-workspace: RELATED, PARENT/CHILD, SPAWNED, BLOCKS/BLOCKED_BY, DUPLICATE)
-- Cleanup: удаляет ВСЕ данные (включая Legacy)
-- Guard: проверяет существование секции "HR" и наличие пользователей
+**Структура:** `apps/backend/src/seed/`
 
-**`SeedServiceDepartment`** (seed-service-department.ts) — сервисный отдел:
-- **Требует Zeebe** — деплоит и запускает реальные BPMN процессы
-- 12 пользователей (руководитель, инженеры, менеджеры)
-- 1 секция "Сервис"
-- 2 workspace'а (ТП — техподдержка, РЕК — рекламации)
-- 3 BPMN process definitions (support-v2, claims-management, sla-escalation) → деплой в Zeebe
-- SLA определения с 3 уровнями серьёзности для рекламаций
-- 2 DMN таблицы
-- 32 ТП entities + 12 РЕК entities → ~44 реальных Zeebe процессов
-- Guard: проверяет отсутствие секции "Сервис"
+```
+seed/
+├── seed.module.ts                # NestJS модуль (17 entities, forwardRef: AuthModule, BpmnModule)
+├── seed-orchestrator.service.ts  # Главный оркестратор (OnModuleInit)
+├── seed-cleanup.service.ts       # Полная очистка ВСЕХ данных (FK-safe порядок)
+├── seed-users.service.ts         # 87 пользователей из legacy + Коршунов
+├── seed-keycloak.service.ts      # Регистрация в Keycloak (graceful degradation)
+├── seed-structure.service.ts     # 8 секций + 15 workspaces + members
+├── seed-entities.service.ts      # ~102 entities + ~280 comments (14 workspaces)
+├── seed-it-department.service.ts # IT workspace: 25 задач разработки с диалогами
+├── seed-bpmn.service.ts          # 10 BPMN definitions + deploy + triggers + instances
+├── seed-sla-dmn.service.ts       # 6 SLA definitions + 3 DMN tables
+└── data/
+    ├── employees.ts              # 87 сотрудников (hardcoded из legacy)
+    └── departments.ts            # 14 отделов + 8 секций
+```
+
+**Порядок выполнения (seed-orchestrator):**
+1. Проверка маркера (Section 'Продажи' → skip)
+2. Ожидание Zeebe (`bpmnService.waitForConnection`)
+3. Cleanup — удаление ВСЕХ данных (включая Legacy)
+4. Создание 87 пользователей (seed-users)
+5. Регистрация в Keycloak (seed-keycloak, опционально)
+6. 8 секций + 15 workspaces + members (seed-structure)
+7. ~102 entities + ~280 comments (seed-entities)
+8. IT workspace: 25 задач + ~150 комментариев (seed-it-department)
+9. BPMN: 10 definitions → deploy → triggers → instances (seed-bpmn)
+10. SLA/DMN: 6 SLA + 3 DMN (seed-sla-dmn)
+
+**Данные сотрудников (87 человек):**
+- 86 из legacy `manager` + `SS_customers` (реальные email, имена, отделы)
+- +1 Коршунов С.М. (добавлен вручную, korshunovsm@yandex.ru)
+- Роли: 3 admin, ~14 manager, ~70 employee
+- Особые пользователи: youredik@gmail.com (admin, IT), korshunovsm@yandex.ru (admin, IT)
+
+**Секции и workspaces (8 секций, 15 workspaces):**
+
+| Секция | Workspaces | Prefixes |
+|--------|-----------|----------|
+| Продажи | Заявки клиентов, Коммерческие предложения | ZK, KP |
+| Сервис | Сервисные заявки, Рекламации | SZ, REK |
+| Маркетинг | Маркетинговые задачи, Контент-план | MK, KN |
+| Склад и логистика | Складские операции, Доставки | SK, DV |
+| Финансы | Финансовые документы, Согласование расходов | FD, SR |
+| Юридический и ВЭД | Договоры, ВЭД операции | DG, VED |
+| Управление | HR и кадры, Тендеры | HR, TN |
+| IT | Разработка Stankoff Portal | DEV |
+
+**IT workspace (отдельный сервис):**
+- 25 задач разработки Stankoff Portal (DEV-1..DEV-25)
+- Задачи в разных статусах: 12 completed, 5 in development, 2 code review, 2 testing, 4 backlog
+- Реалистичные диалоги между Коршуновым (PM) и youredik (dev)
+- Тематика: NestJS, Keycloak, CRUD, Kanban, BPMN, Legacy миграция, AI, SLA, DMN
+
+**Keycloak интеграция:**
+- Graceful degradation: если `isConfigured()` → false, seed продолжает без Keycloak
+- Удаляет всех существующих пользователей (кроме admin) перед созданием
+- Временные пароли + `requiredActions: ['UPDATE_PASSWORD']`
 
 ## E2E тестирование BPMN (Playwright)
 

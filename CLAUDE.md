@@ -29,6 +29,7 @@ stankoff-portal/
 │   └── backend/           # NestJS приложение
 │       ├── src/
 │       │   ├── modules/   # NestJS модули
+│       │   ├── seed/      # Seed данные (87 реальных сотрудников)
 │       │   └── main.ts
 │       └── package.json
 ├── docs/                  # Документация
@@ -537,7 +538,7 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 **OG Preview:**
 - `GET /api/og-preview?url=https://...` — получить OG meta-теги страницы (title, description, image, siteName)
 
-**Legacy CRM (интеграция с MariaDB):**
+**Legacy CRM (интеграция с MariaDB на 185.186.143.38, доступ только с ВМ препрода):**
 - `GET /api/legacy/health` — статус подключения к legacy БД
 - `GET /api/legacy/customers/search?q=текст&limit=10&employeesOnly=false` — поиск клиентов
 - `GET /api/legacy/customers/:id` — получить клиента по ID

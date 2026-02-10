@@ -25,28 +25,7 @@ import { LegacyModule } from './modules/legacy/legacy.module';
 import { AiModule } from './modules/ai/ai.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { GeocodingModule } from './modules/geocoding/geocoding.module';
-import { SeedService } from './seed.service';
-import { SeedShowcase } from './seed-showcase';
-import { SeedServiceDepartment } from './seed-service-department';
-import { User } from './modules/user/user.entity';
-import { WorkspaceEntity } from './modules/entity/entity.entity';
-import { Comment } from './modules/entity/comment.entity';
-import { Workspace } from './modules/workspace/workspace.entity';
-import { WorkspaceMember } from './modules/workspace/workspace-member.entity';
-import { Section } from './modules/section/section.entity';
-import { SectionMember } from './modules/section/section-member.entity';
-import { SlaDefinition } from './modules/sla/entities/sla-definition.entity';
-import { SlaInstance } from './modules/sla/entities/sla-instance.entity';
-import { SlaEvent } from './modules/sla/entities/sla-event.entity';
-import { DecisionTable } from './modules/dmn/entities/decision-table.entity';
-import { ProcessDefinition } from './modules/bpmn/entities/process-definition.entity';
-import { ProcessInstance } from './modules/bpmn/entities/process-instance.entity';
-import { ProcessTrigger } from './modules/bpmn/entities/process-trigger.entity';
-import { AutomationRule } from './modules/automation/automation-rule.entity';
-import { UserGroup } from './modules/bpmn/entities/user-group.entity';
-import { EntityLink } from './modules/bpmn/entities/entity-link.entity';
-import { ProcessActivityLog } from './modules/bpmn/entities/process-activity-log.entity';
-import { FormDefinition } from './modules/bpmn/entities/form-definition.entity';
+import { SeedModule } from './seed/seed.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -59,17 +38,8 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(typeOrmConfig),
-    TypeOrmModule.forFeature([
-      User, WorkspaceEntity, Comment, Workspace, WorkspaceMember,
-      Section, SectionMember,
-      SlaDefinition, SlaInstance, SlaEvent,
-      DecisionTable,
-      ProcessDefinition, ProcessInstance, ProcessTrigger,
-      AutomationRule, UserGroup,
-      EntityLink, ProcessActivityLog,
-      FormDefinition,
-    ]),
 
+    SeedModule,
     WorkspaceModule,
     EntityModule,
     UserModule,
@@ -93,9 +63,6 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     GeocodingModule,
   ],
   providers: [
-    SeedService,
-    SeedShowcase,
-    SeedServiceDepartment,
     // Глобальные guards - порядок важен: сначала JWT, потом Roles
     {
       provide: APP_GUARD,
