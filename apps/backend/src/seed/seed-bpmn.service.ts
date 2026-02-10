@@ -234,7 +234,11 @@ export class SeedBpmnService {
 
     this.logger.log(`Создано ${createdDefs.length} определений процессов с триггерами`);
 
-    // 3. Запустить процессы для некоторых сущностей
+    // 3. Ждём пока Zeebe проиндексирует задеплоенные определения
+    this.logger.log('Ожидание индексации Zeebe (3с)...');
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // 4. Запустить процессы для некоторых сущностей
     await this.startProcessesForEntities(createdDefs, entitiesMap, userByEmail);
   }
 
