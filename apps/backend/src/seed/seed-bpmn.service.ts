@@ -166,11 +166,18 @@ export class SeedBpmnService {
       it: itEntities,
     };
 
-    // Чтение BPMN файлов
+    // Чтение BPMN файлов с подменой process ID
     const templatesDir = path.join(__dirname, '..', 'modules', 'bpmn', 'templates');
-    const readBpmn = (filename: string): string => {
+    const readBpmn = (filename: string, targetProcessId: string): string => {
       try {
-        return fs.readFileSync(path.join(templatesDir, filename), 'utf-8');
+        let xml = fs.readFileSync(path.join(templatesDir, filename), 'utf-8');
+        // Заменяем bpmn:process id="..." на наш processId,
+        // чтобы Zeebe знал процесс по нужному ID
+        xml = xml.replace(
+          /(<bpmn:process id=")([^"]+)(")/,
+          `$1${targetProcessId}$3`,
+        );
+        return xml;
       } catch {
         return `<!-- ${filename} not found -->`;
       }
@@ -188,7 +195,7 @@ export class SeedBpmnService {
       }
 
       const createdBy = userByEmail.get(pdSeed.createdByEmail);
-      const bpmnXml = readBpmn(pdSeed.templateFile);
+      const bpmnXml = readBpmn(pdSeed.templateFile, pdSeed.processId);
 
       const def = await this.procDefRepo.save(
         this.procDefRepo.create({
@@ -234,11 +241,7 @@ export class SeedBpmnService {
 
     this.logger.log(`Создано ${createdDefs.length} определений процессов с триггерами`);
 
-    // 3. Ждём пока Zeebe проиндексирует задеплоенные определения
-    this.logger.log('Ожидание индексации Zeebe (3с)...');
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // 4. Запустить процессы для некоторых сущностей
+    // 3. Запустить процессы для некоторых сущностей
     await this.startProcessesForEntities(createdDefs, entitiesMap, userByEmail);
   }
 
