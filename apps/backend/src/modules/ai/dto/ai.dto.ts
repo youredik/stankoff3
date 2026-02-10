@@ -57,6 +57,13 @@ export class GeneratedResponseDto {
 }
 
 /**
+ * Событие streaming генерации ответа
+ */
+export type StreamingEvent =
+  | { type: 'chunk'; text: string }
+  | { type: 'done'; sources: GeneratedResponseDto['sources'] };
+
+/**
  * DTO для RAG поиска
  */
 export class SearchRequestDto {
@@ -228,4 +235,10 @@ export interface AiAssistantResponse {
   suggestedActions?: string[];
   /** Ключевые слова/теги */
   keywords?: string[];
+  /** Настроение последнего комментария */
+  sentiment?: {
+    label: string;
+    emoji: string;
+    score: number;
+  };
 }

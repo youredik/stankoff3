@@ -63,6 +63,28 @@ export class OpenAiProvider extends BaseLlmProvider {
     };
   }
 
+  async *completeStream(options: LlmCompletionOptions): AsyncGenerator<string> {
+    if (!this.client) {
+      throw new Error('OpenAI не настроен');
+    }
+
+    const stream = await this.client.chat.completions.create({
+      model: this.model,
+      messages: options.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxTokens ?? 1000,
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) yield content;
+    }
+  }
+
   async embed(text: string): Promise<LlmEmbeddingResult> {
     if (!this.client) {
       throw new Error('OpenAI не настроен');

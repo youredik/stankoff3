@@ -24,7 +24,8 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
   const loading = useAiStore((s) => s.assistanceLoading.get(entityId) ?? false);
   const generatedResponse = useAiStore((s) => s.generatedResponse);
   const isGenerating = useAiStore((s) => s.isGenerating);
-  const { fetchAssistance, generateResponse } = useAiStore();
+  const streamingDraft = useAiStore((s) => s.streamingDraft);
+  const { fetchAssistance, generateResponseStream } = useAiStore();
 
   const [copied, setCopied] = useState(false);
 
@@ -32,11 +33,11 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
     fetchAssistance(entityId);
   }, [entityId, fetchAssistance]);
 
-  // Генерация черновика ответа
+  // Генерация черновика ответа (streaming)
   const handleGenerateResponse = useCallback(async () => {
     if (!entityId || isGenerating) return;
-    await generateResponse(entityId);
-  }, [entityId, isGenerating, generateResponse]);
+    await generateResponseStream(entityId);
+  }, [entityId, isGenerating, generateResponseStream]);
 
   // Копировать черновик
   const handleCopy = useCallback(() => {
@@ -107,8 +108,23 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
           )}
         </button>
 
-        {/* Сгенерированный ответ */}
-        {generatedResponse && (
+        {/* Streaming: текст появляется по мере генерации */}
+        {isGenerating && streamingDraft && (
+          <div className="mt-4">
+            <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
+              <h4 className="text-sm font-medium text-teal-700 dark:text-teal-300 mb-2">
+                Черновик ответа
+              </h4>
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                {streamingDraft}
+                <span className="inline-block w-0.5 h-4 bg-teal-500 ml-0.5 animate-pulse align-text-bottom" />
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Сгенерированный ответ (после завершения) */}
+        {!isGenerating && generatedResponse && (
           <div className="mt-4 space-y-3">
             <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
               <div className="flex items-center justify-between mb-2">

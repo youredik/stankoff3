@@ -7,6 +7,7 @@ import type {
   SearchRequest,
   SearchResult,
   AiAssistantResponse,
+  ConversationSummary,
   IndexerStatus,
   IndexerStats,
   KnowledgeBaseStats,
@@ -82,6 +83,12 @@ export const aiApi = {
    */
   suggestResponse: (entityId: string, additionalContext?: string) =>
     apiClient.post<GeneratedResponse>(`/ai/assist/${entityId}/suggest-response`, { additionalContext }).then((r) => r.data),
+
+  /**
+   * Получить AI-резюме переписки
+   */
+  getSummary: (entityId: string) =>
+    apiClient.get<ConversationSummary>(`/ai/assist/${entityId}/summary`).then((r) => r.data),
 
   // ==================== Indexer ====================
 

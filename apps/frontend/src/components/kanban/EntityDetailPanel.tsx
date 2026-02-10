@@ -14,6 +14,8 @@ import { EntityTimeline } from '@/components/entity/timeline';
 import { AiAssistantTab } from '@/components/entity/AiAssistantTab';
 import { AiClassificationPanel } from '@/components/ai/AiClassificationPanel';
 import { AiInsightsPanel } from '@/components/ai/AiInsightsPanel';
+import { AiSummaryBanner } from '@/components/ai/AiSummaryBanner';
+import { useAiStore } from '@/store/useAiStore';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment, Field, Section, Attachment } from '@/types';
@@ -33,6 +35,14 @@ const DEFAULT_STATUSES: FieldOption[] = [
   { id: 'testing', label: 'Тестирование', color: '#8B5CF6' },
   { id: 'done', label: 'Готово', color: '#10B981' },
 ];
+
+const sentimentLabels: Record<string, string> = {
+  satisfied: 'Доволен',
+  neutral: 'Нейтрально',
+  concerned: 'Обеспокоен',
+  frustrated: 'Недоволен',
+  urgent: 'Срочно',
+};
 
 const PRIORITY_COLORS: Record<string, string> = {
   high: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800',
@@ -176,6 +186,11 @@ export function EntityDetailPanel() {
   const canEditEntity = canEdit();
   // Назначение исполнителей: admin, manager или workspace admin/editor
   const canAssign = user?.role === 'admin' || user?.role === 'manager' || canEditEntity;
+
+  // Sentiment из AI assistance cache
+  const aiSentiment = useAiStore((s) =>
+    selectedEntity ? s.assistanceCache.get(selectedEntity.id)?.data?.sentiment ?? null : null,
+  );
 
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'activity' | 'ai'>('activity');
@@ -367,8 +382,13 @@ export function EntityDetailPanel() {
             {/* Left column: title, description, custom fields */}
             <div className="flex-1 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
               <div className="p-6">
-                <h2 id="entity-detail-title" data-testid="entity-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <h2 id="entity-detail-title" data-testid="entity-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   {selectedEntity.title}
+                  {aiSentiment && (
+                    <span title={`Настроение: ${sentimentLabels[aiSentiment.label] || aiSentiment.label}`} className="text-lg cursor-default">
+                      {aiSentiment.emoji}
+                    </span>
+                  )}
                 </h2>
 
                 {/* Description from data */}
@@ -443,12 +463,18 @@ export function EntityDetailPanel() {
               <div className="flex-1 overflow-y-auto p-6">
                 {/* Activity Timeline */}
                 {activeTab === 'activity' && (
-                  <EntityTimeline
-                    entityId={selectedEntity.id}
-                    comments={comments}
-                    statusOptions={statuses}
-                    allAttachments={allEntityAttachments}
-                  />
+                  <>
+                    <AiSummaryBanner
+                      entityId={selectedEntity.id}
+                      commentCount={comments.length}
+                    />
+                    <EntityTimeline
+                      entityId={selectedEntity.id}
+                      comments={comments}
+                      statusOptions={statuses}
+                      allAttachments={allEntityAttachments}
+                    />
+                  </>
                 )}
 
                 {/* AI Assistant Tab */}

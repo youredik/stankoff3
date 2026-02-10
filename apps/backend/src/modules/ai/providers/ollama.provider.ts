@@ -148,6 +148,68 @@ export class OllamaProvider extends BaseLlmProvider {
     }
   }
 
+  async *completeStream(options: LlmCompletionOptions): AsyncGenerator<string> {
+    if (!this.isAvailable) {
+      throw new Error('Ollama недоступен');
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages: options.messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          stream: true,
+          options: {
+            temperature: options.temperature ?? 0.7,
+            num_predict: options.maxTokens ?? 1000,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ollama streaming ошибка: ${response.status} - ${errorText}`);
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            const data = JSON.parse(trimmed) as OllamaChatResponse;
+            if (data.done) return;
+            const content = data.message?.content;
+            if (content) yield content;
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        this.isAvailable = false;
+      }
+      throw error;
+    }
+  }
+
   async embed(text: string): Promise<LlmEmbeddingResult> {
     if (!this.isAvailable) {
       throw new Error('Ollama недоступен');

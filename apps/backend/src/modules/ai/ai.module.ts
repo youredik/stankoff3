@@ -16,12 +16,13 @@ import { KnowledgeChunk } from './entities/knowledge-chunk.entity';
 import { AiUsageLog } from './entities/ai-usage-log.entity';
 import { AiClassification } from './entities/ai-classification.entity';
 import { WorkspaceEntity } from '../entity/entity.entity';
+import { Comment } from '../entity/comment.entity';
 import { LegacyModule } from '../legacy/legacy.module';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([KnowledgeChunk, AiUsageLog, AiClassification, WorkspaceEntity]),
+    TypeOrmModule.forFeature([KnowledgeChunk, AiUsageLog, AiClassification, WorkspaceEntity, Comment]),
     forwardRef(() => LegacyModule),
   ],
   controllers: [AiController],

@@ -5,12 +5,14 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 import { LegacyUrlService } from '../../legacy/services/legacy-url.service';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
 import { WorkspaceEntity } from '../../entity/entity.entity';
+import { Comment } from '../../entity/comment.entity';
 import {
   AiAssistantResponse,
   SimilarCase,
   SuggestedExpert,
   RelatedContext,
   GeneratedResponseDto,
+  StreamingEvent,
 } from '../dto/ai.dto';
 
 /**
@@ -34,9 +36,17 @@ export class AiAssistantService {
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
   private readonly CACHE_MAX_SIZE = 200;
 
+  // Кэш summary (TTL 5 мин)
+  private readonly summaryCache = new Map<
+    string,
+    { summary: string; expiresAt: number }
+  >();
+
   constructor(
     @InjectRepository(WorkspaceEntity)
     private readonly entityRepository: Repository<WorkspaceEntity>,
+    @InjectRepository(Comment)
+    private readonly commentRepository: Repository<Comment>,
     private readonly knowledgeBaseService: KnowledgeBaseService,
     private readonly legacyUrlService: LegacyUrlService,
     private readonly providerRegistry: AiProviderRegistry,
@@ -119,6 +129,14 @@ export class AiAssistantService {
       // Извлекаем ключевые слова
       const keywords = this.extractKeywords(searchResults);
 
+      // Анализ настроения (не блокируем основной ответ)
+      let sentiment: AiAssistantResponse['sentiment'];
+      try {
+        sentiment = await this.analyzeSentiment(entityId) ?? undefined;
+      } catch {
+        // Sentiment не критичен, пропускаем при ошибке
+      }
+
       const result: AiAssistantResponse = {
         available: true,
         similarCases,
@@ -126,6 +144,7 @@ export class AiAssistantService {
         relatedContext: Object.keys(relatedContext).length > 0 ? relatedContext : undefined,
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
         keywords: keywords.length > 0 ? keywords : undefined,
+        sentiment,
       };
 
       // Сохраняем в кэш
@@ -545,5 +564,211 @@ ${context}
       draft: result.content,
       sources,
     };
+  }
+
+  /**
+   * Генерирует черновик ответа в режиме streaming
+   * Yield: { type: 'chunk', text } для текста, { type: 'done', sources } в конце
+   */
+  async *generateResponseSuggestionStream(
+    entityId: string,
+    additionalContext?: string,
+  ): AsyncGenerator<StreamingEvent> {
+    if (!this.providerRegistry.isCompletionAvailable()) {
+      throw new Error('AI провайдеры недоступны');
+    }
+
+    const entity = await this.entityRepository.findOne({
+      where: { id: entityId },
+    });
+
+    if (!entity) {
+      throw new Error('Заявка не найдена');
+    }
+
+    const query = this.buildSearchQuery(entity);
+    if (!query || query.length < 10) {
+      throw new Error('Недостаточно данных для генерации');
+    }
+
+    const searchResults = await this.knowledgeBaseService.searchSimilar({
+      query,
+      sourceType: 'legacy_request',
+      limit: 5,
+      minSimilarity: 0.5,
+    });
+
+    if (searchResults.length === 0) {
+      throw new Error('Не найдено похожих случаев');
+    }
+
+    const contextParts: string[] = [];
+    const sources: GeneratedResponseDto['sources'] = [];
+
+    for (const result of searchResults) {
+      const metadata = result.metadata || {};
+      const requestId = metadata.requestId as number;
+      const subject = metadata.subject as string || `Заявка #${requestId}`;
+
+      contextParts.push(`--- Похожий случай ---
+Тема: ${subject}
+Решение: ${result.content.substring(0, 500)}`);
+
+      sources.push({
+        type: 'legacy_request',
+        id: String(requestId),
+        title: subject,
+        similarity: Math.round(result.similarity * 100) / 100,
+      });
+    }
+
+    const context = contextParts.join('\n\n');
+
+    const prompt = `Ты - специалист техподдержки промышленного оборудования компании "Станкофф".
+Твоя задача - сформировать черновик ответа клиенту на основе текущей заявки и похожих решённых случаев.
+
+ТЕКУЩАЯ ЗАЯВКА:
+Тема: ${entity.title}
+Описание: ${(entity.data as Record<string, unknown>)?.description || 'Нет описания'}
+${additionalContext ? `Дополнительный контекст: ${additionalContext}` : ''}
+
+ПОХОЖИЕ РЕШЁННЫЕ СЛУЧАИ:
+${context}
+
+ТРЕБОВАНИЯ К ОТВЕТУ:
+1. Пиши вежливо и профессионально
+2. Используй информацию из похожих случаев
+3. Не придумывай технические детали, которых нет в контексте
+4. Если решение требует диагностики, предложи уточняющие вопросы
+5. Ответ должен быть на русском языке
+6. Формат: обычный текст, можно использовать списки
+
+Сформируй черновик ответа:`;
+
+    // Streaming от LLM
+    for await (const chunk of this.providerRegistry.completeStream({
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      maxTokens: 1000,
+    })) {
+      yield { type: 'chunk' as const, text: chunk };
+    }
+
+    yield { type: 'done' as const, sources };
+  }
+
+  /**
+   * Резюме переписки по entity
+   */
+  async summarizeConversation(entityId: string): Promise<{ summary: string; commentCount: number }> {
+    // Проверяем кэш
+    const cached = this.summaryCache.get(entityId);
+    if (cached && cached.expiresAt > Date.now()) {
+      const count = await this.commentRepository.count({ where: { entityId } });
+      return { summary: cached.summary, commentCount: count };
+    }
+
+    if (!this.providerRegistry.isCompletionAvailable()) {
+      throw new Error('AI провайдеры недоступны');
+    }
+
+    const comments = await this.commentRepository.find({
+      where: { entityId },
+      order: { createdAt: 'ASC' },
+      take: 50,
+      relations: ['author'],
+    });
+
+    if (comments.length < 3) {
+      throw new Error('Недостаточно комментариев для резюме');
+    }
+
+    const entity = await this.entityRepository.findOne({ where: { id: entityId } });
+    const title = entity?.title || 'Без темы';
+
+    const conversation = comments.map((c) => {
+      const author = c.author
+        ? `${c.author.firstName} ${c.author.lastName}`
+        : 'Неизвестный';
+      return `[${author}]: ${c.content.substring(0, 300)}`;
+    }).join('\n');
+
+    const result = await this.providerRegistry.complete({
+      messages: [{
+        role: 'user',
+        content: `Кратко резюмируй переписку по заявке "${title}" (${comments.length} сообщений).
+Выдели: ключевую проблему, текущий статус, и что требуется дальше.
+Ответ на русском, 2-4 предложения.
+
+ПЕРЕПИСКА:
+${conversation}`,
+      }],
+      temperature: 0.3,
+      maxTokens: 300,
+    });
+
+    // Кэшируем
+    this.summaryCache.set(entityId, {
+      summary: result.content,
+      expiresAt: Date.now() + this.CACHE_TTL_MS,
+    });
+
+    return { summary: result.content, commentCount: comments.length };
+  }
+
+  /**
+   * Анализ настроения последнего комментария
+   */
+  async analyzeSentiment(entityId: string): Promise<{
+    label: string;
+    emoji: string;
+    score: number;
+  } | null> {
+    if (!this.providerRegistry.isCompletionAvailable()) {
+      return null;
+    }
+
+    // Получаем последний комментарий
+    const lastComment = await this.commentRepository.findOne({
+      where: { entityId },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!lastComment || lastComment.content.length < 10) {
+      return null;
+    }
+
+    try {
+      const result = await this.providerRegistry.complete({
+        messages: [{
+          role: 'user',
+          content: `Определи настроение клиента по сообщению. Ответь строго в JSON формате:
+{"label":"одно_из: satisfied|neutral|concerned|frustrated|urgent","score":0.0-1.0}
+
+Сообщение: "${lastComment.content.substring(0, 500)}"`,
+        }],
+        temperature: 0,
+        maxTokens: 50,
+        jsonMode: true,
+      });
+
+      const parsed = JSON.parse(result.content);
+      const emojiMap: Record<string, string> = {
+        satisfied: '😊',
+        neutral: '😐',
+        concerned: '😟',
+        frustrated: '😤',
+        urgent: '🚨',
+      };
+
+      return {
+        label: parsed.label || 'neutral',
+        emoji: emojiMap[parsed.label] || '😐',
+        score: parsed.score || 0.5,
+      };
+    } catch (error) {
+      this.logger.warn(`Ошибка анализа настроения: ${error.message}`);
+      return null;
+    }
   }
 }

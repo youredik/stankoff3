@@ -6,6 +6,7 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 import { LegacyUrlService } from '../../legacy/services/legacy-url.service';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
 import { WorkspaceEntity } from '../../entity/entity.entity';
+import { Comment } from '../../entity/comment.entity';
 
 describe('AiAssistantService', () => {
   let service: AiAssistantService;
@@ -70,6 +71,14 @@ describe('AiAssistantService', () => {
           provide: getRepositoryToken(WorkspaceEntity),
           useValue: {
             findOne: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(Comment),
+          useValue: {
+            find: jest.fn().mockResolvedValue([]),
+            findOne: jest.fn().mockResolvedValue(null),
+            count: jest.fn().mockResolvedValue(0),
           },
         },
         {

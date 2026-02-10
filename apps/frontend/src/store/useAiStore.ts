@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { aiApi } from '@/lib/api/ai';
+import { useAuthStore } from './useAuthStore';
 import type {
   AiAssistantResponse,
   AiClassification,
+  ConversationSummary,
   GeneratedResponse,
 } from '@/types/ai';
 
@@ -25,6 +27,11 @@ interface AiState {
   // Сгенерированный ответ (эфемерный, не кэшируется)
   generatedResponse: GeneratedResponse | null;
   isGenerating: boolean;
+  streamingDraft: string;
+
+  // Кэш summary по entityId
+  summaryCache: Map<string, ConversationSummary>;
+  summaryLoading: Map<string, boolean>;
 
   // Actions
   fetchAssistance: (entityId: string, forceRefresh?: boolean) => Promise<AiAssistantResponse | null>;
@@ -37,6 +44,8 @@ interface AiState {
   ) => Promise<AiClassification | null>;
   applyClassification: (entityId: string) => Promise<AiClassification | null>;
   generateResponse: (entityId: string, additionalContext?: string) => Promise<GeneratedResponse | null>;
+  generateResponseStream: (entityId: string, additionalContext?: string) => Promise<GeneratedResponse | null>;
+  fetchSummary: (entityId: string) => Promise<ConversationSummary | null>;
   onClassificationReady: (entityId: string) => void;
   invalidateAssistance: (entityId: string) => void;
   clearAll: () => void;
@@ -49,6 +58,9 @@ export const useAiStore = create<AiState>((set, get) => ({
   classificationLoading: new Map(),
   generatedResponse: null,
   isGenerating: false,
+  streamingDraft: '',
+  summaryCache: new Map(),
+  summaryLoading: new Map(),
 
   fetchAssistance: async (entityId, forceRefresh = false) => {
     if (!entityId) return null;
@@ -182,6 +194,98 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
   },
 
+  generateResponseStream: async (entityId, additionalContext) => {
+    if (get().isGenerating) return null;
+
+    set({ isGenerating: true, streamingDraft: '', generatedResponse: null });
+
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const response = await fetch(`/api/ai/assist/${entityId}/suggest-response/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ additionalContext }),
+      });
+
+      if (!response.ok) {
+        set({ isGenerating: false });
+        return null;
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let draft = '';
+      let buffer = '';
+      let sources: GeneratedResponse['sources'] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+          try {
+            const event = JSON.parse(trimmed.slice(6));
+            if (event.type === 'chunk') {
+              draft += event.text;
+              set({ streamingDraft: draft });
+            } else if (event.type === 'done') {
+              sources = event.sources || [];
+            }
+          } catch {
+            // Игнорируем невалидный JSON
+          }
+        }
+      }
+
+      const result: GeneratedResponse = { draft, sources };
+      set({ generatedResponse: result, isGenerating: false, streamingDraft: '' });
+      return result;
+    } catch {
+      set({ isGenerating: false, streamingDraft: '' });
+      return null;
+    }
+  },
+
+  fetchSummary: async (entityId) => {
+    if (!entityId) return null;
+    if (get().summaryLoading.get(entityId)) return get().summaryCache.get(entityId) ?? null;
+
+    set((state) => {
+      const loading = new Map(state.summaryLoading);
+      loading.set(entityId, true);
+      return { summaryLoading: loading };
+    });
+
+    try {
+      const data = await aiApi.getSummary(entityId);
+      set((state) => {
+        const cache = new Map(state.summaryCache);
+        const loading = new Map(state.summaryLoading);
+        cache.set(entityId, data);
+        loading.set(entityId, false);
+        return { summaryCache: cache, summaryLoading: loading };
+      });
+      return data;
+    } catch {
+      set((state) => {
+        const loading = new Map(state.summaryLoading);
+        loading.set(entityId, false);
+        return { summaryLoading: loading };
+      });
+      return null;
+    }
+  },
+
   onClassificationReady: (entityId) => {
     // Перезагрузить классификацию из API
     get().fetchClassification(entityId);
@@ -203,6 +307,9 @@ export const useAiStore = create<AiState>((set, get) => ({
       classificationLoading: new Map(),
       generatedResponse: null,
       isGenerating: false,
+      streamingDraft: '',
+      summaryCache: new Map(),
+      summaryLoading: new Map(),
     });
   },
 }));

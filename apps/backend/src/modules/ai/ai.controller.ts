@@ -5,10 +5,12 @@ import {
   Body,
   Param,
   Query,
+  Res,
   HttpException,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../user/user.entity';
 import { ClassifierService } from './services/classifier.service';
@@ -454,6 +456,75 @@ export class AiController {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  /**
+   * Получить AI-резюме переписки по entity
+   *
+   * GET /api/ai/assist/:entityId/summary
+   */
+  @Get('assist/:entityId/summary')
+  async getConversationSummary(
+    @Param('entityId') entityId: string,
+    @CurrentUser() user: User,
+  ): Promise<{ summary: string; commentCount: number }> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+
+    try {
+      return await this.aiAssistantService.summarizeConversation(entityId);
+    } catch (error) {
+      this.logger.error(`Ошибка генерации резюме: ${error.message}`);
+      throw new HttpException(
+        error.message || 'Ошибка генерации резюме',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Streaming генерация черновика ответа (SSE)
+   *
+   * POST /api/ai/assist/:entityId/suggest-response/stream
+   *
+   * Возвращает Server-Sent Events:
+   * - data: {"type":"chunk","text":"..."} — фрагмент текста
+   * - data: {"type":"done","sources":[...]} — завершение с источниками
+   */
+  @Post('assist/:entityId/suggest-response/stream')
+  async suggestResponseStream(
+    @Param('entityId') entityId: string,
+    @Body() body: { additionalContext?: string },
+    @Res() res: Response,
+    @CurrentUser() user: User,
+  ): Promise<void> {
+    if (!user?.id) {
+      res.status(401).json({ message: 'Требуется авторизация' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    try {
+      const stream = this.aiAssistantService.generateResponseSuggestionStream(
+        entityId,
+        body.additionalContext,
+      );
+
+      for await (const event of stream) {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    } catch (error) {
+      this.logger.error(`Ошибка streaming генерации: ${error.message}`);
+      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    }
+
+    res.end();
   }
 
   // ==================== USAGE STATS ====================

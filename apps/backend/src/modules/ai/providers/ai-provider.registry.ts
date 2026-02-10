@@ -188,6 +188,33 @@ export class AiProviderRegistry implements OnModuleInit {
   }
 
   /**
+   * Выполняет streaming completion с fallback
+   */
+  async *completeStream(options: LlmCompletionOptions): AsyncGenerator<string> {
+    const errors: string[] = [];
+
+    for (const name of this.llmPriority) {
+      const provider = this.providers.get(name);
+      const config = this.providerConfigs.find((c) => c.name === name);
+
+      if (!provider?.isConfigured || !config?.supportsCompletion) {
+        continue;
+      }
+
+      try {
+        yield* provider.completeStream(options);
+        return;
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        errors.push(`${name}: ${errorMsg}`);
+        this.logger.warn(`Провайдер ${name} streaming недоступен: ${errorMsg}`);
+      }
+    }
+
+    throw new Error(`Все AI провайдеры недоступны для streaming. Ошибки: ${errors.join('; ')}`);
+  }
+
+  /**
    * Генерирует embeddings с fallback
    */
   async embed(text: string): Promise<LlmEmbeddingResult & { provider: string }> {

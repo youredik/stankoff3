@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAiStore } from './useAiStore';
-import type { AiAssistantResponse, AiClassification, GeneratedResponse } from '@/types/ai';
+import type { AiAssistantResponse, AiClassification, GeneratedResponse, ConversationSummary } from '@/types/ai';
 
 // Mock AI API
 vi.mock('@/lib/api/ai', () => ({
@@ -10,7 +10,13 @@ vi.mock('@/lib/api/ai', () => ({
     classifyAndSave: vi.fn(),
     applyClassification: vi.fn(),
     suggestResponse: vi.fn(),
+    getSummary: vi.fn(),
   },
+}));
+
+// Mock auth store
+vi.mock('./useAuthStore', () => ({
+  useAuthStore: { getState: () => ({ accessToken: 'test-token' }) },
 }));
 
 import { aiApi } from '@/lib/api/ai';
@@ -62,6 +68,9 @@ describe('useAiStore', () => {
       classificationLoading: new Map(),
       generatedResponse: null,
       isGenerating: false,
+      streamingDraft: '',
+      summaryCache: new Map(),
+      summaryLoading: new Map(),
     });
     vi.clearAllMocks();
   });
@@ -75,6 +84,9 @@ describe('useAiStore', () => {
       expect(state.classificationLoading.size).toBe(0);
       expect(state.generatedResponse).toBeNull();
       expect(state.isGenerating).toBe(false);
+      expect(state.streamingDraft).toBe('');
+      expect(state.summaryCache.size).toBe(0);
+      expect(state.summaryLoading.size).toBe(0);
     });
   });
 
@@ -249,6 +261,39 @@ describe('useAiStore', () => {
     });
   });
 
+  describe('fetchSummary', () => {
+    const mockSummary: ConversationSummary = {
+      summary: 'Клиент сообщил о проблеме. Требуется диагностика.',
+      commentCount: 15,
+    };
+
+    it('должен загрузить summary из API', async () => {
+      vi.mocked(aiApi.getSummary).mockResolvedValue(mockSummary);
+
+      const result = await useAiStore.getState().fetchSummary('entity-1');
+
+      expect(aiApi.getSummary).toHaveBeenCalledWith('entity-1');
+      expect(result).toEqual(mockSummary);
+      expect(useAiStore.getState().summaryCache.get('entity-1')).toEqual(mockSummary);
+      expect(useAiStore.getState().summaryLoading.get('entity-1')).toBe(false);
+    });
+
+    it('должен вернуть null при ошибке', async () => {
+      vi.mocked(aiApi.getSummary).mockRejectedValue(new Error('Error'));
+
+      const result = await useAiStore.getState().fetchSummary('entity-1');
+
+      expect(result).toBeNull();
+      expect(useAiStore.getState().summaryLoading.get('entity-1')).toBe(false);
+    });
+
+    it('должен вернуть null для пустого entityId', async () => {
+      const result = await useAiStore.getState().fetchSummary('');
+      expect(result).toBeNull();
+      expect(aiApi.getSummary).not.toHaveBeenCalled();
+    });
+  });
+
   describe('invalidateAssistance', () => {
     it('должен удалить запись из кэша', async () => {
       vi.mocked(aiApi.getAssistance).mockResolvedValue(mockAssistance);
@@ -280,6 +325,9 @@ describe('useAiStore', () => {
       expect(state.classificationLoading.size).toBe(0);
       expect(state.generatedResponse).toBeNull();
       expect(state.isGenerating).toBe(false);
+      expect(state.streamingDraft).toBe('');
+      expect(state.summaryCache.size).toBe(0);
+      expect(state.summaryLoading.size).toBe(0);
     });
   });
 });

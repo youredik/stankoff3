@@ -110,6 +110,16 @@ export interface AiAssistantResponse {
   suggestedResponse?: string;
   suggestedActions?: string[];
   keywords?: string[];
+  sentiment?: {
+    label: string;
+    emoji: string;
+    score: number;
+  };
+}
+
+export interface ConversationSummary {
+  summary: string;
+  commentCount: number;
 }
 
 export interface GeneratedResponse {

@@ -31,5 +31,6 @@ export abstract class BaseLlmProvider {
   abstract readonly isConfigured: boolean;
 
   abstract complete(options: LlmCompletionOptions): Promise<LlmCompletionResult>;
+  abstract completeStream(options: LlmCompletionOptions): AsyncGenerator<string>;
   abstract embed(text: string): Promise<LlmEmbeddingResult>;
 }

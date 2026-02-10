@@ -107,6 +107,62 @@ export class GroqProvider extends BaseLlmProvider {
     };
   }
 
+  async *completeStream(options: LlmCompletionOptions): AsyncGenerator<string> {
+    if (!this.apiKey) {
+      throw new Error('Groq не настроен');
+    }
+
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: options.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? 1000,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Groq streaming ошибка: ${response.status} - ${errorText}`);
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          if (trimmed === 'data: [DONE]') return;
+
+          const data = JSON.parse(trimmed.slice(6));
+          const content = data.choices?.[0]?.delta?.content;
+          if (content) yield content;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
   /**
    * Groq не поддерживает embeddings
    * Используйте Ollama или OpenAI для embeddings
