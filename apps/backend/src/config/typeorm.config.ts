@@ -14,6 +14,7 @@ const entityPatterns = [
   __dirname + '/../modules/auth/*.entity{.ts,.js}',
   __dirname + '/../modules/automation/*.entity{.ts,.js}',
   __dirname + '/../modules/bpmn/**/*.entity{.ts,.js}',
+  __dirname + '/../modules/chat/**/*.entity{.ts,.js}',
   __dirname + '/../modules/connectors/*.entity{.ts,.js}',
   __dirname + '/../modules/dmn/**/*.entity{.ts,.js}',
   __dirname + '/../modules/email/*.entity{.ts,.js}',

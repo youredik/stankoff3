@@ -21,6 +21,7 @@ import {
   ChevronRight,
   FolderPlus,
   Inbox,
+  MessageCircle,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
@@ -28,6 +29,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import { useTaskStore } from '@/store/useTaskStore';
+import { useChatStore } from '@/store/useChatStore';
 import { ImportModal } from '@/components/workspace/ImportModal';
 import { SectionMembersModal } from '@/components/section/SectionMembersModal';
 import type { Workspace, MenuSection } from '@/types';
@@ -96,6 +98,10 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     useSectionStore();
   const { user, logout } = useAuthStore();
   const { inboxCount, fetchInboxCount } = useTaskStore();
+  const totalChatUnread = useChatStore((s) => {
+    const counts = s.unreadCounts;
+    return Object.values(counts).reduce((sum, c) => sum + c, 0);
+  });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [sectionMenuOpen, setSectionMenuOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -632,6 +638,29 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                 )}
               </div>
               <span className="font-medium">Входящие задачи</span>
+            </button>
+
+            {/* Чат */}
+            <button
+              onClick={() => {
+                router.push('/chat');
+                close();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer mt-1 ${
+                pathname === '/chat'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+              }`}
+            >
+              <div className="relative">
+                <MessageCircle className="w-5 h-5" />
+                {totalChatUnread > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary-500 text-white text-[10px] font-semibold flex items-center justify-center rounded-full px-1">
+                    {totalChatUnread > 9 ? '9+' : totalChatUnread}
+                  </span>
+                )}
+              </div>
+              <span className="font-medium">Чат</span>
             </button>
           </div>
 

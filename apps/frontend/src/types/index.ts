@@ -841,3 +841,98 @@ export interface DecisionTableStatistics {
   avgEvaluationTime: number;
   ruleHitCounts: Record<string, number>;
 }
+
+// ─── Chat / Messenger ──────────────────────────────────────
+
+export type ConversationType = 'direct' | 'group' | 'entity';
+export type MessageType = 'text' | 'voice' | 'system';
+export type ParticipantRole = 'owner' | 'admin' | 'member';
+
+export interface ChatParticipant {
+  id: string;
+  conversationId: string;
+  userId: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatar?: string;
+  };
+  role: ParticipantRole;
+  lastReadAt: string | null;
+  lastReadMessageId: string | null;
+  mutedUntil: string | null;
+  joinedAt: string;
+  leftAt: string | null;
+}
+
+export interface ChatConversation {
+  id: string;
+  type: ConversationType;
+  name: string | null;
+  entityId: string | null;
+  workspaceId: string | null;
+  createdById: string;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  lastMessageAuthorId: string | null;
+  lastMessageAuthor: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  } | null;
+  participants: ChatParticipant[];
+  unreadCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessageAttachment {
+  id: string;
+  name: string;
+  size: number;
+  key: string;
+  mimeType: string;
+  thumbnailKey?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  authorId: string;
+  author: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatar?: string;
+  };
+  content: string | null;
+  type: MessageType;
+  replyToId: string | null;
+  replyTo: {
+    id: string;
+    content: string | null;
+    author: {
+      id: string;
+      firstName: string;
+      lastName: string;
+    };
+  } | null;
+  attachments: ChatMessageAttachment[];
+  voiceKey: string | null;
+  voiceDuration: number | null;
+  voiceWaveform: number[] | null;
+  mentionedUserIds: string[];
+  isEdited: boolean;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessagesPage {
+  messages: ChatMessage[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}

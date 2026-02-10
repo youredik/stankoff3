@@ -230,6 +230,30 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Client ${client.id} unsubscribed from SLA updates`);
   }
 
+  // ─── Chat events ──────────────────────────────────────────
+
+  @SubscribeMessage('chat:join')
+  handleChatJoin(client: AuthenticatedSocket, payload: { conversationId: string }): void {
+    if (!client.data?.user?.sub) return;
+    client.join(`chat:${payload.conversationId}`);
+  }
+
+  @SubscribeMessage('chat:leave')
+  handleChatLeave(client: AuthenticatedSocket, payload: { conversationId: string }): void {
+    client.leave(`chat:${payload.conversationId}`);
+  }
+
+  @SubscribeMessage('chat:typing')
+  handleChatTyping(client: AuthenticatedSocket, payload: { conversationId: string }): void {
+    const userId = client.data?.user?.sub;
+    if (!userId) return;
+    // Broadcast to room, excluding sender
+    client.to(`chat:${payload.conversationId}`).emit('chat:typing', {
+      conversationId: payload.conversationId,
+      userId,
+    });
+  }
+
   @SubscribeMessage('message')
   handleMessage(_client: Socket, _payload: unknown): string {
     return 'Message received';

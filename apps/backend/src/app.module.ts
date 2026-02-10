@@ -25,6 +25,7 @@ import { LegacyModule } from './modules/legacy/legacy.module';
 import { AiModule } from './modules/ai/ai.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { GeocodingModule } from './modules/geocoding/geocoding.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { SeedModule } from './seed/seed.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
@@ -61,6 +62,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     AiModule,
     OnboardingModule,
     GeocodingModule,
+    ChatModule,
   ],
   providers: [
     // Глобальные guards - порядок важен: сначала JWT, потом Roles

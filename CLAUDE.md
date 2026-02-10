@@ -538,6 +538,21 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 **OG Preview:**
 - `GET /api/og-preview?url=https://...` — получить OG meta-теги страницы (title, description, image, siteName)
 
+**Chat (корпоративный мессенджер, стиль Telegram):**
+- `GET /api/chat/conversations` — список чатов пользователя (query: search)
+- `POST /api/chat/conversations` — создать чат (body: type, name?, entityId?, participantIds)
+- `GET /api/chat/conversations/:id` — детали чата
+- `GET /api/chat/conversations/:id/messages` — сообщения (cursor-пагинация: cursor?, limit?)
+- `POST /api/chat/conversations/:id/messages` — отправить сообщение (body: content?, type?, replyToId?, attachments?, voiceKey?, voiceDuration?, voiceWaveform?, mentionedUserIds?)
+- `PATCH /api/chat/conversations/:id/messages/:msgId` — редактировать сообщение
+- `DELETE /api/chat/conversations/:id/messages/:msgId` — удалить сообщение (soft)
+- `POST /api/chat/conversations/:id/read` — отметить прочитанным (body: lastReadMessageId)
+- `POST /api/chat/conversations/:id/participants` — добавить участников (body: userIds)
+- `DELETE /api/chat/conversations/:id/participants/:userId` — удалить участника
+- `GET /api/chat/conversations/for-entity/:entityId` — чат привязанный к заявке
+- `GET /api/chat/unread-counts` — количество непрочитанных по чатам
+- `GET /api/chat/search?q=текст` — поиск по сообщениям (full-text)
+
 **Legacy CRM (интеграция с MariaDB на 185.186.143.38, доступ только с ВМ препрода):**
 - `GET /api/legacy/health` — статус подключения к legacy БД
 - `GET /api/legacy/customers/search?q=текст&limit=10&employeesOnly=false` — поиск клиентов
@@ -589,3 +604,11 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `ai:classification:ready` — автоклассификация AI завершена (entityId, workspaceId, classification)
 - `auth:refresh` (client → server) — обновление JWT без разрыва WebSocket
 - `presence:update` — список онлайн-пользователей (usePresenceStore)
+- `chat:message` — новое сообщение в чате (conversationId, message)
+- `chat:message:edited` — сообщение отредактировано (conversationId, message)
+- `chat:message:deleted` — сообщение удалено (conversationId, messageId)
+- `chat:typing` — пользователь печатает (conversationId, userId)
+- `chat:read` — прочитано (conversationId, userId, lastReadMessageId)
+- `chat:conversation:created` — новый чат создан
+- `chat:conversation:updated` — чат обновлён (lastMessage)
+- `chat:join` / `chat:leave` (client → server) — подписка на room чата

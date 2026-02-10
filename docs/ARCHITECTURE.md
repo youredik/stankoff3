@@ -188,6 +188,19 @@ Stankoff Portal - это корпоративная система управл�
 - `onboarding/OnboardingTooltip.tsx` - Интерактивный tooltip с подсветкой элементов и прогресс-баром
 - `onboarding/OnboardingStatusCard.tsx` - Карточка прогресса обучения для Dashboard
 
+**Chat (Мессенджер в стиле Telegram)**
+- `chat/ChatPage.tsx` - Двухколоночный layout: список бесед (380px) + область сообщений
+- `chat/ConversationList.tsx` - Список чатов с поиском и кнопкой создания
+- `chat/ConversationItem.tsx` - Карточка беседы: аватар, имя, превью, время, бейдж непрочитанных
+- `chat/ChatView.tsx` - Область сообщений: header + message list + input
+- `chat/ChatHeader.tsx` - Шапка чата: имя, онлайн-статус / "печатает..."
+- `chat/MessageList.tsx` - Бесконечный скролл вверх, авто-скролл вниз, DateSeparator, группировка
+- `chat/MessageBubble.tsx` - Telegram-стиль: свои (зелёные) справа, чужие (белые) слева, SVG хвостик, время + ✓✓, контекстное меню (ответить, копировать, редактировать, удалить)
+- `chat/DateSeparator.tsx` - "Сегодня", "Вчера", "15 января 2026"
+- `chat/ChatInput.tsx` - Textarea (Enter=send, Shift+Enter=newline), reply preview, кнопки вложений/микрофон
+- `chat/VoicePlayer.tsx` - Play/pause + waveform bars + скорость 1x/1.5x/2x
+- `chat/NewChatModal.tsx` - Модал создания личного/группового чата
+
 > **Dynamic Imports:** Все компоненты с bpmn-js используют `dynamic(() => import(...), { ssr: false })`, так как библиотека требует браузерных API (DOM, Canvas).
 
 #### Stores (Zustand)
@@ -1500,6 +1513,51 @@ geocoding/
 - In-memory кеш с TTL 5 минут и максимальным размером 1000 записей
 - Graceful degradation: если `YANDEX_GEOCODER_API_KEY` не задан, возвращает пустые результаты
 - Таймаут HTTP-запросов: 5 секунд
+
+**ChatModule**
+Корпоративный мессенджер в стиле Telegram — личные, групповые чаты и обсуждения заявок.
+
+```
+chat/
+├── chat.module.ts
+├── chat.service.ts               # бизнес-логика (CRUD, дедупликация, cursor-пагинация)
+├── chat.service.spec.ts          # 19 unit-тестов
+├── chat.controller.ts            # REST API (13 endpoints)
+├── dto/
+│   ├── create-conversation.dto.ts
+│   ├── send-message.dto.ts
+│   ├── edit-message.dto.ts
+│   ├── mark-read.dto.ts
+│   ├── add-participants.dto.ts
+│   └── messages-query.dto.ts
+└── entities/
+    ├── conversation.entity.ts           # conversations (direct, group, entity)
+    ├── conversation-participant.entity.ts # conversation_participants
+    └── message.entity.ts                # messages (text, voice, system)
+```
+
+**Ключевые возможности:**
+- Три типа чатов: `direct` (1-на-1), `group`, `entity` (привязан к заявке)
+- Дедупликация: один direct чат между двумя пользователями, один чат на заявку
+- Cursor-based пагинация сообщений
+- Soft delete сообщений, редактирование своих
+- Read receipts (lastReadAt, lastReadMessageId)
+- Full-text search по сообщениям (tsvector, русский язык)
+- Голосовые сообщения (voiceKey → S3, voiceDuration, voiceWaveform)
+- System messages (add/remove participants)
+- WebSocket: real-time доставка, typing indicators, room-based routing
+
+**Frontend компоненты:**
+- `ChatPage` — два столбца: ConversationList (380px) + ChatView
+- `ConversationList` / `ConversationItem` — список чатов с бейджами непрочитанных
+- `ChatView` / `ChatHeader` — просмотр чата, статус онлайн/печатает
+- `MessageList` — бесконечный скролл, автопрокрутка, DateSeparator
+- `MessageBubble` — Telegram-стиль: цветные bubble, SVG хвостик, время + чекмарки, контекстное меню
+- `ChatInput` — textarea с Enter=send, Shift+Enter=newline, reply preview
+- `VoicePlayer` — визуализация waveform, play/pause, скорость 1x/1.5x/2x
+- `NewChatModal` — выбор пользователей для личного/группового чата
+
+**Frontend store:** `useChatStore` (Zustand) — conversations, messages, unreadCounts, typingUsers, replyToMessage + WS handlers
 
 #### API Endpoints
 

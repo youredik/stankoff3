@@ -8,6 +8,7 @@ import { useSlaStore, SlaUpdate } from '@/store/useSlaStore';
 import { usePresenceStore } from '@/store/usePresenceStore';
 import { useTaskStore } from '@/store/useTaskStore';
 import { useAiStore } from '@/store/useAiStore';
+import { useChatStore } from '@/store/useChatStore';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -341,6 +342,36 @@ export function useWebSocket() {
           workspaceId: data.workspaceId,
         });
       }
+    });
+
+    // ─── Chat events ───────────────────────────────────────
+
+    socket.on('chat:message', (data: { conversationId: string; message: any }) => {
+      useChatStore.getState().onNewMessage(data.conversationId, data.message);
+    });
+
+    socket.on('chat:message:edited', (data: { conversationId: string; message: any }) => {
+      useChatStore.getState().onMessageEdited(data.conversationId, data.message);
+    });
+
+    socket.on('chat:message:deleted', (data: { conversationId: string; messageId: string }) => {
+      useChatStore.getState().onMessageDeleted(data.conversationId, data.messageId);
+    });
+
+    socket.on('chat:typing', (data: { conversationId: string; userId: string }) => {
+      useChatStore.getState().onTyping(data.conversationId, data.userId);
+    });
+
+    socket.on('chat:read', (data: { conversationId: string; userId: string; lastReadMessageId: string }) => {
+      useChatStore.getState().onReadReceipt(data.conversationId, data.userId, data.lastReadMessageId);
+    });
+
+    socket.on('chat:conversation:created', (conversation: any) => {
+      useChatStore.getState().onConversationCreated(conversation);
+    });
+
+    socket.on('chat:conversation:updated', (data: any) => {
+      useChatStore.getState().onConversationUpdated(data);
     });
 
     return () => {
