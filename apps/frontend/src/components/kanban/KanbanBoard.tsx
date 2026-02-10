@@ -9,6 +9,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  pointerWithin,
+  closestCenter,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import { Plus, Filter, Settings, X, Eye } from 'lucide-react';
 import { SkeletonColumn } from '@/components/ui/Skeleton';
@@ -40,6 +43,17 @@ const DEFAULT_COLUMNS: FieldOption[] = [
   { id: 'testing', label: 'Тестирование', color: '#8B5CF6' },
   { id: 'done', label: 'Готово', color: '#10B981' },
 ];
+
+// Кастомный алгоритм коллизий для канбана:
+// pointerWithin — если указатель внутри столбца, берём его (точное попадание)
+// closestCenter — fallback, когда указатель вне droppable-зон (между столбцами или ниже)
+const kanbanCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) {
+    return pointerCollisions;
+  }
+  return closestCenter(args);
+};
 
 export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const router = useRouter();
@@ -259,6 +273,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
         <DndContext
           sensors={sensors}
+          collisionDetection={kanbanCollisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >

@@ -34,7 +34,7 @@ export function KanbanColumn({
 
   return (
     <div
-      className={`flex-shrink-0 w-80 px-4 border-r border-gray-300 dark:border-gray-600 last:border-r-0 transition-colors ${
+      className={`flex-shrink-0 w-80 px-4 border-r border-gray-300 dark:border-gray-600 last:border-r-0 transition-colors flex flex-col ${
         isOver ? 'bg-primary-100/50 dark:bg-primary-900/20' : ''
       }`}
     >
@@ -59,7 +59,7 @@ export function KanbanColumn({
         ref={setNodeRef}
         data-testid="kanban-column"
         data-status={id}
-        className="space-y-3 min-h-[200px]"
+        className="space-y-3 min-h-[200px] flex-1"
       >
         <SortableContext
           items={cards.map((c) => c.id)}
