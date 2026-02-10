@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sparkles, RefreshCw, Check, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { aiApi } from '@/lib/api/ai';
-import type { AiClassification, ClassifyResponse } from '@/types/ai';
+import { useAiStore } from '@/store/useAiStore';
+import type { AiClassification } from '@/types/ai';
 
 interface AiClassificationPanelProps {
   entityId: string;
@@ -66,9 +67,10 @@ export function AiClassificationPanel({
   onApply,
   readOnly = false,
 }: AiClassificationPanelProps) {
-  const [classification, setClassification] = useState<AiClassification | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isClassifying, setIsClassifying] = useState(false);
+  const classification = useAiStore((s) => s.classificationCache.get(entityId) ?? null);
+  const isLoading = useAiStore((s) => s.classificationLoading.get(entityId) ?? false);
+  const { fetchClassification, classifyEntity, applyClassification } = useAiStore();
+
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
@@ -83,70 +85,32 @@ export function AiClassificationPanel({
   // Загружаем существующую классификацию
   useEffect(() => {
     if (!entityId) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    aiApi.getClassification(entityId)
-      .then((data) => {
-        setClassification(data);
-      })
-      .catch((err) => {
-        console.error('Failed to load classification:', err);
-        // Не показываем ошибку если классификации просто нет
-      })
-      .finally(() => setIsLoading(false));
-  }, [entityId]);
-
-  // Слушаем WebSocket событие автоклассификации
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { entityId: eid } = (e as CustomEvent).detail;
-      if (eid === entityId) {
-        aiApi.getClassification(entityId).then((data) => {
-          if (data) setClassification(data);
-        }).catch(() => {});
-      }
-    };
-    window.addEventListener('ai:classification:ready', handler);
-    return () => window.removeEventListener('ai:classification:ready', handler);
-  }, [entityId]);
+    fetchClassification(entityId);
+  }, [entityId, fetchClassification]);
 
   // Запустить классификацию
   const handleClassify = useCallback(async () => {
     if (!title) return;
-
-    setIsClassifying(true);
     setError(null);
 
-    try {
-      const result = await aiApi.classifyAndSave(entityId, {
-        title,
-        description: description || '',
-        workspaceId,
-      });
-      setClassification(result);
-    } catch (err) {
-      console.error('Classification failed:', err);
+    const result = await classifyEntity(entityId, title, description, workspaceId);
+    if (!result) {
       setError('Ошибка классификации');
-    } finally {
-      setIsClassifying(false);
     }
-  }, [entityId, title, description, workspaceId]);
+  }, [entityId, title, description, workspaceId, classifyEntity]);
 
   // Применить классификацию
   const handleApply = useCallback(async () => {
     if (!classification) return;
+    setError(null);
 
-    try {
-      const applied = await aiApi.applyClassification(entityId);
-      setClassification(applied);
+    const applied = await applyClassification(entityId);
+    if (applied) {
       onApply?.(applied);
-    } catch (err) {
-      console.error('Failed to apply classification:', err);
+    } else {
       setError('Ошибка применения');
     }
-  }, [entityId, classification, onApply]);
+  }, [entityId, classification, applyClassification, onApply]);
 
   // AI недоступен
   if (isAvailable === false) {
@@ -158,12 +122,25 @@ export function AiClassificationPanel({
     );
   }
 
-  // Загрузка
-  if (isLoading) {
+  // Skeleton загрузка
+  if (isLoading && !classification) {
     return (
-      <div className="flex items-center gap-2 text-xs text-gray-500">
-        <div className="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full" />
-        <span>Загрузка...</span>
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        </div>
+        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3">
+          <div className="space-y-1.5">
+            <div className="h-2.5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-6 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="h-2.5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          </div>
+          <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -174,10 +151,10 @@ export function AiClassificationPanel({
       <div>
         <button
           onClick={handleClassify}
-          disabled={isClassifying || readOnly}
+          disabled={isLoading || readOnly}
           className="flex items-center gap-2 px-3 py-2 w-full text-sm font-medium text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isClassifying ? (
+          {isLoading ? (
             <>
               <div className="animate-spin w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full" />
               <span>Анализирую...</span>
@@ -303,11 +280,11 @@ export function AiClassificationPanel({
               )}
               <button
                 onClick={handleClassify}
-                disabled={isClassifying}
+                disabled={isLoading}
                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded transition-colors disabled:opacity-50"
                 title="Переклассифицировать"
               >
-                {isClassifying ? (
+                {isLoading ? (
                   <div className="animate-spin w-3.5 h-3.5 border border-gray-400 border-t-transparent rounded-full" />
                 ) : (
                   <RefreshCw className="w-3.5 h-3.5" />

@@ -413,6 +413,34 @@ interface PresenceState {
 
 > Хранит список онлайн-пользователей, обновляется через WebSocket событие `presence:update`. Используется в UserField при `showOnlineStatus = true`.
 
+**useAiStore**
+```typescript
+interface AiState {
+  // Кэш подсказок по entityId (TTL 5 мин, зеркалит backend кэш)
+  assistanceCache: Map<string, { data: AiAssistantResponse; loadedAt: number }>;
+  assistanceLoading: Map<string, boolean>;
+
+  // Кэш классификации по entityId
+  classificationCache: Map<string, AiClassification | null>;
+  classificationLoading: Map<string, boolean>;
+
+  // Сгенерированный ответ (эфемерный)
+  generatedResponse: GeneratedResponse | null;
+  isGenerating: boolean;
+
+  fetchAssistance(entityId: string, forceRefresh?: boolean): Promise<AiAssistantResponse | null>;
+  fetchClassification(entityId: string): Promise<AiClassification | null>;
+  classifyEntity(entityId: string, title: string, description?: string, workspaceId?: string): Promise<AiClassification | null>;
+  applyClassification(entityId: string): Promise<AiClassification | null>;
+  generateResponse(entityId: string, additionalContext?: string): Promise<GeneratedResponse | null>;
+  onClassificationReady(entityId: string): void;
+  invalidateAssistance(entityId: string): void;
+  clearAll(): void;
+}
+```
+
+> Централизованный store для AI данных. Устраняет дублирование API запросов: `AiInsightsPanel` (сайдбар) и `AiAssistantTab` (полная вкладка) делят один кэш. WebSocket событие `ai:classification:ready` обновляет store напрямую через `onClassificationReady()`. Клиентский TTL 5 мин зеркалит серверный кэш `AiAssistantService`.
+
 #### Hooks
 
 **useWebSocket**
@@ -431,7 +459,7 @@ interface PresenceState {
 - `task:reminder` - Напоминание о приближающемся дедлайне задачи (за 1 час, отправляется assignee/candidates)
 - `task:overdue` - Уведомление о просроченной задаче (отправляется assignee/candidates)
 - `process:incident` - Процесс зависнул с ошибкой (worker retries исчерпаны, отправляется в workspace)
-- `ai:classification:ready` - AI классификация завершена (создаёт уведомление `ai_suggestion` при confidence >= 0.7)
+- `ai:classification:ready` - AI классификация завершена (обновляет useAiStore, создаёт уведомление `ai_suggestion` при confidence >= 0.7)
 - `auth:refresh` - Client → Server: обновление JWT токена без разрыва WebSocket соединения
 
 > **Proactive token refresh:** Фронтенд автоматически обновляет access token за 60 секунд до истечения (без ожидания 401). При обновлении токена отправляет `auth:refresh` событие серверу для переаутентификации WebSocket без reconnect.

@@ -705,6 +705,14 @@ export function EntityDetailPanel() {
                   <AiInsightsPanel
                     entityId={selectedEntity.id}
                     onShowDetails={() => setActiveTab('ai')}
+                    onAssignExpert={(expertName) => {
+                      const matchedUser = users.find(
+                        (u) => `${u.firstName} ${u.lastName}` === expertName,
+                      );
+                      if (matchedUser) {
+                        updateAssignee(selectedEntity.id, matchedUser.id);
+                      }
+                    }}
                   />
                 </div>
 

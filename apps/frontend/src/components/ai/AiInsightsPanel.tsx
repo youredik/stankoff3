@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Sparkles,
   RefreshCw,
@@ -10,42 +10,30 @@ import {
   Lightbulb,
   Search,
   User,
+  UserPlus,
   ArrowRight,
   Building2,
 } from 'lucide-react';
-import { aiApi } from '@/lib/api/ai';
-import type { AiAssistantResponse } from '@/types/ai';
+import { useAiStore } from '@/store/useAiStore';
 
 interface AiInsightsPanelProps {
   entityId: string;
   onShowDetails?: () => void;
+  onAssignExpert?: (expertName: string, managerId?: number) => void;
 }
 
-export function AiInsightsPanel({ entityId, onShowDetails }: AiInsightsPanelProps) {
-  const [data, setData] = useState<AiAssistantResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AiInsightsPanel({ entityId, onShowDetails, onAssignExpert }: AiInsightsPanelProps) {
+  const data = useAiStore((s) => s.assistanceCache.get(entityId)?.data ?? null);
+  const loading = useAiStore((s) => s.assistanceLoading.get(entityId) ?? false);
+  const fetchAssistance = useAiStore((s) => s.fetchAssistance);
+
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const loadInsights = useCallback(async () => {
-    if (!entityId) {
-      setData(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await aiApi.getAssistance(entityId);
-      setData(result);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [entityId]);
-
   useEffect(() => {
-    loadInsights();
-  }, [loadInsights]);
+    fetchAssistance(entityId);
+  }, [entityId, fetchAssistance]);
+
+  const handleRefresh = () => fetchAssistance(entityId, true);
 
   // Не рендерим если AI недоступен или нет данных
   if (!loading && (!data || !data.available)) {
@@ -76,7 +64,7 @@ export function AiInsightsPanel({ entityId, onShowDetails }: AiInsightsPanelProp
           AI Подсказки
         </button>
         <button
-          onClick={loadInsights}
+          onClick={handleRefresh}
           disabled={loading}
           className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors disabled:opacity-50"
           title="Обновить"
@@ -179,9 +167,20 @@ export function AiInsightsPanel({ entityId, onShowDetails }: AiInsightsPanelProp
                     <span className="text-gray-600 dark:text-gray-400 truncate">
                       {expert.name}
                     </span>
-                    <span className="text-gray-400 shrink-0 ml-1">
-                      {expert.relevantCases} случа{expert.relevantCases === 1 ? 'й' : expert.relevantCases < 5 ? 'я' : 'ев'}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-gray-400 ml-1">
+                        {expert.relevantCases} случа{expert.relevantCases === 1 ? 'й' : expert.relevantCases < 5 ? 'я' : 'ев'}
+                      </span>
+                      {onAssignExpert && (
+                        <button
+                          onClick={() => onAssignExpert(expert.name, expert.managerId)}
+                          className="p-0.5 text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                          title="Назначить исполнителем"
+                        >
+                          <UserPlus className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

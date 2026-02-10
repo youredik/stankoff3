@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Copy, Check, Sparkles, MessageSquare } from 'lucide-react';
-import { aiApi } from '@/lib/api/ai';
+import { useAiStore } from '@/store/useAiStore';
 import type {
-  AiAssistantResponse,
   SimilarCase,
   SuggestedExpert,
-  GeneratedResponse,
+  AiAssistantResponse,
 } from '@/types/ai';
 
 interface AiAssistantTabProps {
@@ -21,48 +20,23 @@ interface AiAssistantTabProps {
  * Показывает похожие случаи, экспертов и рекомендации на основе RAG
  */
 export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps) {
-  const [data, setData] = useState<AiAssistantResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const data = useAiStore((s) => s.assistanceCache.get(entityId)?.data ?? null);
+  const loading = useAiStore((s) => s.assistanceLoading.get(entityId) ?? false);
+  const generatedResponse = useAiStore((s) => s.generatedResponse);
+  const isGenerating = useAiStore((s) => s.isGenerating);
+  const { fetchAssistance, generateResponse } = useAiStore();
 
-  // State для генерации ответа
-  const [generatedResponse, setGeneratedResponse] = useState<GeneratedResponse | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!entityId) return;
-
-    setLoading(true);
-    setError(null);
-
-    aiApi.getAssistance(entityId)
-      .then(setData)
-      .catch((err) => {
-        console.error('AI Assistant error:', err);
-        setError('Не удалось загрузить данные AI помощника');
-      })
-      .finally(() => setLoading(false));
-  }, [entityId]);
+    fetchAssistance(entityId);
+  }, [entityId, fetchAssistance]);
 
   // Генерация черновика ответа
   const handleGenerateResponse = useCallback(async () => {
     if (!entityId || isGenerating) return;
-
-    setIsGenerating(true);
-    setGenerateError(null);
-
-    try {
-      const response = await aiApi.suggestResponse(entityId);
-      setGeneratedResponse(response);
-    } catch (err) {
-      console.error('Generate response error:', err);
-      setGenerateError('Не удалось сгенерировать ответ');
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [entityId, isGenerating]);
+    await generateResponse(entityId);
+  }, [entityId, isGenerating, generateResponse]);
 
   // Копировать черновик
   const handleCopy = useCallback(() => {
@@ -83,14 +57,6 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
       <div className="flex flex-col items-center justify-center py-12 text-gray-500">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mb-3" />
         <span>Анализирую...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="py-8 text-center text-red-500">
-        <p>{error}</p>
       </div>
     );
   }
@@ -140,10 +106,6 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
             </>
           )}
         </button>
-
-        {generateError && (
-          <p className="text-sm text-red-500 mt-2 text-center">{generateError}</p>
-        )}
 
         {/* Сгенерированный ответ */}
         {generatedResponse && (
@@ -291,9 +253,21 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 }
 
 /**
- * Карточка похожего случая
+ * Карточка похожего случая с кнопкой копирования решения
  */
 function SimilarCaseCard({ caseItem }: { caseItem: SimilarCase }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyResolution = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (caseItem.resolution) {
+      navigator.clipboard.writeText(caseItem.resolution);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <a
       href={caseItem.legacyUrl}
@@ -315,9 +289,22 @@ function SimilarCaseCard({ caseItem }: { caseItem: SimilarCase }) {
             {caseItem.subject}
           </p>
           {caseItem.resolution && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-              {caseItem.resolution}
-            </p>
+            <div className="flex items-start gap-1.5 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 flex-1">
+                {caseItem.resolution}
+              </p>
+              <button
+                onClick={handleCopyResolution}
+                className="p-0.5 text-gray-400 hover:text-teal-500 shrink-0 transition-colors"
+                title="Копировать решение"
+              >
+                {copied ? (
+                  <Check className="w-3.5 h-3.5 text-green-500" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
           )}
           <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
             {caseItem.resolutionTimeHours && (

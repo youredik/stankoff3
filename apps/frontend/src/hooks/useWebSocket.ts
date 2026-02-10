@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useSlaStore, SlaUpdate } from '@/store/useSlaStore';
 import { usePresenceStore } from '@/store/usePresenceStore';
 import { useTaskStore } from '@/store/useTaskStore';
+import { useAiStore } from '@/store/useAiStore';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -327,9 +328,8 @@ export function useWebSocket() {
         confidence: number;
       };
     }) => {
-      window.dispatchEvent(
-        new CustomEvent('ai:classification:ready', { detail: data }),
-      );
+      // Обновляем AI store
+      useAiStore.getState().onClassificationReady(data.entityId);
 
       // Уведомление при высокой уверенности
       const { category, priority, confidence } = data.classification;

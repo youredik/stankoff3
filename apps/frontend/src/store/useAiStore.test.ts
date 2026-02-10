@@ -1,0 +1,285 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useAiStore } from './useAiStore';
+import type { AiAssistantResponse, AiClassification, GeneratedResponse } from '@/types/ai';
+
+// Mock AI API
+vi.mock('@/lib/api/ai', () => ({
+  aiApi: {
+    getAssistance: vi.fn(),
+    getClassification: vi.fn(),
+    classifyAndSave: vi.fn(),
+    applyClassification: vi.fn(),
+    suggestResponse: vi.fn(),
+  },
+}));
+
+import { aiApi } from '@/lib/api/ai';
+
+const mockAssistance: AiAssistantResponse = {
+  available: true,
+  similarCases: [
+    {
+      requestId: 123,
+      subject: 'Тестовая заявка',
+      resolution: 'Решение',
+      similarity: 0.92,
+      legacyUrl: 'https://example.com/123',
+    },
+  ],
+  suggestedExperts: [
+    { name: 'Иванов И.И.', relevantCases: 5, topics: ['CNC'] },
+  ],
+  suggestedActions: ['Назначить эксперта'],
+  keywords: ['ЧПУ'],
+};
+
+const mockClassification: AiClassification = {
+  id: 'cls-1',
+  entityId: 'entity-1',
+  category: 'technical_support',
+  priority: 'high',
+  skills: ['mechanical'],
+  confidence: 0.85,
+  reasoning: 'Тестовое обоснование',
+  provider: 'groq',
+  model: 'llama-3.1-70b',
+  applied: false,
+  createdAt: '2026-02-10T00:00:00Z',
+  updatedAt: '2026-02-10T00:00:00Z',
+};
+
+const mockGeneratedResponse: GeneratedResponse = {
+  draft: 'Добрый день! Рекомендуем...',
+  sources: [{ type: 'legacy_request', id: '123', title: 'Заявка #123', similarity: 0.9 }],
+};
+
+describe('useAiStore', () => {
+  beforeEach(() => {
+    useAiStore.setState({
+      assistanceCache: new Map(),
+      assistanceLoading: new Map(),
+      classificationCache: new Map(),
+      classificationLoading: new Map(),
+      generatedResponse: null,
+      isGenerating: false,
+    });
+    vi.clearAllMocks();
+  });
+
+  describe('initial state', () => {
+    it('должен иметь пустое начальное состояние', () => {
+      const state = useAiStore.getState();
+      expect(state.assistanceCache.size).toBe(0);
+      expect(state.assistanceLoading.size).toBe(0);
+      expect(state.classificationCache.size).toBe(0);
+      expect(state.classificationLoading.size).toBe(0);
+      expect(state.generatedResponse).toBeNull();
+      expect(state.isGenerating).toBe(false);
+    });
+  });
+
+  describe('fetchAssistance', () => {
+    it('должен загрузить данные из API и закэшировать', async () => {
+      vi.mocked(aiApi.getAssistance).mockResolvedValue(mockAssistance);
+
+      const result = await useAiStore.getState().fetchAssistance('entity-1');
+
+      expect(aiApi.getAssistance).toHaveBeenCalledWith('entity-1');
+      expect(result).toEqual(mockAssistance);
+
+      const state = useAiStore.getState();
+      expect(state.assistanceCache.get('entity-1')?.data).toEqual(mockAssistance);
+      expect(state.assistanceLoading.get('entity-1')).toBe(false);
+    });
+
+    it('должен вернуть данные из кэша если TTL не истёк', async () => {
+      vi.mocked(aiApi.getAssistance).mockResolvedValue(mockAssistance);
+
+      // Первый вызов — загрузка
+      await useAiStore.getState().fetchAssistance('entity-1');
+      expect(aiApi.getAssistance).toHaveBeenCalledTimes(1);
+
+      // Второй вызов — из кэша
+      const result = await useAiStore.getState().fetchAssistance('entity-1');
+      expect(aiApi.getAssistance).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(mockAssistance);
+    });
+
+    it('должен перезагрузить данные при forceRefresh', async () => {
+      vi.mocked(aiApi.getAssistance).mockResolvedValue(mockAssistance);
+
+      await useAiStore.getState().fetchAssistance('entity-1');
+      await useAiStore.getState().fetchAssistance('entity-1', true);
+
+      expect(aiApi.getAssistance).toHaveBeenCalledTimes(2);
+    });
+
+    it('должен вернуть null при ошибке API', async () => {
+      vi.mocked(aiApi.getAssistance).mockRejectedValue(new Error('Network error'));
+
+      const result = await useAiStore.getState().fetchAssistance('entity-1');
+
+      expect(result).toBeNull();
+      expect(useAiStore.getState().assistanceLoading.get('entity-1')).toBe(false);
+    });
+
+    it('должен вернуть null для пустого entityId', async () => {
+      const result = await useAiStore.getState().fetchAssistance('');
+      expect(result).toBeNull();
+      expect(aiApi.getAssistance).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('fetchClassification', () => {
+    it('должен загрузить классификацию из API', async () => {
+      vi.mocked(aiApi.getClassification).mockResolvedValue(mockClassification);
+
+      const result = await useAiStore.getState().fetchClassification('entity-1');
+
+      expect(aiApi.getClassification).toHaveBeenCalledWith('entity-1');
+      expect(result).toEqual(mockClassification);
+
+      const state = useAiStore.getState();
+      expect(state.classificationCache.get('entity-1')).toEqual(mockClassification);
+      expect(state.classificationLoading.get('entity-1')).toBe(false);
+    });
+
+    it('должен вернуть null при ошибке API', async () => {
+      vi.mocked(aiApi.getClassification).mockRejectedValue(new Error('Not found'));
+
+      const result = await useAiStore.getState().fetchClassification('entity-1');
+
+      expect(result).toBeNull();
+      expect(useAiStore.getState().classificationLoading.get('entity-1')).toBe(false);
+    });
+  });
+
+  describe('classifyEntity', () => {
+    it('должен классифицировать и обновить кэш', async () => {
+      vi.mocked(aiApi.classifyAndSave).mockResolvedValue(mockClassification);
+
+      const result = await useAiStore.getState().classifyEntity(
+        'entity-1',
+        'Тестовая заявка',
+        'Описание проблемы',
+        'workspace-1',
+      );
+
+      expect(aiApi.classifyAndSave).toHaveBeenCalledWith('entity-1', {
+        title: 'Тестовая заявка',
+        description: 'Описание проблемы',
+        workspaceId: 'workspace-1',
+      });
+      expect(result).toEqual(mockClassification);
+      expect(useAiStore.getState().classificationCache.get('entity-1')).toEqual(mockClassification);
+    });
+
+    it('должен вернуть null при ошибке', async () => {
+      vi.mocked(aiApi.classifyAndSave).mockRejectedValue(new Error('Error'));
+
+      const result = await useAiStore.getState().classifyEntity('entity-1', 'Заявка');
+
+      expect(result).toBeNull();
+      expect(useAiStore.getState().classificationLoading.get('entity-1')).toBe(false);
+    });
+  });
+
+  describe('applyClassification', () => {
+    it('должен применить классификацию и обновить кэш', async () => {
+      const appliedClassification = { ...mockClassification, applied: true, appliedAt: '2026-02-10T12:00:00Z' };
+      vi.mocked(aiApi.applyClassification).mockResolvedValue(appliedClassification);
+
+      const result = await useAiStore.getState().applyClassification('entity-1');
+
+      expect(aiApi.applyClassification).toHaveBeenCalledWith('entity-1');
+      expect(result).toEqual(appliedClassification);
+      expect(useAiStore.getState().classificationCache.get('entity-1')?.applied).toBe(true);
+    });
+
+    it('должен вернуть null при ошибке', async () => {
+      vi.mocked(aiApi.applyClassification).mockRejectedValue(new Error('Error'));
+
+      const result = await useAiStore.getState().applyClassification('entity-1');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('generateResponse', () => {
+    it('должен сгенерировать ответ и сохранить в store', async () => {
+      vi.mocked(aiApi.suggestResponse).mockResolvedValue(mockGeneratedResponse);
+
+      const result = await useAiStore.getState().generateResponse('entity-1');
+
+      expect(aiApi.suggestResponse).toHaveBeenCalledWith('entity-1', undefined);
+      expect(result).toEqual(mockGeneratedResponse);
+
+      const state = useAiStore.getState();
+      expect(state.generatedResponse).toEqual(mockGeneratedResponse);
+      expect(state.isGenerating).toBe(false);
+    });
+
+    it('должен передать additionalContext', async () => {
+      vi.mocked(aiApi.suggestResponse).mockResolvedValue(mockGeneratedResponse);
+
+      await useAiStore.getState().generateResponse('entity-1', 'Дополнительный контекст');
+
+      expect(aiApi.suggestResponse).toHaveBeenCalledWith('entity-1', 'Дополнительный контекст');
+    });
+
+    it('должен вернуть null при ошибке', async () => {
+      vi.mocked(aiApi.suggestResponse).mockRejectedValue(new Error('Error'));
+
+      const result = await useAiStore.getState().generateResponse('entity-1');
+
+      expect(result).toBeNull();
+      expect(useAiStore.getState().isGenerating).toBe(false);
+    });
+  });
+
+  describe('onClassificationReady', () => {
+    it('должен перезагрузить классификацию из API', async () => {
+      vi.mocked(aiApi.getClassification).mockResolvedValue(mockClassification);
+
+      useAiStore.getState().onClassificationReady('entity-1');
+
+      // Дожидаемся async вызова
+      await vi.waitFor(() => {
+        expect(aiApi.getClassification).toHaveBeenCalledWith('entity-1');
+      });
+    });
+  });
+
+  describe('invalidateAssistance', () => {
+    it('должен удалить запись из кэша', async () => {
+      vi.mocked(aiApi.getAssistance).mockResolvedValue(mockAssistance);
+
+      await useAiStore.getState().fetchAssistance('entity-1');
+      expect(useAiStore.getState().assistanceCache.has('entity-1')).toBe(true);
+
+      useAiStore.getState().invalidateAssistance('entity-1');
+      expect(useAiStore.getState().assistanceCache.has('entity-1')).toBe(false);
+    });
+  });
+
+  describe('clearAll', () => {
+    it('должен сбросить всё состояние', async () => {
+      vi.mocked(aiApi.getAssistance).mockResolvedValue(mockAssistance);
+      vi.mocked(aiApi.getClassification).mockResolvedValue(mockClassification);
+      vi.mocked(aiApi.suggestResponse).mockResolvedValue(mockGeneratedResponse);
+
+      await useAiStore.getState().fetchAssistance('entity-1');
+      await useAiStore.getState().fetchClassification('entity-1');
+      await useAiStore.getState().generateResponse('entity-1');
+
+      useAiStore.getState().clearAll();
+
+      const state = useAiStore.getState();
+      expect(state.assistanceCache.size).toBe(0);
+      expect(state.assistanceLoading.size).toBe(0);
+      expect(state.classificationCache.size).toBe(0);
+      expect(state.classificationLoading.size).toBe(0);
+      expect(state.generatedResponse).toBeNull();
+      expect(state.isGenerating).toBe(false);
+    });
+  });
+});
