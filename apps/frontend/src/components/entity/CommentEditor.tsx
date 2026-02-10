@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -263,9 +264,12 @@ export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: Comm
                 });
               }}
             >
-              <div className="w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-xs">{user.firstName[0]}</span>
-              </div>
+              <UserAvatar
+                firstName={user.firstName}
+                lastName={user.lastName}
+                userId={user.id}
+                size="xs"
+              />
               <span>
                 {user.firstName} {user.lastName}
               </span>

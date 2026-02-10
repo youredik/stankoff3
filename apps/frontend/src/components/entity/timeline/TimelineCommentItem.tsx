@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { Comment, Attachment } from '@/types';
 
 interface TimelineCommentItemProps {
@@ -11,12 +12,12 @@ interface TimelineCommentItemProps {
 export function TimelineCommentItem({ comment, allAttachments }: TimelineCommentItemProps) {
   return (
     <div className="flex gap-3">
-      <div className="w-8 h-8 bg-primary-500 rounded-full flex-shrink-0 flex items-center justify-center">
-        <span className="text-white text-xs font-semibold">
-          {comment.author.firstName[0]}
-          {comment.author.lastName[0]}
-        </span>
-      </div>
+      <UserAvatar
+        firstName={comment.author.firstName}
+        lastName={comment.author.lastName}
+        userId={comment.author.id}
+        size="md"
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-900 dark:text-gray-200">

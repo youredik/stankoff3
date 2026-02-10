@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Link2, Calendar } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { Entity } from '@/types';
 import { useEntityStore } from '@/store/useEntityStore';
 import { SlaTimer } from '@/components/sla/SlaTimer';
@@ -101,11 +102,12 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
         <div className="flex items-center gap-2">
           {entity.assignee ? (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-primary-500 rounded flex items-center justify-center">
-                <span className="text-white text-[10px] font-semibold">
-                  {entity.assignee.firstName[0]}{entity.assignee.lastName[0]}
-                </span>
-              </div>
+              <UserAvatar
+                firstName={entity.assignee.firstName}
+                lastName={entity.assignee.lastName}
+                userId={entity.assignee.id}
+                size="sm"
+              />
               <span className="text-xs text-gray-400">
                 {entity.assignee.firstName} {entity.assignee.lastName[0]}.
               </span>

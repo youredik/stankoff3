@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Bell, LayoutGrid, BarChart3, List, Menu, LogOut, ChevronDown } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { NotificationPanel } from './NotificationPanel';
 import { GlobalSearch } from './GlobalSearch';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -27,14 +28,6 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
   const handleLogout = async () => {
     setShowUserMenu(false);
     await logout();
-  };
-
-  // Получаем инициалы пользователя
-  const getInitials = () => {
-    if (!user) return 'U';
-    const first = user.firstName?.[0] || '';
-    const last = user.lastName?.[0] || '';
-    return (first + last).toUpperCase() || user.email[0].toUpperCase();
   };
 
   const getFullName = () => {
@@ -132,9 +125,13 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
                 data-testid="user-menu-button"
                 className="flex items-center gap-3 px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
               >
-                <div className="w-8 h-8 bg-primary-500 rounded flex items-center justify-center">
-                  <span className="text-white text-sm font-semibold">{getInitials()}</span>
-                </div>
+                <UserAvatar
+                  firstName={user?.firstName}
+                  lastName={user?.lastName}
+                  email={user?.email}
+                  size="md"
+                  showOnline={false}
+                />
                 <div className="text-left hidden sm:block">
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{getFullName()}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{user?.department || user?.role || ''}</p>

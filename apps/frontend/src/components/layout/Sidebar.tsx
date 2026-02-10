@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import {
   Plus,
   Users,
@@ -112,14 +113,6 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     () => groupWorkspacesBySections(workspaces, sections),
     [workspaces, sections]
   );
-
-  // Получаем инициалы пользователя
-  const getInitials = () => {
-    if (!user) return 'U';
-    const first = user.firstName?.[0] || '';
-    const last = user.lastName?.[0] || '';
-    return (first + last).toUpperCase() || user.email[0].toUpperCase();
-  };
 
   const getFullName = () => {
     if (!user) return 'Пользователь';
@@ -678,9 +671,13 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
         {/* User section */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-9 h-9 rounded bg-primary-500 flex items-center justify-center text-white text-sm font-medium">
-              {getInitials()}
-            </div>
+            <UserAvatar
+              firstName={user?.firstName}
+              lastName={user?.lastName}
+              email={user?.email}
+              size="lg"
+              showOnline={false}
+            />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{getFullName()}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>

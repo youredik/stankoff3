@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { usersApi, type CreateUserData, type UpdateUserData } from '@/lib/api/users';
 import { UserModal, type UserFormData } from './UserModal';
 import type { User } from '@/types';
@@ -149,10 +150,12 @@ export function UserList() {
               <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center text-white text-sm font-medium">
-                      {user.firstName[0]}
-                      {user.lastName[0]}
-                    </div>
+                    <UserAvatar
+                      firstName={user.firstName}
+                      lastName={user.lastName}
+                      userId={user.id}
+                      size="lg"
+                    />
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       {user.firstName} {user.lastName}
                     </span>

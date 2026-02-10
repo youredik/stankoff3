@@ -5,22 +5,7 @@ import { X } from 'lucide-react';
 import type { UserFieldConfig } from '@/types';
 import type { FieldRenderer } from './types';
 import { usePresenceStore } from '@/store/usePresenceStore';
-
-function UserAvatar({ firstName, lastName, size = 'sm', showOnline }: {
-  firstName: string; lastName: string; size?: 'sm' | 'xs'; showOnline?: boolean;
-}) {
-  const sizeClass = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-5 h-5 text-[9px]';
-  return (
-    <div className="relative inline-flex flex-shrink-0">
-      <div className={`${sizeClass} bg-primary-600 rounded-full flex items-center justify-center`}>
-        <span className="text-white font-medium">{firstName[0]}{lastName[0]}</span>
-      </div>
-      {showOnline && (
-        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full" />
-      )}
-    </div>
-  );
-}
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 // Фильтрация пользователей по отделу
 function useFilteredUsers(users: any[], config?: UserFieldConfig) {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Search, User, Tag, Calendar, ChevronDown, Hash, Type, ToggleLeft, Link2, MapPin, Users } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { fieldRegistry } from '@/components/fields';
@@ -283,11 +284,12 @@ export function FilterPanel({
                             }
                             className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                           />
-                          <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
-                            <span className="text-white text-xs">
-                              {user.firstName[0]}
-                            </span>
-                          </div>
+                          <UserAvatar
+                            firstName={user.firstName}
+                            lastName={user.lastName}
+                            userId={user.id}
+                            size="sm"
+                          />
                           <span className="text-sm text-gray-700 dark:text-gray-300">
                             {user.firstName} {user.lastName}
                           </span>

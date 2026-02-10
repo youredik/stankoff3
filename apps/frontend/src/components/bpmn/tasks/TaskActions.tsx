@@ -8,6 +8,7 @@ import {
   X,
   Loader2,
 } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { UserTask, User } from '@/types';
 
 interface TaskActionsProps {
@@ -180,10 +181,12 @@ function DelegateModal({ users, isLoading, onDelegate, onClose }: DelegateModalP
                     onChange={(e) => setSelectedUserId(e.target.value)}
                     className="sr-only"
                   />
-                  <div className="w-8 h-8 rounded-full bg-teal-100 dark:bg-teal-800 flex items-center justify-center text-sm font-medium text-teal-600 dark:text-teal-300">
-                    {user.firstName[0]}
-                    {user.lastName[0]}
-                  </div>
+                  <UserAvatar
+                    firstName={user.firstName}
+                    lastName={user.lastName}
+                    userId={user.id}
+                    size="md"
+                  />
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">
                       {user.firstName} {user.lastName}
