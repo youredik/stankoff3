@@ -521,6 +521,12 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/ai/search` — RAG поиск по базе знаний (pgvector)
 - `GET /api/ai/knowledge-base/stats` — статистика базы знаний
 
+**AI Assistant (помощник по заявкам):**
+- `GET /api/ai/assist/:entityId` — AI подсказки (похожие случаи, эксперты, sentiment)
+- `POST /api/ai/assist/:entityId/suggest-response` — генерация черновика ответа
+- `POST /api/ai/assist/:entityId/suggest-response/stream` — streaming генерация (SSE)
+- `GET /api/ai/assist/:entityId/summary` — AI резюме переписки
+
 **AI RAG Indexer (индексация legacy данных):**
 - `GET /api/ai/indexer/health` — статус RAG индексатора
 - `GET /api/ai/indexer/status` — текущий статус индексации
@@ -552,6 +558,10 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `GET /api/chat/conversations/for-entity/:entityId` — чат привязанный к заявке
 - `GET /api/chat/unread-counts` — количество непрочитанных по чатам
 - `GET /api/chat/search?q=текст` — поиск по сообщениям (full-text)
+- `POST /api/chat/conversations/:id/messages/:msgId/reactions` — toggle emoji-реакции (body: emoji)
+- `GET /api/chat/conversations/:id/pinned` — закреплённые сообщения
+- `POST /api/chat/conversations/:id/messages/:msgId/pin` — закрепить сообщение
+- `DELETE /api/chat/conversations/:id/messages/:msgId/pin` — открепить сообщение
 
 **Legacy CRM (интеграция с MariaDB на 185.186.143.38, доступ только с ВМ препрода):**
 - `GET /api/legacy/health` — статус подключения к legacy БД
@@ -611,4 +621,7 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `chat:read` — прочитано (conversationId, userId, lastReadMessageId)
 - `chat:conversation:created` — новый чат создан
 - `chat:conversation:updated` — чат обновлён (lastMessage)
+- `chat:reaction` — реакция обновлена (conversationId, messageId, reactions[])
+- `chat:message:pinned` — сообщение закреплено (conversationId, message)
+- `chat:message:unpinned` — сообщение откреплено (conversationId, messageId)
 - `chat:join` / `chat:leave` (client → server) — подписка на room чата

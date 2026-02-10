@@ -32,6 +32,14 @@ const ALLOWED_MIME_TYPES = [
   'video/quicktime',
   'video/x-msvideo',
   'video/x-matroska',
+  // Audio
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+  'audio/webm',
+  'audio/aac',
+  'audio/flac',
+  'audio/mp4',
   // Documents
   'application/pdf',
   'application/msword',
@@ -59,7 +67,7 @@ export class S3Controller {
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Недопустимый тип файла. Разрешены: изображения, видео, PDF, Word, Excel, текстовые файлы.',
+        'Недопустимый тип файла. Разрешены: изображения, видео, аудио, PDF, Word, Excel, текстовые файлы.',
       );
     }
 

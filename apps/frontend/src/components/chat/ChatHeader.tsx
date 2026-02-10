@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { MoreVertical, Phone, Search } from 'lucide-react';
+import { MoreVertical, Search, Pin } from 'lucide-react';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePresenceStore } from '@/store/usePresenceStore';
@@ -10,9 +10,12 @@ import { getConversationName } from './ConversationList';
 
 interface ChatHeaderProps {
   conversationId: string;
+  onSearchClick: () => void;
+  onMenuClick: () => void;
+  pinnedCount?: number;
 }
 
-export function ChatHeader({ conversationId }: ChatHeaderProps) {
+export function ChatHeader({ conversationId, onSearchClick, onMenuClick, pinnedCount }: ChatHeaderProps) {
   const { user } = useAuthStore();
   const conversations = useChatStore((s) => s.conversations);
   const typingUsers = useChatStore((s) => s.typingUsers);
@@ -24,20 +27,19 @@ export function ChatHeader({ conversationId }: ChatHeaderProps) {
   const name = getConversationName(conversation, user?.id);
   const typing = typingUsers[conversationId] || [];
 
-  // Get other participant for direct chats
   const otherParticipant = conversation.type === 'direct'
     ? conversation.participants?.find((p) => p.userId !== user?.id && !p.leftAt)
     : null;
 
-  // Status text
   let statusText = '';
   if (typing.length > 0) {
-    statusText = 'печатает...';
+    statusText = typing.length === 1 ? 'печатает...' : `${typing.length} печатают...`;
   } else if (conversation.type === 'direct' && otherParticipant) {
     statusText = onlineUserIds.has(otherParticipant.userId) ? 'в сети' : 'не в сети';
   } else {
     const activeCount = conversation.participants?.filter((p) => !p.leftAt).length || 0;
-    statusText = `${activeCount} участников`;
+    const onlineCount = conversation.participants?.filter((p) => !p.leftAt && onlineUserIds.has(p.userId)).length || 0;
+    statusText = `${activeCount} участников${onlineCount > 0 ? `, ${onlineCount} в сети` : ''}`;
   }
 
   return (
@@ -67,10 +69,18 @@ export function ChatHeader({ conversationId }: ChatHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1">
-        <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors">
+        <button
+          onClick={onSearchClick}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
+          title="Поиск"
+        >
           <Search className="w-5 h-5" />
         </button>
-        <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors">
+        <button
+          onClick={onMenuClick}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
+          title="Настройки"
+        >
           <MoreVertical className="w-5 h-5" />
         </button>
       </div>

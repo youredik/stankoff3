@@ -6,6 +6,8 @@ import { ChatService } from './chat.service';
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message } from './entities/message.entity';
+import { MessageReaction } from './entities/message-reaction.entity';
+import { PinnedMessage } from './entities/pinned-message.entity';
 import { EventsGateway } from '../websocket/events.gateway';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -45,6 +47,8 @@ describe('ChatService', () => {
   let conversationRepo: jest.Mocked<Repository<Conversation>>;
   let participantRepo: jest.Mocked<Repository<ConversationParticipant>>;
   let messageRepo: jest.Mocked<Repository<Message>>;
+  let reactionRepo: jest.Mocked<Repository<MessageReaction>>;
+  let pinnedRepo: jest.Mocked<Repository<PinnedMessage>>;
   let eventsGateway: jest.Mocked<EventsGateway>;
 
   const userId = 'user-1';
@@ -58,6 +62,14 @@ describe('ChatService', () => {
         { provide: getRepositoryToken(Conversation), useFactory: createMockRepository },
         { provide: getRepositoryToken(ConversationParticipant), useFactory: createMockRepository },
         { provide: getRepositoryToken(Message), useFactory: createMockRepository },
+        { provide: getRepositoryToken(MessageReaction), useFactory: () => ({
+          ...createMockRepository(),
+          remove: jest.fn().mockResolvedValue(undefined),
+        }) },
+        { provide: getRepositoryToken(PinnedMessage), useFactory: () => ({
+          ...createMockRepository(),
+          remove: jest.fn().mockResolvedValue(undefined),
+        }) },
         {
           provide: EventsGateway,
           useValue: { emitToUser: jest.fn() },
@@ -69,6 +81,8 @@ describe('ChatService', () => {
     conversationRepo = module.get(getRepositoryToken(Conversation));
     participantRepo = module.get(getRepositoryToken(ConversationParticipant));
     messageRepo = module.get(getRepositoryToken(Message));
+    reactionRepo = module.get(getRepositoryToken(MessageReaction));
+    pinnedRepo = module.get(getRepositoryToken(PinnedMessage));
     eventsGateway = module.get(EventsGateway);
   });
 
@@ -474,6 +488,128 @@ describe('ChatService', () => {
       const result = await service.getUnreadCounts(userId);
 
       expect(result).toEqual({ 'conv-1': 3 });
+    });
+  });
+
+  // ─── toggleReaction ──────────────────────────────────────
+
+  describe('toggleReaction', () => {
+    const messageId = 'msg-1';
+    const emoji = '👍';
+
+    beforeEach(() => {
+      participantRepo.findOne.mockResolvedValue({ conversationId, userId, leftAt: null } as any);
+      messageRepo.findOne.mockResolvedValue({ id: messageId, conversationId } as any);
+      participantRepo.find.mockResolvedValue([]);
+    });
+
+    it('должен добавить реакцию если её нет', async () => {
+      reactionRepo.findOne.mockResolvedValue(null);
+      reactionRepo.find.mockResolvedValue([
+        { emoji, userId, messageId, createdAt: new Date() },
+      ] as any);
+
+      const result = await service.toggleReaction(conversationId, messageId, userId, emoji);
+
+      expect(reactionRepo.save).toHaveBeenCalled();
+      expect(result).toEqual([{ emoji, userIds: [userId], count: 1 }]);
+    });
+
+    it('должен удалить реакцию если она уже есть', async () => {
+      const existing = { id: 'r-1', emoji, userId, messageId };
+      reactionRepo.findOne.mockResolvedValue(existing as any);
+      reactionRepo.find.mockResolvedValue([]);
+
+      const result = await service.toggleReaction(conversationId, messageId, userId, emoji);
+
+      expect(reactionRepo.remove).toHaveBeenCalledWith(existing);
+      expect(result).toEqual([]);
+    });
+
+    it('должен отклонить реакцию на несуществующее сообщение', async () => {
+      messageRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.toggleReaction(conversationId, 'bad-id', userId, emoji),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ─── pinMessage / unpinMessage ──────────────────────────────
+
+  describe('pinMessage', () => {
+    const messageId = 'msg-1';
+
+    beforeEach(() => {
+      participantRepo.findOne.mockResolvedValue({ conversationId, userId, leftAt: null } as any);
+      participantRepo.find.mockResolvedValue([]);
+    });
+
+    it('должен закрепить сообщение', async () => {
+      messageRepo.findOne
+        .mockResolvedValueOnce({ id: messageId, conversationId } as any) // check message exists
+        .mockResolvedValueOnce({ id: messageId, author: { id: userId } } as any); // full for emit
+      pinnedRepo.findOne.mockResolvedValue(null);
+      pinnedRepo.save.mockResolvedValue({} as any);
+      participantRepo.find.mockResolvedValue([{ userId, leftAt: null }] as any);
+
+      const result = await service.pinMessage(conversationId, messageId, userId);
+      expect(result.success).toBe(true);
+      expect(pinnedRepo.save).toHaveBeenCalled();
+      expect(eventsGateway.emitToUser).toHaveBeenCalled();
+    });
+
+    it('должен отклонить повторное закрепление', async () => {
+      messageRepo.findOne.mockResolvedValue({ id: messageId, conversationId } as any);
+      pinnedRepo.findOne.mockResolvedValue({ id: 'pin-1' } as any);
+
+      await expect(
+        service.pinMessage(conversationId, messageId, userId),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('unpinMessage', () => {
+    const messageId = 'msg-1';
+
+    beforeEach(() => {
+      participantRepo.findOne.mockResolvedValue({ conversationId, userId, leftAt: null } as any);
+      participantRepo.find.mockResolvedValue([]);
+    });
+
+    it('должен открепить сообщение', async () => {
+      const pin = { id: 'pin-1', conversationId, messageId };
+      pinnedRepo.findOne.mockResolvedValue(pin as any);
+
+      const result = await service.unpinMessage(conversationId, messageId, userId);
+      expect(result.success).toBe(true);
+      expect(pinnedRepo.remove).toHaveBeenCalledWith(pin);
+    });
+
+    it('должен отклонить открепление незакреплённого', async () => {
+      pinnedRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.unpinMessage(conversationId, messageId, userId),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getPinnedMessages', () => {
+    it('должен вернуть закреплённые сообщения', async () => {
+      participantRepo.findOne.mockResolvedValue({ conversationId, userId, leftAt: null } as any);
+      pinnedRepo.find.mockResolvedValue([
+        {
+          conversationId,
+          messageId: 'msg-1',
+          message: { id: 'msg-1', content: 'Hello', author: { id: userId } },
+          pinnedAt: new Date(),
+        },
+      ] as any);
+
+      const result = await service.getPinnedMessages(conversationId, userId);
+      expect(result).toHaveLength(1);
+      expect(result[0].isPinned).toBe(true);
     });
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
@@ -9,6 +9,28 @@ import { usePresenceStore } from '@/store/usePresenceStore';
 import { useTaskStore } from '@/store/useTaskStore';
 import { useAiStore } from '@/store/useAiStore';
 import { useChatStore } from '@/store/useChatStore';
+import { initSocket, destroySocket, getSocket } from '@/lib/socket';
+import { browserNotifications } from '@/hooks/useBrowserNotifications';
+
+// Звуковое уведомление через Web Audio API
+function playNotificationSound() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+    setTimeout(() => ctx.close(), 500);
+  } catch {
+    // Audio not available
+  }
+}
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -41,34 +63,13 @@ function getStatusLabel(statusId: string): string {
   return statusId;
 }
 
-// Определяем URL для WebSocket подключения
-const getWsUrl = () => {
-  if (typeof window === 'undefined') {
-    // SSR fallback
-    return process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
-  }
-
-  // В production (nginx проксирует WebSocket) — используем текущий origin
-  // В development — подключаемся напрямую к backend (Next.js rewrites не поддерживает WebSocket)
-  const isDev = window.location.hostname === 'localhost' && window.location.port === '3000';
-  if (isDev) {
-    return 'http://localhost:3001';
-  }
-
-  return window.location.origin;
-};
-
 export function useWebSocket() {
   const socketRef = useRef<Socket | null>(null);
   const accessToken = useAuthStore((state) => state.accessToken);
 
-  // Создаём socket один раз при монтировании
+  // Создаём socket один раз при монтировании (через singleton)
   useEffect(() => {
-    const socket = io(getWsUrl(), {
-      transports: ['websocket', 'polling'],
-      auth: { token: useAuthStore.getState().accessToken },
-    });
-
+    const socket = initSocket();
     socketRef.current = socket;
 
     socket.on('entity:created', (entity) => {
@@ -348,6 +349,27 @@ export function useWebSocket() {
 
     socket.on('chat:message', (data: { conversationId: string; message: any }) => {
       useChatStore.getState().onNewMessage(data.conversationId, data.message);
+
+      // Desktop notification + sound for messages from others
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (data.message.authorId !== currentUserId) {
+        const authorName = data.message.author
+          ? `${data.message.author.firstName} ${data.message.author.lastName}`
+          : 'Новое сообщение';
+        const preview = data.message.type === 'voice'
+          ? 'Голосовое сообщение'
+          : (data.message.content || '').replace(/<[^>]*>/g, '').substring(0, 80);
+
+        browserNotifications.show(authorName, {
+          body: preview,
+          tag: `chat-${data.conversationId}`,
+          onClick: () => {
+            useChatStore.getState().selectConversation(data.conversationId);
+          },
+        });
+
+        playNotificationSound();
+      }
     });
 
     socket.on('chat:message:edited', (data: { conversationId: string; message: any }) => {
@@ -374,21 +396,38 @@ export function useWebSocket() {
       useChatStore.getState().onConversationUpdated(data);
     });
 
+    // ─── Chat reactions ─────────────────────────────────────
+
+    socket.on('chat:reaction', (data: { conversationId: string; messageId: string; reactions: any }) => {
+      useChatStore.getState().onReactionUpdated(data.conversationId, data.messageId, data.reactions);
+    });
+
+    // ─── Chat pin ─────────────────────────────────────────
+
+    socket.on('chat:message:pinned', (data: { conversationId: string; message: any }) => {
+      useChatStore.getState().onMessagePinned(data.conversationId, data.message);
+    });
+
+    socket.on('chat:message:unpinned', (data: { conversationId: string; messageId: string }) => {
+      useChatStore.getState().onMessageUnpinned(data.conversationId, data.messageId);
+    });
+
     return () => {
-      socket.disconnect();
+      destroySocket();
       socketRef.current = null;
     };
   }, []); // Пустые зависимости — создаём socket только один раз
 
   // Обновляем auth при изменении токена (без пересоздания socket)
   useEffect(() => {
-    if (socketRef.current && accessToken) {
-      socketRef.current.auth = { token: accessToken };
-      if (socketRef.current.connected) {
+    const s = getSocket();
+    if (s && accessToken) {
+      s.auth = { token: accessToken };
+      if (s.connected) {
         // Отправляем новый токен серверу без разрыва соединения
-        socketRef.current.emit('auth:refresh', { token: accessToken });
+        s.emit('auth:refresh', { token: accessToken });
       } else {
-        socketRef.current.connect();
+        s.connect();
       }
     }
   }, [accessToken]);

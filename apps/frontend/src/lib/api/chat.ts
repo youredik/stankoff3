@@ -104,4 +104,28 @@ export const chatApi = {
     apiClient
       .delete(`/chat/conversations/${conversationId}/participants/${userId}`)
       .then((r) => r.data),
+
+  // ─── Reactions ──────────────────────────────────────────
+
+  toggleReaction: (conversationId: string, messageId: string, emoji: string) =>
+    apiClient
+      .post(`/chat/conversations/${conversationId}/messages/${messageId}/reactions`, { emoji })
+      .then((r) => r.data),
+
+  // ─── Pinned messages ────────────────────────────────────
+
+  getPinnedMessages: (conversationId: string) =>
+    apiClient
+      .get<ChatMessage[]>(`/chat/conversations/${conversationId}/pinned`)
+      .then((r) => r.data),
+
+  pinMessage: (conversationId: string, messageId: string) =>
+    apiClient
+      .post(`/chat/conversations/${conversationId}/messages/${messageId}/pin`)
+      .then((r) => r.data),
+
+  unpinMessage: (conversationId: string, messageId: string) =>
+    apiClient
+      .delete(`/chat/conversations/${conversationId}/messages/${messageId}/pin`)
+      .then((r) => r.data),
 };

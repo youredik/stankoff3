@@ -1,16 +1,17 @@
 import { create } from 'zustand';
-import type { ChatConversation, ChatMessage } from '@/types';
+import type { ChatConversation, ChatMessage, ChatMessageReaction } from '@/types';
 import { chatApi } from '@/lib/api/chat';
 
 interface ChatState {
   // Data
   conversations: ChatConversation[];
   selectedConversationId: string | null;
-  messages: Record<string, ChatMessage[]>; // conversationId → messages
+  messages: Record<string, ChatMessage[]>;
   hasMore: Record<string, boolean>;
   unreadCounts: Record<string, number>;
-  typingUsers: Record<string, string[]>; // conversationId → userIds
+  typingUsers: Record<string, string[]>;
   replyToMessage: ChatMessage | null;
+  pinnedMessages: Record<string, ChatMessage[]>;
   loading: boolean;
   messagesLoading: boolean;
 
@@ -40,6 +41,10 @@ interface ChatState {
   }) => Promise<ChatConversation>;
   setReplyTo: (message: ChatMessage | null) => void;
   fetchUnreadCounts: () => Promise<void>;
+  toggleReaction: (conversationId: string, messageId: string, emoji: string) => Promise<void>;
+  pinMessage: (conversationId: string, messageId: string) => Promise<void>;
+  unpinMessage: (conversationId: string, messageId: string) => Promise<void>;
+  fetchPinnedMessages: (conversationId: string) => Promise<void>;
 
   // WebSocket handlers
   onNewMessage: (conversationId: string, message: ChatMessage) => void;
@@ -54,6 +59,9 @@ interface ChatState {
     lastMessagePreview: string;
     lastMessageAuthorId: string;
   }) => void;
+  onReactionUpdated: (conversationId: string, messageId: string, reactions: ChatMessageReaction[]) => void;
+  onMessagePinned: (conversationId: string, message: ChatMessage) => void;
+  onMessageUnpinned: (conversationId: string, messageId: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -64,6 +72,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   unreadCounts: {},
   typingUsers: {},
   replyToMessage: null,
+  pinnedMessages: {},
   loading: false,
   messagesLoading: false,
 
@@ -149,17 +158,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ unreadCounts: counts });
   },
 
+  toggleReaction: async (conversationId, messageId, emoji) => {
+    try {
+      await chatApi.toggleReaction(conversationId, messageId, emoji);
+    } catch {
+      // Silently fail
+    }
+  },
+
+  pinMessage: async (conversationId, messageId) => {
+    try {
+      await chatApi.pinMessage(conversationId, messageId);
+    } catch {
+      // Silently fail
+    }
+  },
+
+  unpinMessage: async (conversationId, messageId) => {
+    try {
+      await chatApi.unpinMessage(conversationId, messageId);
+    } catch {
+      // Silently fail
+    }
+  },
+
+  fetchPinnedMessages: async (conversationId) => {
+    try {
+      const pinned = await chatApi.getPinnedMessages(conversationId);
+      set((state) => ({
+        pinnedMessages: { ...state.pinnedMessages, [conversationId]: pinned },
+      }));
+    } catch {
+      // Silently fail
+    }
+  },
+
   // ─── WebSocket handlers ─────────────────────────────────
 
   onNewMessage: (conversationId, message) => {
     set((state) => {
       const existing = state.messages[conversationId] || [];
-      // Avoid duplicates
       if (existing.some((m) => m.id === message.id)) return state;
 
       const newMessages = { ...state.messages, [conversationId]: [...existing, message] };
 
-      // Update conversation in list
       const conversations = state.conversations.map((c) =>
         c.id === conversationId
           ? {
@@ -177,14 +219,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : c,
       );
 
-      // Sort by lastMessageAt
       conversations.sort((a, b) => {
         const dateA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
         const dateB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
         return dateB - dateA;
       });
 
-      // Increment unread if not viewing this conversation
       const unreadCounts = { ...state.unreadCounts };
       if (state.selectedConversationId !== conversationId) {
         unreadCounts[conversationId] = (unreadCounts[conversationId] || 0) + 1;
@@ -198,7 +238,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const existing = state.messages[conversationId];
       if (!existing) return state;
-
       return {
         messages: {
           ...state.messages,
@@ -212,7 +251,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const existing = state.messages[conversationId];
       if (!existing) return state;
-
       return {
         messages: {
           ...state.messages,
@@ -234,7 +272,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         [conversationId]: [...current, userId],
       };
 
-      // Auto-clear after 3 seconds
       setTimeout(() => {
         set((s) => ({
           typingUsers: {
@@ -251,8 +288,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   onReadReceipt: (conversationId, _userId, _lastReadMessageId) => {
-    // Can be used to update checkmarks in the future
-    // For now just refetch unread counts
     get().fetchUnreadCounts();
   },
 
@@ -282,5 +317,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
           return dateB - dateA;
         }),
     }));
+  },
+
+  onReactionUpdated: (conversationId, messageId, reactions) => {
+    set((state) => {
+      const existing = state.messages[conversationId];
+      if (!existing) return state;
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: existing.map((m) =>
+            m.id === messageId ? { ...m, reactions } : m,
+          ),
+        },
+      };
+    });
+  },
+
+  onMessagePinned: (conversationId, message) => {
+    set((state) => {
+      const current = state.pinnedMessages[conversationId] || [];
+      if (current.some(m => m.id === message.id)) return state;
+      return {
+        pinnedMessages: {
+          ...state.pinnedMessages,
+          [conversationId]: [...current, message],
+        },
+      };
+    });
+  },
+
+  onMessageUnpinned: (conversationId, messageId) => {
+    set((state) => {
+      const current = state.pinnedMessages[conversationId] || [];
+      return {
+        pinnedMessages: {
+          ...state.pinnedMessages,
+          [conversationId]: current.filter(m => m.id !== messageId),
+        },
+      };
+    });
   },
 }));

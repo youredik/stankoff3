@@ -925,10 +925,18 @@ export interface ChatMessage {
   voiceDuration: number | null;
   voiceWaveform: number[] | null;
   mentionedUserIds: string[];
+  reactions?: ChatMessageReaction[];
+  isPinned?: boolean;
   isEdited: boolean;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChatMessageReaction {
+  emoji: string;
+  userIds: string[];
+  count: number;
 }
 
 export interface ChatMessagesPage {

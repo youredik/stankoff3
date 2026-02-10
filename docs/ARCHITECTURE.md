@@ -77,7 +77,7 @@ Stankoff Portal - это корпоративная система управл�
 - `CommentEditor.tsx` - Rich text редактор с Tiptap, @mentions, вложениями и AI кнопкой генерации ответа
 - `LinkedEntities.tsx` - Управление связями между сущностями
 - `ActivityPanel.tsx` - История активности по сущности (создание, изменения, комментарии) — хелперы экспортируются для переиспользования
-- `AiAssistantTab.tsx` - Вкладка AI помощника (похожие случаи, эксперты, контекст клиента, рекомендации, генерация черновика с вставкой в редактор)
+- `AiAssistantTab.tsx` - Вкладка AI помощника (похожие случаи, эксперты, контекст клиента, рекомендации, streaming генерация черновика с вставкой в редактор)
 
 **Entity Timeline** (`components/entity/timeline/`)
 - `EntityTimeline.tsx` - Объединённый хронологический таймлайн комментариев и аудит-событий
@@ -192,14 +192,16 @@ Stankoff Portal - это корпоративная система управл�
 - `chat/ChatPage.tsx` - Двухколоночный layout: список бесед (380px) + область сообщений
 - `chat/ConversationList.tsx` - Список чатов с поиском и кнопкой создания
 - `chat/ConversationItem.tsx` - Карточка беседы: аватар, имя, превью, время, бейдж непрочитанных
-- `chat/ChatView.tsx` - Область сообщений: header + message list + input
-- `chat/ChatHeader.tsx` - Шапка чата: имя, онлайн-статус / "печатает..."
-- `chat/MessageList.tsx` - Бесконечный скролл вверх, авто-скролл вниз, DateSeparator, группировка
-- `chat/MessageBubble.tsx` - Telegram-стиль: свои (зелёные) справа, чужие (белые) слева, SVG хвостик, время + ✓✓, контекстное меню (ответить, копировать, редактировать, удалить)
+- `chat/ChatView.tsx` - Область сообщений: header + message list + input + pinned banner + поиск + меню
+- `chat/ChatHeader.tsx` - Шапка чата: имя, онлайн-счётчик, "печатает...", кнопки поиска/меню
+- `chat/MessageList.tsx` - Бесконечный скролл вверх, авто-скролл вниз, DateSeparator, группировка, `id` на каждом сообщении для scroll-to
+- `chat/MessageBubble.tsx` - Telegram-стиль: свои (зелёные) справа, чужие (белые) слева, SVG хвостик, время + ✓✓, контекстное меню, emoji-реакции (quick picker + ReactionBar), link preview (OG), inline image preview с lightbox, pin-индикатор
 - `chat/DateSeparator.tsx` - "Сегодня", "Вчера", "15 января 2026"
-- `chat/ChatInput.tsx` - Textarea (Enter=send, Shift+Enter=newline), reply preview, кнопки вложений/микрофон
+- `chat/ChatInput.tsx` - Textarea (Enter=send, Shift+Enter=newline), reply preview, file picker + drag-and-drop + paste, голосовые (MediaRecorder + waveform), typing indicator emit
 - `chat/VoicePlayer.tsx` - Play/pause + waveform bars + скорость 1x/1.5x/2x
 - `chat/NewChatModal.tsx` - Модал создания личного/группового чата
+- `chat/ChatSearchPanel.tsx` - Поиск по сообщениям с debounce, навигация по результатам, scroll-to + highlight
+- `chat/ChatMenu.tsx` - Список участников, добавление/удаление, выход из чата
 
 > **Dynamic Imports:** Все компоненты с bpmn-js используют `dynamic(() => import(...), { ssr: false })`, так как библиотека требует браузерных API (DOM, Canvas).
 
@@ -440,12 +442,19 @@ interface AiState {
   // Сгенерированный ответ (эфемерный)
   generatedResponse: GeneratedResponse | null;
   isGenerating: boolean;
+  streamingDraft: string; // Текст по мере streaming генерации
+
+  // Кэш AI summary переписки
+  summaryCache: Map<string, ConversationSummary>;
+  summaryLoading: Map<string, boolean>;
 
   fetchAssistance(entityId: string, forceRefresh?: boolean): Promise<AiAssistantResponse | null>;
   fetchClassification(entityId: string): Promise<AiClassification | null>;
   classifyEntity(entityId: string, title: string, description?: string, workspaceId?: string): Promise<AiClassification | null>;
   applyClassification(entityId: string): Promise<AiClassification | null>;
   generateResponse(entityId: string, additionalContext?: string): Promise<GeneratedResponse | null>;
+  generateResponseStream(entityId: string, additionalContext?: string): Promise<GeneratedResponse | null>; // SSE streaming
+  fetchSummary(entityId: string): Promise<ConversationSummary | null>;
   onClassificationReady(entityId: string): void;
   invalidateAssistance(entityId: string): void;
   clearAll(): void;
@@ -453,6 +462,12 @@ interface AiState {
 ```
 
 > Централизованный store для AI данных. Устраняет дублирование API запросов: `AiInsightsPanel` (сайдбар) и `AiAssistantTab` (полная вкладка) делят один кэш. WebSocket событие `ai:classification:ready` обновляет store напрямую через `onClassificationReady()`. Клиентский TTL 5 мин зеркалит серверный кэш `AiAssistantService`.
+>
+> **Streaming:** `generateResponseStream()` использует native `fetch` + `ReadableStream` для парсинга SSE событий (`data: {"type":"chunk","text":"..."}`) и обновляет `streamingDraft` в реальном времени.
+>
+> **Summary:** `fetchSummary()` загружает AI-резюме переписки для entity с >= 5 комментариев.
+>
+> **Sentiment:** `AiAssistantResponse.sentiment` содержит настроение последнего комментария (emoji + label).
 
 #### Hooks
 
@@ -1399,6 +1414,7 @@ UI-компоненты для AI функций располагаются в `
 |-----------|----------|
 | `AiInsightsPanel` | Компактные AI подсказки в правом сайдбаре: похожие решения, эксперты, рекомендации. Автозагрузка при открытии заявки. |
 | `AiClassificationPanel` | Панель AI классификации в карточке сущности (категория, приоритет, навыки, уверенность). Автообновляется через WebSocket при автоклассификации. |
+| `AiSummaryBanner` | Компактный баннер AI-резюме переписки над таймлайном. Показывается при >= 5 комментариях, сворачиваемый. |
 
 **Использование:**
 ```tsx
@@ -1520,9 +1536,9 @@ geocoding/
 ```
 chat/
 ├── chat.module.ts
-├── chat.service.ts               # бизнес-логика (CRUD, дедупликация, cursor-пагинация)
-├── chat.service.spec.ts          # 19 unit-тестов
-├── chat.controller.ts            # REST API (13 endpoints)
+├── chat.service.ts               # бизнес-логика (CRUD, дедупликация, cursor-пагинация, реакции, pin)
+├── chat.service.spec.ts          # 27 unit-тестов
+├── chat.controller.ts            # REST API (17 endpoints)
 ├── dto/
 │   ├── create-conversation.dto.ts
 │   ├── send-message.dto.ts
@@ -1533,7 +1549,9 @@ chat/
 └── entities/
     ├── conversation.entity.ts           # conversations (direct, group, entity)
     ├── conversation-participant.entity.ts # conversation_participants
-    └── message.entity.ts                # messages (text, voice, system)
+    ├── message.entity.ts                # messages (text, voice, system)
+    ├── message-reaction.entity.ts       # message_reactions (emoji toggle)
+    └── pinned-message.entity.ts         # pinned_messages (pin/unpin)
 ```
 
 **Ключевые возможности:**
@@ -1544,20 +1562,27 @@ chat/
 - Read receipts (lastReadAt, lastReadMessageId)
 - Full-text search по сообщениям (tsvector, русский язык)
 - Голосовые сообщения (voiceKey → S3, voiceDuration, voiceWaveform)
+- Вложения: файлы, изображения с drag-and-drop, paste, превью
+- Emoji-реакции (toggle per user, агрегация по emoji)
+- Закреплённые сообщения (pin/unpin, banner в ChatView)
 - System messages (add/remove participants)
 - WebSocket: real-time доставка, typing indicators, room-based routing
+- Desktop notifications + звуковые уведомления (Web Audio API)
+- Link previews (OG meta-теги через `/api/og-preview`)
 
 **Frontend компоненты:**
 - `ChatPage` — два столбца: ConversationList (380px) + ChatView
 - `ConversationList` / `ConversationItem` — список чатов с бейджами непрочитанных
-- `ChatView` / `ChatHeader` — просмотр чата, статус онлайн/печатает
-- `MessageList` — бесконечный скролл, автопрокрутка, DateSeparator
-- `MessageBubble` — Telegram-стиль: цветные bubble, SVG хвостик, время + чекмарки, контекстное меню
-- `ChatInput` — textarea с Enter=send, Shift+Enter=newline, reply preview
+- `ChatView` / `ChatHeader` — просмотр чата, статус онлайн/печатает, pinned banner
+- `MessageList` — бесконечный скролл, автопрокрутка, DateSeparator, id на сообщениях для scroll-to
+- `MessageBubble` — Telegram-стиль: цветные bubble, SVG хвостик, время + чекмарки, контекстное меню, emoji-реакции, link preview, image preview с lightbox
+- `ChatInput` — textarea с Enter=send, Shift+Enter=newline, reply preview, файлы (drag-and-drop, paste), голос (MediaRecorder)
 - `VoicePlayer` — визуализация waveform, play/pause, скорость 1x/1.5x/2x
+- `ChatSearchPanel` — поиск по сообщениям с debounce, навигация по результатам, scroll-to + highlight
+- `ChatMenu` — список участников, добавление/удаление, выход из чата
 - `NewChatModal` — выбор пользователей для личного/группового чата
 
-**Frontend store:** `useChatStore` (Zustand) — conversations, messages, unreadCounts, typingUsers, replyToMessage + WS handlers
+**Frontend store:** `useChatStore` (Zustand) — conversations, messages, unreadCounts, typingUsers, replyToMessage, pinnedMessages + WS handlers (onReactionUpdated, onMessagePinned/Unpinned)
 
 #### API Endpoints
 
@@ -2820,6 +2845,16 @@ CREATE INDEX ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops);
   - Генерирует черновик ответа на русском языке
   - Возвращает источники с процентом схожести
   - Черновик можно вставить прямо в редактор комментария через кнопку AI в тулбаре
+- `POST /api/ai/assist/:entityId/suggest-response/stream` - Streaming генерация ответа (SSE)
+  - Server-Sent Events: `data: {"type":"chunk","text":"..."}` и `data: {"type":"done","sources":[...]}`
+  - Текст появляется у пользователя по мере генерации (нет ожидания 3-5 сек)
+  - Заголовки: `Content-Type: text/event-stream`, `X-Accel-Buffering: no`
+- `GET /api/ai/assist/:entityId/summary` - AI-резюме переписки
+  - Кэш 5 мин, summary для >= 3 комментариев
+  - Возвращает: `{ summary: string, commentCount: number }`
+- **Sentiment** — встроен в `GET /api/ai/assist/:entityId` (поле `sentiment`)
+  - Анализ настроения последнего комментария
+  - Возвращает: `{ label, emoji, score }` (satisfied/neutral/concerned/frustrated/urgent)
 
 **Статистика использования:**
 - `GET /api/ai/usage/stats` - Статистика использования AI

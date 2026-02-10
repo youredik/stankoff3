@@ -13,6 +13,7 @@ interface MessageListProps {
   hasMore: boolean;
   onLoadMore: () => void;
   onReply: (message: ChatMessage) => void;
+  conversationId: string;
 }
 
 function shouldShowDate(current: ChatMessage, previous: ChatMessage | null): boolean {
@@ -53,6 +54,7 @@ export function MessageList({
   hasMore,
   onLoadMore,
   onReply,
+  conversationId,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -121,7 +123,7 @@ export function MessageList({
           const next = i < messages.length - 1 ? messages[i + 1] : null;
 
           return (
-            <div key={msg.id}>
+            <div key={msg.id} id={`msg-${msg.id}`}>
               {shouldShowDate(msg, prev) && (
                 <DateSeparator date={msg.createdAt} />
               )}
@@ -132,6 +134,7 @@ export function MessageList({
                   isFirstInGroup={isFirstInGroup(msg, prev)}
                   isLastInGroup={isLastInGroup(msg, next)}
                   onReply={() => onReply(msg)}
+                  conversationId={conversationId}
                 />
               )}
             </div>

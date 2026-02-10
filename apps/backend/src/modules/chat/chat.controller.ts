@@ -138,4 +138,44 @@ export class ChatController {
   ) {
     return this.chatService.removeParticipant(id, user.id, targetUserId);
   }
+
+  // ─── Reactions ──────────────────────────────────────────
+
+  @Post('conversations/:id/messages/:msgId/reactions')
+  toggleReaction(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('msgId') msgId: string,
+    @Body('emoji') emoji: string,
+  ) {
+    return this.chatService.toggleReaction(id, msgId, user.id, emoji);
+  }
+
+  // ─── Pinned messages ──────────────────────────────────────
+
+  @Get('conversations/:id/pinned')
+  getPinnedMessages(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ) {
+    return this.chatService.getPinnedMessages(id, user.id);
+  }
+
+  @Post('conversations/:id/messages/:msgId/pin')
+  pinMessage(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('msgId') msgId: string,
+  ) {
+    return this.chatService.pinMessage(id, msgId, user.id);
+  }
+
+  @Delete('conversations/:id/messages/:msgId/pin')
+  unpinMessage(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('msgId') msgId: string,
+  ) {
+    return this.chatService.unpinMessage(id, msgId, user.id);
+  }
 }

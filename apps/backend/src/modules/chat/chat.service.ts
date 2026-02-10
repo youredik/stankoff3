@@ -9,6 +9,8 @@ import { Repository, IsNull } from 'typeorm';
 import { Conversation, ConversationType } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message } from './entities/message.entity';
+import { MessageReaction } from './entities/message-reaction.entity';
+import { PinnedMessage } from './entities/pinned-message.entity';
 import { EventsGateway } from '../websocket/events.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -25,6 +27,10 @@ export class ChatService {
     private participantRepo: Repository<ConversationParticipant>,
     @InjectRepository(Message)
     private messageRepo: Repository<Message>,
+    @InjectRepository(MessageReaction)
+    private reactionRepo: Repository<MessageReaction>,
+    @InjectRepository(PinnedMessage)
+    private pinnedRepo: Repository<PinnedMessage>,
     private eventsGateway: EventsGateway,
   ) {}
 
@@ -413,6 +419,123 @@ export class ChatService {
 
     await this.ensureParticipant(conversation.id, userId);
     return this.getConversationWithParticipants(conversation.id);
+  }
+
+  // ─── Reactions ──────────────────────────────────────────────
+
+  async toggleReaction(conversationId: string, messageId: string, userId: string, emoji: string) {
+    await this.assertParticipant(conversationId, userId);
+
+    const message = await this.messageRepo.findOne({
+      where: { id: messageId, conversationId },
+    });
+    if (!message) throw new NotFoundException('Сообщение не найдено');
+
+    const existing = await this.reactionRepo.findOne({
+      where: { messageId, userId, emoji },
+    });
+
+    if (existing) {
+      await this.reactionRepo.remove(existing);
+    } else {
+      await this.reactionRepo.save(
+        this.reactionRepo.create({ messageId, userId, emoji }),
+      );
+    }
+
+    const reactions = await this.getAggregatedReactions(messageId);
+
+    this.emitToConversation(conversationId, 'chat:reaction', {
+      conversationId,
+      messageId,
+      reactions,
+    });
+
+    return reactions;
+  }
+
+  private async getAggregatedReactions(messageId: string) {
+    const raw = await this.reactionRepo.find({
+      where: { messageId },
+      order: { createdAt: 'ASC' },
+    });
+
+    const map: Record<string, string[]> = {};
+    for (const r of raw) {
+      if (!map[r.emoji]) map[r.emoji] = [];
+      map[r.emoji].push(r.userId);
+    }
+
+    return Object.entries(map).map(([emoji, userIds]) => ({
+      emoji,
+      userIds,
+      count: userIds.length,
+    }));
+  }
+
+  // ─── Pinned messages ──────────────────────────────────────
+
+  async getPinnedMessages(conversationId: string, userId: string) {
+    await this.assertParticipant(conversationId, userId);
+
+    const pinned = await this.pinnedRepo.find({
+      where: { conversationId },
+      relations: ['message', 'message.author'],
+      order: { pinnedAt: 'ASC' },
+    });
+
+    return pinned.map((p) => ({
+      ...p.message,
+      isPinned: true,
+    }));
+  }
+
+  async pinMessage(conversationId: string, messageId: string, userId: string) {
+    await this.assertParticipant(conversationId, userId);
+
+    const message = await this.messageRepo.findOne({
+      where: { id: messageId, conversationId },
+    });
+    if (!message) throw new NotFoundException('Сообщение не найдено');
+
+    const existing = await this.pinnedRepo.findOne({
+      where: { conversationId, messageId },
+    });
+    if (existing) throw new BadRequestException('Сообщение уже закреплено');
+
+    await this.pinnedRepo.save(
+      this.pinnedRepo.create({ conversationId, messageId, pinnedById: userId }),
+    );
+
+    const full = await this.messageRepo.findOne({
+      where: { id: messageId },
+      relations: ['author'],
+    });
+
+    this.emitToConversation(conversationId, 'chat:message:pinned', {
+      conversationId,
+      message: { ...full, isPinned: true },
+    });
+
+    return { success: true };
+  }
+
+  async unpinMessage(conversationId: string, messageId: string, userId: string) {
+    await this.assertParticipant(conversationId, userId);
+
+    const pin = await this.pinnedRepo.findOne({
+      where: { conversationId, messageId },
+    });
+    if (!pin) throw new NotFoundException('Сообщение не закреплено');
+
+    await this.pinnedRepo.remove(pin);
+
+    this.emitToConversation(conversationId, 'chat:message:unpinned', {
+      conversationId,
+      messageId,
+    });
+
+    return { success: true };
   }
 
   // ─── Helpers ──────────────────────────────────────────────
