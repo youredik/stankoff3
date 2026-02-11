@@ -3183,7 +3183,7 @@ OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 
 # Groq (облако, бесплатный tier - 14,400 req/day)
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.1-70b-versatile
+GROQ_MODEL=llama-3.3-70b-versatile
 
 # OpenAI (облако, платно - fallback)
 OPENAI_API_KEY=sk-...

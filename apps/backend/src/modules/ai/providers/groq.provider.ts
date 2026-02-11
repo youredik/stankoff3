@@ -50,7 +50,7 @@ export class GroqProvider extends BaseLlmProvider {
     super();
 
     this.apiKey = this.configService.get<string>('GROQ_API_KEY');
-    this.model = this.configService.get<string>('GROQ_MODEL') || 'llama-3.1-70b-versatile';
+    this.model = this.configService.get<string>('GROQ_MODEL') || 'llama-3.3-70b-versatile';
 
     if (this.apiKey) {
       this.logger.log(`Groq провайдер инициализирован (model: ${this.model})`);
