@@ -20,8 +20,8 @@ RUN mkdir -p /backups /scripts
 COPY backup.sh /scripts/backup.sh
 RUN chmod +x /scripts/backup.sh
 
-# Create cron job (hourly backup)
-RUN echo "0 * * * * /scripts/backup.sh scheduled >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+# Create cron job (every 30 minutes)
+RUN echo "0,30 * * * * /scripts/backup.sh scheduled >> /var/log/backup.log 2>&1" > /etc/crontabs/root
 
 # Create log file
 RUN touch /var/log/backup.log

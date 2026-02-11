@@ -329,10 +329,11 @@ scheduled() {
 
     # Create backup and upload to S3
     if ! backup_s3; then
-        local error_msg="<b>BACKUP FAILED</b>
-DB: ${DB_NAME}
-Host: $(hostname)
-Time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+        local error_msg="<b>Backup FAILED</b>
+
+<b>Server:</b> preprod.stankoff.ru
+<b>DB:</b> ${DB_NAME}
+<b>Time:</b> $(date '+%Y-%m-%d %H:%M:%S MSK')"
         notify_telegram "$error_msg"
         log_error "Scheduled backup FAILED"
         exit 1
@@ -345,12 +346,31 @@ Time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
 
     local end_time=$(date +%s)
     local duration=$(( end_time - start_time ))
-    local size=$(du -h "${BACKUP_DIR}/latest.sql.gz" 2>/dev/null | cut -f1 || echo "N/A")
+
+    # Get actual file size (resolve symlink, use ls for reliability)
+    local latest_file="${BACKUP_DIR}/latest.sql.gz"
+    local size="N/A"
+    if [ -f "$latest_file" ]; then
+        size=$(ls -lh "$latest_file" | awk '{print $5}')
+    fi
+
+    # Count total backups in S3
+    local s3_count=""
+    if [ -n "$S3_BUCKET" ] && [ -n "$S3_ACCESS_KEY" ]; then
+        configure_aws
+        s3_count=$(aws s3 ls "s3://${S3_BUCKET}/${S3_BACKUP_PREFIX}/" \
+            --endpoint-url "$S3_ENDPOINT" 2>/dev/null | wc -l | tr -d ' ')
+    fi
 
     local success_msg="<b>Backup OK</b>
-DB: ${DB_NAME} (${size})
-Duration: ${duration}s
-Time: $(date '+%H:%M %Z')"
+
+<b>Server:</b> preprod.stankoff.ru
+<b>DB:</b> ${DB_NAME}
+<b>Size:</b> ${size}
+<b>S3:</b> s3://${S3_BUCKET}/${S3_BACKUP_PREFIX}/
+<b>Backups in S3:</b> ${s3_count:-?}
+<b>Duration:</b> ${duration}s
+<b>Time:</b> $(date '+%Y-%m-%d %H:%M MSK')"
     notify_telegram "$success_msg"
 
     log_info "=== Scheduled backup completed in ${duration}s ==="
