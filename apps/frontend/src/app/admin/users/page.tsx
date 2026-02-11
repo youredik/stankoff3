@@ -8,24 +8,26 @@ import { ToastContainer } from '@/components/ui/ToastContainer';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { UserList } from '@/components/admin/UserList';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useCan } from '@/hooks/useCan';
 
 function AdminUsersContent() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const canManageUsers = useCan('global:user:manage');
 
   // Проверка прав администратора
   useEffect(() => {
-    if (user && user.role !== 'admin') {
+    if (user && !canManageUsers) {
       router.replace('/dashboard');
     }
-  }, [user, router]);
+  }, [user, canManageUsers, router]);
 
   // Пустое рабочее место - страница не связана с workspace
   const handleWorkspaceChange = (id: string) => {
     router.push('/dashboard');
   };
 
-  if (user?.role !== 'admin') {
+  if (!canManageUsers) {
     return null;
   }
 

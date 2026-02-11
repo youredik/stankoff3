@@ -11,6 +11,7 @@ import { SeedStructureService } from './seed-structure.service';
 import { SeedEntitiesService } from './seed-entities.service';
 import { SeedItDepartmentService } from './seed-it-department.service';
 import { SeedBpmnService } from './seed-bpmn.service';
+import { SeedRbacService } from './seed-rbac.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
 import { Workspace } from '../modules/workspace/workspace.entity';
 
@@ -24,6 +25,7 @@ describe('SeedOrchestratorService', () => {
   let seedStructure: jest.Mocked<SeedStructureService>;
   let seedEntities: jest.Mocked<SeedEntitiesService>;
   let seedItDept: jest.Mocked<SeedItDepartmentService>;
+  let seedRbac: jest.Mocked<SeedRbacService>;
   let seedBpmn: jest.Mocked<SeedBpmnService>;
   let seedSlaDmn: jest.Mocked<SeedSlaDmnService>;
 
@@ -92,6 +94,10 @@ describe('SeedOrchestratorService', () => {
           useValue: { createAll: jest.fn() },
         },
         {
+          provide: SeedRbacService,
+          useValue: { seedRolesAndGlobal: jest.fn(), seedMembershipRoles: jest.fn() },
+        },
+        {
           provide: SeedKeycloakService,
           useValue: { syncUsers: jest.fn() },
         },
@@ -123,6 +129,7 @@ describe('SeedOrchestratorService', () => {
     bpmnService = module.get(BpmnService);
     cleanup = module.get(SeedCleanupService);
     seedUsers = module.get(SeedUsersService);
+    seedRbac = module.get(SeedRbacService);
     seedKeycloak = module.get(SeedKeycloakService);
     seedStructure = module.get(SeedStructureService);
     seedEntities = module.get(SeedEntitiesService);
@@ -186,11 +193,13 @@ describe('SeedOrchestratorService', () => {
       const callOrder: string[] = [];
       cleanup.cleanupAll.mockImplementation(async () => { callOrder.push('cleanup'); });
       seedUsers.createAll.mockImplementation(async () => { callOrder.push('users'); return mockUsers; });
+      seedRbac.seedRolesAndGlobal.mockImplementation(async () => { callOrder.push('rbac-global'); });
       seedKeycloak.syncUsers.mockImplementation(async () => { callOrder.push('keycloak'); });
       seedStructure.createAll.mockImplementation(async () => {
         callOrder.push('structure');
         return { sections: mockSections, workspaces: mockWorkspaces } as any;
       });
+      seedRbac.seedMembershipRoles.mockImplementation(async () => { callOrder.push('rbac-membership'); });
       seedEntities.createAll.mockImplementation(async () => { callOrder.push('entities'); return mockEntities; });
       seedItDept.createAll.mockImplementation(async () => {
         callOrder.push('itDept');
@@ -204,8 +213,10 @@ describe('SeedOrchestratorService', () => {
       expect(callOrder).toEqual([
         'cleanup',
         'users',
+        'rbac-global',
         'keycloak',
         'structure',
+        'rbac-membership',
         'entities',
         'itDept',
         'bpmn',

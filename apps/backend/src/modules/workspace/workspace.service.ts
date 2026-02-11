@@ -1,11 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Workspace } from './workspace.entity';
 import { WorkspaceMember, WorkspaceRole } from './workspace-member.entity';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { UserRole } from '../user/user.entity';
+import { RbacService } from '../rbac/rbac.service';
+import { Role } from '../rbac/role.entity';
+import { EventsGateway } from '../websocket/events.gateway';
+
+/** Маппинг legacy enum → системный role slug */
+const WS_ROLE_SLUG_MAP: Record<WorkspaceRole, string> = {
+  [WorkspaceRole.ADMIN]: 'ws_admin',
+  [WorkspaceRole.EDITOR]: 'ws_editor',
+  [WorkspaceRole.VIEWER]: 'ws_viewer',
+};
 
 @Injectable()
 export class WorkspaceService {
@@ -16,33 +26,28 @@ export class WorkspaceService {
     private memberRepository: Repository<WorkspaceMember>,
     @InjectRepository(WorkspaceEntity)
     private entityRepository: Repository<WorkspaceEntity>,
+    @InjectRepository(Role)
+    private readonly roleRepository: Repository<Role>,
+    private readonly rbacService: RbacService,
+    @Optional() @Inject(EventsGateway) private readonly eventsGateway?: EventsGateway,
   ) {}
 
-  // Получить все workspaces (фильтрация по пользователю, исключая internal)
-  async findAll(userId: string, userRole: UserRole): Promise<Workspace[]> {
-    // Глобальный admin видит все (кроме internal)
-    if (userRole === UserRole.ADMIN) {
-      return this.workspaceRepository.find({
-        where: { isInternal: false },
-        relations: ['section'],
-        order: { orderInSection: 'ASC', name: 'ASC' },
-      });
-    }
+  // Получить все workspaces (фильтрация по permissions, исключая internal)
+  async findAll(userId: string, _userRole?: UserRole): Promise<Workspace[]> {
+    const accessibleIds = await this.rbacService.getAccessibleWorkspaceIds(userId);
 
-    // Остальные видят только свои (кроме internal)
-    const memberships = await this.memberRepository.find({
-      where: { userId },
-      relations: ['workspace', 'workspace.section'],
+    if (accessibleIds.length === 0) return [];
+
+    return this.workspaceRepository.find({
+      where: { id: In(accessibleIds), isInternal: false },
+      relations: ['section'],
+      order: { orderInSection: 'ASC', name: 'ASC' },
     });
-
-    return memberships
-      .map((m) => m.workspace)
-      .filter((ws) => !ws.isInternal);
   }
 
   // Алиас для findAll — для использования в поиске
-  async getAccessibleWorkspaces(userId: string, userRole: UserRole): Promise<Workspace[]> {
-    return this.findAll(userId, userRole);
+  async getAccessibleWorkspaces(userId: string, _userRole?: UserRole): Promise<Workspace[]> {
+    return this.findAll(userId);
   }
 
   async findOne(id: string): Promise<Workspace | null> {
@@ -52,39 +57,42 @@ export class WorkspaceService {
     });
   }
 
-  // Проверка доступа пользователя к workspace
+  // Проверка доступа пользователя к workspace (через RBAC permissions)
   async checkAccess(
     workspaceId: string,
     userId: string,
-    userRole: UserRole,
+    _userRole?: UserRole,
     requiredRole?: WorkspaceRole,
   ): Promise<WorkspaceMember | null> {
-    // Глобальный admin имеет полный доступ
-    if (userRole === UserRole.ADMIN) {
-      return { role: WorkspaceRole.ADMIN } as WorkspaceMember;
-    }
+    // Маппинг старых WorkspaceRole → permission
+    const requiredPermission = this.mapWorkspaceRoleToPermission(requiredRole);
 
+    const hasAccess = await this.rbacService.hasPermission(
+      userId,
+      requiredPermission,
+      { workspaceId },
+    );
+
+    if (!hasAccess) return null;
+
+    // Возвращаем membership для обратной совместимости (вызывающий код может использовать access.role)
     const membership = await this.memberRepository.findOne({
       where: { workspaceId, userId },
     });
 
-    if (!membership) {
-      return null;
-    }
+    // Если membership нет, но доступ есть (суперадмин) — возвращаем синтетический объект
+    return membership || ({ role: WorkspaceRole.ADMIN } as WorkspaceMember);
+  }
 
-    // Проверка минимальной роли
-    if (requiredRole) {
-      const roleHierarchy = {
-        [WorkspaceRole.VIEWER]: 0,
-        [WorkspaceRole.EDITOR]: 1,
-        [WorkspaceRole.ADMIN]: 2,
-      };
-      if (roleHierarchy[membership.role] < roleHierarchy[requiredRole]) {
-        return null;
-      }
+  private mapWorkspaceRoleToPermission(requiredRole?: WorkspaceRole): string {
+    switch (requiredRole) {
+      case WorkspaceRole.ADMIN:
+        return 'workspace:settings:update';
+      case WorkspaceRole.EDITOR:
+        return 'workspace:entity:update';
+      default:
+        return 'workspace:entity:read';
     }
-
-    return membership;
   }
 
   async create(workspaceData: Partial<Workspace>, creatorId: string): Promise<Workspace> {
@@ -109,28 +117,20 @@ export class WorkspaceService {
   // Получить роли пользователя во всех workspaces
   async getMyRoles(
     userId: string,
-    userRole: UserRole,
+    _userRole?: UserRole,
   ): Promise<Record<string, WorkspaceRole>> {
     const roles: Record<string, WorkspaceRole> = {};
 
-    // Глобальный admin имеет admin роль во всех workspaces (кроме internal)
-    if (userRole === UserRole.ADMIN) {
-      const workspaces = await this.workspaceRepository.find({
-        where: { isInternal: false },
-      });
-      for (const ws of workspaces) {
-        roles[ws.id] = WorkspaceRole.ADMIN;
-      }
-      return roles;
-    }
-
-    // Остальные — по membership
+    // Проверяем: суперадмин (role с permission '*') → admin во всех
+    const accessibleIds = await this.rbacService.getAccessibleWorkspaceIds(userId);
     const memberships = await this.memberRepository.find({
       where: { userId },
     });
 
-    for (const m of memberships) {
-      roles[m.workspaceId] = m.role;
+    const memberMap = new Map(memberships.map((m) => [m.workspaceId, m.role]));
+
+    for (const wsId of accessibleIds) {
+      roles[wsId] = memberMap.get(wsId) || WorkspaceRole.ADMIN;
     }
 
     return roles;
@@ -150,6 +150,7 @@ export class WorkspaceService {
     workspaceId: string,
     userId: string,
     role: WorkspaceRole = WorkspaceRole.EDITOR,
+    roleId?: string,
   ): Promise<WorkspaceMember> {
     // Проверяем существование workspace
     const workspace = await this.findOne(workspaceId);
@@ -157,24 +158,34 @@ export class WorkspaceService {
       throw new NotFoundException('Workspace не найден');
     }
 
+    // Resolve roleId: если передан явно — используем, иначе маппим по enum
+    const resolvedRoleId = roleId || await this.resolveWorkspaceRoleId(role);
+
     // Проверяем, не является ли уже членом
     const existing = await this.memberRepository.findOne({
       where: { workspaceId, userId },
     });
     if (existing) {
-      // Обновляем роль
       existing.role = role;
-      return this.memberRepository.save(existing);
+      existing.roleId = resolvedRoleId;
+      const saved = await this.memberRepository.save(existing);
+      this.rbacService.invalidateUser(userId);
+      this.eventsGateway?.emitRbacPermissionsChanged(userId);
+      return saved;
     }
 
-    const member = this.memberRepository.create({ workspaceId, userId, role });
-    return this.memberRepository.save(member);
+    const member = this.memberRepository.create({ workspaceId, userId, role, roleId: resolvedRoleId });
+    const saved = await this.memberRepository.save(member);
+    this.rbacService.invalidateUser(userId);
+    this.eventsGateway?.emitRbacPermissionsChanged(userId);
+    return saved;
   }
 
   async updateMemberRole(
     workspaceId: string,
     userId: string,
     role: WorkspaceRole,
+    roleId?: string,
   ): Promise<WorkspaceMember> {
     const member = await this.memberRepository.findOne({
       where: { workspaceId, userId },
@@ -183,8 +194,13 @@ export class WorkspaceService {
       throw new NotFoundException('Участник не найден');
     }
 
+    const resolvedRoleId = roleId || await this.resolveWorkspaceRoleId(role);
     member.role = role;
-    return this.memberRepository.save(member);
+    member.roleId = resolvedRoleId;
+    const saved = await this.memberRepository.save(member);
+    this.rbacService.invalidateUser(userId);
+    this.eventsGateway?.emitRbacPermissionsChanged(userId);
+    return saved;
   }
 
   async removeMember(workspaceId: string, userId: string): Promise<void> {
@@ -192,6 +208,15 @@ export class WorkspaceService {
     if (result.affected === 0) {
       throw new NotFoundException('Участник не найден');
     }
+    this.rbacService.invalidateUser(userId);
+    this.eventsGateway?.emitRbacPermissionsChanged(userId);
+  }
+
+  private async resolveWorkspaceRoleId(role: WorkspaceRole): Promise<string | null> {
+    const slug = WS_ROLE_SLUG_MAP[role];
+    if (!slug) return null;
+    const roleEntity = await this.roleRepository.findOne({ where: { slug } });
+    return roleEntity?.id || null;
   }
 
   // === Дублирование, архивирование, экспорт ===

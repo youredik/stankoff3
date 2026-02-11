@@ -7,6 +7,8 @@ import { User } from '../user/user.entity';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { KeycloakService } from './keycloak.service';
 import { KeycloakUserInfo } from './interfaces/keycloak-user.interface';
+import { RoleService } from '../rbac/role.service';
+import { LEGACY_ROLE_MAPPING } from '../rbac/system-roles';
 
 export interface TokensResponse {
   accessToken: string;
@@ -22,6 +24,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private keycloakService: KeycloakService,
+    private roleService: RoleService,
   ) {}
 
   async login(user: User): Promise<{ accessToken: string; refreshToken: string }> {
@@ -124,6 +127,10 @@ export class AuthService {
     const keycloakRoles = userInfo.realm_access?.roles || [];
     const appRole = this.keycloakService.mapKeycloakRoleToAppRole(keycloakRoles);
 
+    // Находим RBAC роль по маппингу legacy enum → slug
+    const roleSlug = LEGACY_ROLE_MAPPING.global[appRole] || 'employee';
+    const rbacRole = await this.roleService.findBySlug(roleSlug);
+
     // Генерируем случайный пароль (не используется при SSO, но поле обязательное)
     const randomPassword = Math.random().toString(36).slice(-16);
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
@@ -134,11 +141,12 @@ export class AuthService {
       firstName: userInfo.given_name || userInfo.preferred_username || 'User',
       lastName: userInfo.family_name || '',
       role: appRole,
+      roleId: rbacRole?.id || null,
       isActive: true,
     });
 
     this.logger.log(
-      `Keycloak SSO: создан новый пользователь ${userInfo.email} с ролью ${appRole}`,
+      `Keycloak SSO: создан новый пользователь ${userInfo.email} с ролью ${appRole} (RBAC: ${roleSlug})`,
     );
 
     return newUser;

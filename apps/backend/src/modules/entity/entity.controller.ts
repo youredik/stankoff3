@@ -21,9 +21,9 @@ import { UpdateEntityDto } from './dto/update-entity.dto';
 import { KanbanQueryDto, ColumnLoadMoreDto } from './dto/kanban-query.dto';
 import { TableQueryDto } from './dto/table-query.dto';
 import { FacetsQueryDto } from './dto/facets-query.dto';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../rbac/rbac.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole, User } from '../user/user.entity';
+import { User } from '../user/user.entity';
 import { WorkspaceService } from '../workspace/workspace.service';
 import { WorkspaceRole } from '../workspace/workspace-member.entity';
 
@@ -263,7 +263,7 @@ export class EntityController {
   }
 
   @Delete('cleanup/test-data')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   removeTestData() {
     if (process.env.NODE_ENV === 'production' && process.env.ENABLE_TEST_CLEANUP !== 'true') {
       throw new ForbiddenException('Очистка тестовых данных недоступна в production');

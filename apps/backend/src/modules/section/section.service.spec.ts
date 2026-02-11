@@ -8,6 +8,9 @@ import { SectionMember, SectionRole } from './section-member.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { WorkspaceMember } from '../workspace/workspace-member.entity';
 import { UserRole } from '../user/user.entity';
+import { Role } from '../rbac/role.entity';
+import { RbacService } from '../rbac/rbac.service';
+import { EventsGateway } from '../websocket/events.gateway';
 
 describe('SectionService', () => {
   let service: SectionService;
@@ -88,6 +91,22 @@ describe('SectionService', () => {
       findOne: jest.fn(),
     };
 
+    const mockRoleRepo = {
+      findOne: jest.fn(),
+    };
+
+    const mockRbacService = {
+      invalidateUser: jest.fn(),
+      invalidateAll: jest.fn(),
+      hasPermission: jest.fn(),
+      getAccessibleWorkspaceIds: jest.fn(),
+      getEffectivePermissions: jest.fn(),
+    };
+
+    const mockEventsGateway = {
+      emitRbacPermissionsChanged: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SectionService,
@@ -95,6 +114,9 @@ describe('SectionService', () => {
         { provide: getRepositoryToken(SectionMember), useValue: mockMemberRepo },
         { provide: getRepositoryToken(Workspace), useValue: mockWorkspaceRepo },
         { provide: getRepositoryToken(WorkspaceMember), useValue: mockWorkspaceMemberRepo },
+        { provide: getRepositoryToken(Role), useValue: mockRoleRepo },
+        { provide: RbacService, useValue: mockRbacService },
+        { provide: EventsGateway, useValue: mockEventsGateway },
       ],
     }).compile();
 

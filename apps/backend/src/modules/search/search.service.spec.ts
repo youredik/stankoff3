@@ -5,10 +5,12 @@ import { SearchService } from './search.service';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { Comment } from '../entity/comment.entity';
 import { AuditLog } from '../audit-log/audit-log.entity';
+import { RbacService } from '../rbac/rbac.service';
 
 describe('SearchService', () => {
   let service: SearchService;
   let dataSource: { query: jest.Mock };
+  let rbacService: { getAccessibleWorkspaceIds: jest.Mock };
 
   const mockEntityResult = {
     id: 'entity-1',
@@ -45,6 +47,9 @@ describe('SearchService', () => {
     const mockDataSource = {
       query: jest.fn(),
     };
+    const mockRbacService = {
+      getAccessibleWorkspaceIds: jest.fn().mockResolvedValue(['ws-1', 'ws-2']),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -53,11 +58,13 @@ describe('SearchService', () => {
         { provide: getRepositoryToken(Comment), useValue: mockCommentRepo },
         { provide: getRepositoryToken(AuditLog), useValue: mockAuditRepo },
         { provide: DataSource, useValue: mockDataSource },
+        { provide: RbacService, useValue: mockRbacService },
       ],
     }).compile();
 
     service = module.get<SearchService>(SearchService);
     dataSource = module.get(DataSource);
+    rbacService = module.get(RbacService);
   });
 
   describe('search', () => {
@@ -66,44 +73,62 @@ describe('SearchService', () => {
         .mockResolvedValueOnce([mockEntityResult])
         .mockResolvedValueOnce([mockCommentResult]);
 
-      const result = await service.search('test');
+      const result = await service.search('test', 'user-1');
 
       expect(result).toHaveLength(2);
       expect(dataSource.query).toHaveBeenCalledTimes(2);
+      expect(rbacService.getAccessibleWorkspaceIds).toHaveBeenCalledWith('user-1');
     });
 
     it('должен вернуть пустой массив для пустого запроса', async () => {
-      const result = await service.search('');
+      const result = await service.search('', 'user-1');
 
       expect(result).toEqual([]);
     });
 
     it('должен вернуть пустой массив для запроса только из спецсимволов', async () => {
-      const result = await service.search('&|!():*');
+      const result = await service.search('&|!():*', 'user-1');
 
       expect(result).toEqual([]);
+    });
+
+    it('должен вернуть пустой массив если нет доступных workspaces', async () => {
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue([]);
+
+      const result = await service.search('test', 'user-1');
+
+      expect(result).toEqual([]);
+      expect(dataSource.query).not.toHaveBeenCalled();
     });
 
     it('должен искать по audit logs если указано в types', async () => {
       dataSource.query.mockResolvedValue([mockAuditResult]);
 
-      const result = await service.search('test', { types: ['audit'] });
+      const result = await service.search('test', 'user-1', { types: ['audit'] });
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('audit');
     });
 
-    it('должен фильтровать по workspaceId', async () => {
+    it('должен фильтровать по workspaceId если он доступен', async () => {
       dataSource.query
         .mockResolvedValueOnce([mockEntityResult])
         .mockResolvedValueOnce([mockCommentResult]);
 
-      await service.search('test', { workspaceId: 'ws-1' });
+      await service.search('test', 'user-1', { workspaceId: 'ws-1' });
 
+      // SQL должен получить только [ws-1] как accessible IDs
       expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('"workspaceId" = $2'),
-        expect.arrayContaining(['ws-1']),
+        expect.any(String),
+        expect.arrayContaining([['ws-1']]),
       );
+    });
+
+    it('должен вернуть пустой массив если workspaceId недоступен', async () => {
+      const result = await service.search('test', 'user-1', { workspaceId: 'ws-forbidden' });
+
+      expect(result).toEqual([]);
+      expect(dataSource.query).not.toHaveBeenCalled();
     });
 
     it('должен применять пагинацию', async () => {
@@ -112,7 +137,7 @@ describe('SearchService', () => {
         .mockResolvedValueOnce(manyResults)
         .mockResolvedValueOnce([]);
 
-      const result = await service.search('test', { limit: 5, offset: 2 });
+      const result = await service.search('test', 'user-1', { limit: 5, offset: 2 });
 
       expect(result.length).toBeLessThanOrEqual(5);
     });
@@ -122,7 +147,7 @@ describe('SearchService', () => {
         .mockResolvedValueOnce([{ ...mockEntityResult, rank: 0.9 }])
         .mockResolvedValueOnce([{ ...mockCommentResult, rank: 0.3 }]);
 
-      const result = await service.search('test');
+      const result = await service.search('test', 'user-1');
 
       expect(result[0].rank).toBeGreaterThan(result[1].rank);
     });
@@ -132,44 +157,40 @@ describe('SearchService', () => {
     it('должен искать по entities', async () => {
       dataSource.query.mockResolvedValue([mockEntityResult]);
 
-      const result = await service.searchEntities('test');
+      const result = await service.searchEntities('test', ['ws-1']);
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('entity');
     });
 
-    it('должен исключать internal workspaces из результатов', async () => {
+    it('должен фильтровать по accessible workspace IDs', async () => {
       dataSource.query.mockResolvedValue([mockEntityResult]);
 
-      await service.searchEntities('test');
+      await service.searchEntities('test', ['ws-1', 'ws-2']);
 
       expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('"isInternal" = true'),
-        expect.any(Array),
+        expect.stringContaining('ANY($2::uuid[])'),
+        expect.arrayContaining([['ws-1', 'ws-2']]),
       );
     });
 
     it('должен вернуть пустой массив для пустого запроса', async () => {
-      const result = await service.searchEntities('');
+      const result = await service.searchEntities('', ['ws-1']);
 
       expect(result).toEqual([]);
     });
 
-    it('должен фильтровать по workspaceId', async () => {
-      dataSource.query.mockResolvedValue([mockEntityResult]);
+    it('должен вернуть пустой массив если нет accessible workspaces', async () => {
+      const result = await service.searchEntities('test', []);
 
-      await service.searchEntities('test', 'ws-1');
-
-      expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('"workspaceId" = $2'),
-        expect.arrayContaining(['ws-1']),
-      );
+      expect(result).toEqual([]);
+      expect(dataSource.query).not.toHaveBeenCalled();
     });
 
     it('должен применять limit', async () => {
       dataSource.query.mockResolvedValue([mockEntityResult]);
 
-      await service.searchEntities('test', undefined, 25);
+      await service.searchEntities('test', ['ws-1'], 25);
 
       expect(dataSource.query).toHaveBeenCalledWith(
         expect.any(String),
@@ -182,25 +203,25 @@ describe('SearchService', () => {
     it('должен искать по комментариям', async () => {
       dataSource.query.mockResolvedValue([mockCommentResult]);
 
-      const result = await service.searchComments('test');
+      const result = await service.searchComments('test', ['ws-1']);
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('comment');
     });
 
-    it('должен исключать internal workspaces из результатов', async () => {
+    it('должен фильтровать по accessible workspace IDs', async () => {
       dataSource.query.mockResolvedValue([mockCommentResult]);
 
-      await service.searchComments('test');
+      await service.searchComments('test', ['ws-1', 'ws-2']);
 
       expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('"isInternal" = true'),
-        expect.any(Array),
+        expect.stringContaining('ANY($2::uuid[])'),
+        expect.arrayContaining([['ws-1', 'ws-2']]),
       );
     });
 
     it('должен вернуть пустой массив для пустого запроса', async () => {
-      const result = await service.searchComments('');
+      const result = await service.searchComments('', ['ws-1']);
 
       expect(result).toEqual([]);
     });
@@ -208,7 +229,7 @@ describe('SearchService', () => {
     it('должен применять коэффициент релевантности 0.8', async () => {
       dataSource.query.mockResolvedValue([{ ...mockCommentResult, rank: 1.0 }]);
 
-      const result = await service.searchComments('test');
+      const result = await service.searchComments('test', ['ws-1']);
 
       expect(result[0].rank).toBe(0.8);
     });
@@ -217,20 +238,9 @@ describe('SearchService', () => {
       const longContent = 'a'.repeat(300);
       dataSource.query.mockResolvedValue([{ ...mockCommentResult, content: longContent }]);
 
-      const result = await service.searchComments('test');
+      const result = await service.searchComments('test', ['ws-1']);
 
       expect(result[0].content?.length).toBe(200);
-    });
-
-    it('должен фильтровать по workspaceId', async () => {
-      dataSource.query.mockResolvedValue([mockCommentResult]);
-
-      await service.searchComments('test', 'ws-1');
-
-      expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('"workspaceId" = $2'),
-        expect.arrayContaining(['ws-1']),
-      );
     });
   });
 
@@ -238,25 +248,25 @@ describe('SearchService', () => {
     it('должен искать по audit logs', async () => {
       dataSource.query.mockResolvedValue([mockAuditResult]);
 
-      const result = await service.searchAuditLogs('test');
+      const result = await service.searchAuditLogs('test', ['ws-1']);
 
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('audit');
     });
 
-    it('должен исключать internal workspaces из результатов', async () => {
+    it('должен фильтровать по accessible workspace IDs', async () => {
       dataSource.query.mockResolvedValue([mockAuditResult]);
 
-      await service.searchAuditLogs('test');
+      await service.searchAuditLogs('test', ['ws-1', 'ws-2']);
 
       expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('"isInternal" = true'),
-        expect.any(Array),
+        expect.stringContaining('ANY($2::uuid[])'),
+        expect.arrayContaining([['ws-1', 'ws-2']]),
       );
     });
 
     it('должен вернуть пустой массив для пустого запроса', async () => {
-      const result = await service.searchAuditLogs('');
+      const result = await service.searchAuditLogs('', ['ws-1']);
 
       expect(result).toEqual([]);
     });
@@ -264,7 +274,7 @@ describe('SearchService', () => {
     it('должен использовать фиксированный rank 0.5', async () => {
       dataSource.query.mockResolvedValue([mockAuditResult]);
 
-      const result = await service.searchAuditLogs('test');
+      const result = await service.searchAuditLogs('test', ['ws-1']);
 
       expect(result[0].rank).toBe(0.5);
     });
@@ -273,20 +283,29 @@ describe('SearchService', () => {
       const longContent = 'a'.repeat(300);
       dataSource.query.mockResolvedValue([{ ...mockAuditResult, content: longContent }]);
 
-      const result = await service.searchAuditLogs('test');
+      const result = await service.searchAuditLogs('test', ['ws-1']);
 
       expect(result[0].content?.length).toBe(200);
     });
+  });
 
-    it('должен фильтровать по workspaceId', async () => {
-      dataSource.query.mockResolvedValue([mockAuditResult]);
+  describe('getAccessibleIds', () => {
+    it('должен вернуть все accessible IDs без workspaceId', async () => {
+      const result = await service.getAccessibleIds('user-1');
 
-      await service.searchAuditLogs('test', 'ws-1');
+      expect(result).toEqual(['ws-1', 'ws-2']);
+    });
 
-      expect(dataSource.query).toHaveBeenCalledWith(
-        expect.stringContaining('"workspaceId" = $2'),
-        expect.arrayContaining(['ws-1']),
-      );
+    it('должен вернуть [workspaceId] если он доступен', async () => {
+      const result = await service.getAccessibleIds('user-1', 'ws-1');
+
+      expect(result).toEqual(['ws-1']);
+    });
+
+    it('должен вернуть пустой массив если workspaceId недоступен', async () => {
+      const result = await service.getAccessibleIds('user-1', 'ws-forbidden');
+
+      expect(result).toEqual([]);
     });
   });
 
@@ -294,7 +313,7 @@ describe('SearchService', () => {
     it('должен удалять спецсимволы PostgreSQL FTS', async () => {
       dataSource.query.mockResolvedValue([]);
 
-      await service.searchEntities('test & query | (with:special*)');
+      await service.searchEntities('test & query | (with:special*)', ['ws-1']);
 
       expect(dataSource.query).toHaveBeenCalledWith(
         expect.any(String),
@@ -305,7 +324,7 @@ describe('SearchService', () => {
     it('должен схлопывать множественные пробелы', async () => {
       dataSource.query.mockResolvedValue([]);
 
-      await service.searchEntities('test    query');
+      await service.searchEntities('test    query', ['ws-1']);
 
       expect(dataSource.query).toHaveBeenCalledWith(
         expect.any(String),

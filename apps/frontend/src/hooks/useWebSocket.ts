@@ -9,6 +9,7 @@ import { usePresenceStore } from '@/store/usePresenceStore';
 import { useTaskStore } from '@/store/useTaskStore';
 import { useAiStore } from '@/store/useAiStore';
 import { useChatStore } from '@/store/useChatStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import { initSocket, destroySocket, getSocket } from '@/lib/socket';
 import { browserNotifications } from '@/hooks/useBrowserNotifications';
 
@@ -362,6 +363,11 @@ export function useWebSocket() {
         entityId: data.entityId || undefined,
         workspaceId: data.workspaceId || undefined,
       });
+    });
+
+    // RBAC: permissions изменились — перезагружаем
+    socket.on('rbac:permissions:changed', () => {
+      usePermissionStore.getState().fetchPermissions();
     });
 
     // ─── Chat events ───────────────────────────────────────

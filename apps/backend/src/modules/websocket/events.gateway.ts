@@ -181,6 +181,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('task:updated', task);
   }
 
+  // RBAC: permissions пользователя изменились — отправляем targeted event
+  emitRbacPermissionsChanged(userId: string) {
+    this.emitToUser(userId, 'rbac:permissions:changed', { userId });
+  }
+
   // AI: автоклассификация завершена
   emitAiClassificationReady(data: {
     entityId: string;

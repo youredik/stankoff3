@@ -3,6 +3,7 @@
 import { useEffect, ReactNode, useState, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -103,6 +104,15 @@ function AuthProviderInner({ children }: AuthProviderProps) {
       }
     }
   }, [hydrated, accessTokenParam, checkAuth, authChecked]);
+
+  // Загружаем permissions после успешной аутентификации, сбрасываем при logout
+  useEffect(() => {
+    if (isAuthenticated) {
+      usePermissionStore.getState().fetchPermissions();
+    } else {
+      usePermissionStore.getState().reset();
+    }
+  }, [isAuthenticated]);
 
   // Редирект на логин если не авторизован
   useEffect(() => {

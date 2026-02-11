@@ -29,6 +29,7 @@ import {
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import type { Entity, FieldOption } from '@/types';
 import { filtersToApi } from '@/lib/utils/filters';
 import { useWorkspaceFilters } from '@/hooks/useWorkspaceFilters';
@@ -76,11 +77,12 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     updateStatus,
     getAllEntities,
   } = useEntityStore();
-  const { currentWorkspace, fetchWorkspace, canEdit, currentRole } = useWorkspaceStore();
+  const { currentWorkspace, fetchWorkspace, canEdit } = useWorkspaceStore();
   const { user } = useAuthStore();
+  const can = usePermissionStore((s) => s.can);
 
-  const isAdmin = user?.role === 'admin' || currentRole === 'admin';
-  const canEditEntities = canEdit();
+  const isAdmin = can('workspace:settings:read', workspaceId);
+  const canEditEntities = can('workspace:entity:update', workspaceId);
   const { facets } = useFacets(workspaceId, filters);
 
   useEffect(() => {
@@ -270,7 +272,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           </div>
         </div>
 
-        {!canEditEntities && currentRole && (
+        {!canEditEntities && can('workspace:entity:read', workspaceId) && (
           <div data-testid="kanban-view-mode-badge" className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
             <Eye className="w-4 h-4" />
             <span className="text-sm">Режим просмотра — вы можете просматривать заявки, но не можете их редактировать</span>

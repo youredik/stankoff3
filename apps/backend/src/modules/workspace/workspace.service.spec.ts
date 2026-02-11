@@ -7,12 +7,16 @@ import { Workspace } from './workspace.entity';
 import { WorkspaceMember, WorkspaceRole } from './workspace-member.entity';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { UserRole } from '../user/user.entity';
+import { RbacService } from '../rbac/rbac.service';
+import { Role } from '../rbac/role.entity';
+import { EventsGateway } from '../websocket/events.gateway';
 
 describe('WorkspaceService', () => {
   let service: WorkspaceService;
   let workspaceRepo: jest.Mocked<Repository<Workspace>>;
   let memberRepo: jest.Mocked<Repository<WorkspaceMember>>;
   let entityRepo: jest.Mocked<Repository<WorkspaceEntity>>;
+  let rbacService: jest.Mocked<RbacService>;
 
   const mockWorkspace = {
     id: 'ws-1',
@@ -72,12 +76,32 @@ describe('WorkspaceService', () => {
       save: jest.fn(),
     };
 
+    const mockRbacService = {
+      getAccessibleWorkspaceIds: jest.fn(),
+      hasPermission: jest.fn(),
+      getEffectivePermissions: jest.fn(),
+      getFieldPermissions: jest.fn(),
+      invalidateUser: jest.fn(),
+      invalidateAll: jest.fn(),
+    };
+
+    const mockRoleRepo = {
+      findOne: jest.fn(),
+    };
+
+    const mockEventsGateway = {
+      emitRbacPermissionsChanged: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkspaceService,
         { provide: getRepositoryToken(Workspace), useValue: mockWorkspaceRepo },
         { provide: getRepositoryToken(WorkspaceMember), useValue: mockMemberRepo },
         { provide: getRepositoryToken(WorkspaceEntity), useValue: mockEntityRepo },
+        { provide: getRepositoryToken(Role), useValue: mockRoleRepo },
+        { provide: RbacService, useValue: mockRbacService },
+        { provide: EventsGateway, useValue: mockEventsGateway },
       ],
     }).compile();
 
@@ -85,41 +109,42 @@ describe('WorkspaceService', () => {
     workspaceRepo = module.get(getRepositoryToken(Workspace));
     memberRepo = module.get(getRepositoryToken(WorkspaceMember));
     entityRepo = module.get(getRepositoryToken(WorkspaceEntity));
+    rbacService = module.get(RbacService);
   });
 
   describe('findAll', () => {
-    it('должен вернуть все workspaces для admin (кроме internal)', async () => {
+    it('должен вернуть workspaces по accessible IDs (через RBAC)', async () => {
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue(['ws-1', 'ws-2']);
       workspaceRepo.find.mockResolvedValue([mockWorkspace]);
 
-      const result = await service.findAll('user-1', UserRole.ADMIN);
+      const result = await service.findAll('user-1');
 
       expect(result).toEqual([mockWorkspace]);
+      expect(rbacService.getAccessibleWorkspaceIds).toHaveBeenCalledWith('user-1');
       expect(workspaceRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { isInternal: false } }),
+        expect.objectContaining({
+          where: { id: expect.anything(), isInternal: false },
+        }),
       );
     });
 
-    it('должен вернуть только доступные workspaces для обычного пользователя', async () => {
-      memberRepo.find.mockResolvedValue([mockMember]);
+    it('должен вернуть пустой массив если нет доступных workspaces', async () => {
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue([]);
 
-      const result = await service.findAll('user-2', UserRole.EMPLOYEE);
+      const result = await service.findAll('user-1');
 
-      expect(result).toEqual([mockWorkspace]);
-      expect(memberRepo.find).toHaveBeenCalledWith({
-        where: { userId: 'user-2' },
-        relations: ['workspace', 'workspace.section'],
-      });
+      expect(result).toEqual([]);
+      expect(workspaceRepo.find).not.toHaveBeenCalled();
     });
 
-    it('должен исключить internal workspaces для обычного пользователя', async () => {
-      const internalWorkspace = { ...mockWorkspace, id: 'ws-internal', isInternal: true } as unknown as Workspace;
-      const internalMember = { ...mockMember, workspace: internalWorkspace } as unknown as WorkspaceMember;
-      memberRepo.find.mockResolvedValue([mockMember, internalMember]);
+    it('должен игнорировать параметр userRole (backward compat)', async () => {
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue(['ws-1']);
+      workspaceRepo.find.mockResolvedValue([mockWorkspace]);
 
-      const result = await service.findAll('user-2', UserRole.EMPLOYEE);
+      const result = await service.findAll('user-1', UserRole.EMPLOYEE);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('ws-1');
+      expect(result).toEqual([mockWorkspace]);
+      expect(rbacService.getAccessibleWorkspaceIds).toHaveBeenCalledWith('user-1');
     });
   });
 
@@ -142,44 +167,75 @@ describe('WorkspaceService', () => {
   });
 
   describe('checkAccess', () => {
-    it('должен вернуть admin role для глобального admin', async () => {
-      const result = await service.checkAccess('ws-1', 'user-1', UserRole.ADMIN);
-
-      expect(result?.role).toBe(WorkspaceRole.ADMIN);
-    });
-
-    it('должен вернуть membership для обычного пользователя', async () => {
+    it('должен вернуть membership если RBAC разрешает и membership существует', async () => {
+      rbacService.hasPermission.mockResolvedValue(true);
       memberRepo.findOne.mockResolvedValue(mockMember);
 
       const result = await service.checkAccess('ws-1', 'user-1', UserRole.EMPLOYEE);
 
       expect(result).toEqual(mockMember);
+      expect(rbacService.hasPermission).toHaveBeenCalledWith(
+        'user-1',
+        'workspace:entity:read',
+        { workspaceId: 'ws-1' },
+      );
     });
 
-    it('должен вернуть null если нет доступа', async () => {
+    it('должен вернуть синтетический ADMIN если нет membership (суперадмин)', async () => {
+      rbacService.hasPermission.mockResolvedValue(true);
       memberRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.checkAccess('ws-1', 'user-1', UserRole.ADMIN);
+
+      expect(result?.role).toBe(WorkspaceRole.ADMIN);
+    });
+
+    it('должен вернуть null если RBAC запрещает', async () => {
+      rbacService.hasPermission.mockResolvedValue(false);
 
       const result = await service.checkAccess('ws-1', 'user-2', UserRole.EMPLOYEE);
 
       expect(result).toBeNull();
+      expect(memberRepo.findOne).not.toHaveBeenCalled();
     });
 
-    it('должен проверить минимальную роль', async () => {
-      const viewerMember = { ...mockMember, role: WorkspaceRole.VIEWER };
-      memberRepo.findOne.mockResolvedValue(viewerMember as any);
+    it('должен маппить requiredRole ADMIN → workspace:settings:update', async () => {
+      rbacService.hasPermission.mockResolvedValue(true);
+      memberRepo.findOne.mockResolvedValue(mockMember);
 
-      const result = await service.checkAccess('ws-1', 'user-1', UserRole.EMPLOYEE, WorkspaceRole.EDITOR);
+      await service.checkAccess('ws-1', 'user-1', UserRole.EMPLOYEE, WorkspaceRole.ADMIN);
 
-      expect(result).toBeNull();
+      expect(rbacService.hasPermission).toHaveBeenCalledWith(
+        'user-1',
+        'workspace:settings:update',
+        { workspaceId: 'ws-1' },
+      );
     });
 
-    it('должен разрешить доступ если роль достаточна', async () => {
-      const editorMember = { ...mockMember, role: WorkspaceRole.EDITOR };
-      memberRepo.findOne.mockResolvedValue(editorMember as any);
+    it('должен маппить requiredRole EDITOR → workspace:entity:update', async () => {
+      rbacService.hasPermission.mockResolvedValue(true);
+      memberRepo.findOne.mockResolvedValue(mockMember);
 
-      const result = await service.checkAccess('ws-1', 'user-1', UserRole.EMPLOYEE, WorkspaceRole.VIEWER);
+      await service.checkAccess('ws-1', 'user-1', UserRole.EMPLOYEE, WorkspaceRole.EDITOR);
 
-      expect(result).toEqual(editorMember);
+      expect(rbacService.hasPermission).toHaveBeenCalledWith(
+        'user-1',
+        'workspace:entity:update',
+        { workspaceId: 'ws-1' },
+      );
+    });
+
+    it('должен маппить requiredRole VIEWER → workspace:entity:read', async () => {
+      rbacService.hasPermission.mockResolvedValue(true);
+      memberRepo.findOne.mockResolvedValue(mockMember);
+
+      await service.checkAccess('ws-1', 'user-1', UserRole.EMPLOYEE, WorkspaceRole.VIEWER);
+
+      expect(rbacService.hasPermission).toHaveBeenCalledWith(
+        'user-1',
+        'workspace:entity:read',
+        { workspaceId: 'ws-1' },
+      );
     });
   });
 
@@ -221,21 +277,33 @@ describe('WorkspaceService', () => {
   });
 
   describe('getMyRoles', () => {
-    it('должен вернуть admin роль во всех workspaces для глобального admin (кроме internal)', async () => {
-      workspaceRepo.find.mockResolvedValue([mockWorkspace]);
-
-      const result = await service.getMyRoles('user-1', UserRole.ADMIN);
-
-      expect(result['ws-1']).toBe(WorkspaceRole.ADMIN);
-      expect(workspaceRepo.find).toHaveBeenCalledWith({ where: { isInternal: false } });
-    });
-
-    it('должен вернуть роли по membership для обычного пользователя', async () => {
+    it('должен вернуть роли через accessible workspaces + memberships', async () => {
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue(['ws-1', 'ws-2']);
       memberRepo.find.mockResolvedValue([mockMember]);
 
-      const result = await service.getMyRoles('user-1', UserRole.EMPLOYEE);
+      const result = await service.getMyRoles('user-1');
 
-      expect(result['ws-1']).toBe(WorkspaceRole.ADMIN);
+      expect(result['ws-1']).toBe(WorkspaceRole.ADMIN); // из membership
+      expect(result['ws-2']).toBe(WorkspaceRole.ADMIN); // fallback для суперадмина без membership
+    });
+
+    it('должен вернуть пустой объект если нет доступных workspaces', async () => {
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue([]);
+      memberRepo.find.mockResolvedValue([]);
+
+      const result = await service.getMyRoles('user-1');
+
+      expect(result).toEqual({});
+    });
+
+    it('должен использовать роль из membership если есть', async () => {
+      const editorMember = { ...mockMember, workspaceId: 'ws-1', role: WorkspaceRole.EDITOR } as unknown as WorkspaceMember;
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue(['ws-1']);
+      memberRepo.find.mockResolvedValue([editorMember]);
+
+      const result = await service.getMyRoles('user-1');
+
+      expect(result['ws-1']).toBe(WorkspaceRole.EDITOR);
     });
   });
 
@@ -487,12 +555,14 @@ describe('WorkspaceService', () => {
   });
 
   describe('getAccessibleWorkspaces', () => {
-    it('должен быть алиасом для findAll', async () => {
+    it('должен делегировать в findAll', async () => {
+      rbacService.getAccessibleWorkspaceIds.mockResolvedValue(['ws-1']);
       workspaceRepo.find.mockResolvedValue([mockWorkspace]);
 
       const result = await service.getAccessibleWorkspaces('user-1', UserRole.ADMIN);
 
       expect(result).toEqual([mockWorkspace]);
+      expect(rbacService.getAccessibleWorkspaceIds).toHaveBeenCalledWith('user-1');
     });
   });
 });

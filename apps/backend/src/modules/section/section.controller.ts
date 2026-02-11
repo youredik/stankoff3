@@ -11,9 +11,9 @@ import {
 import { SectionService } from './section.service';
 import { Section } from './section.entity';
 import { SectionRole } from './section-member.entity';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../rbac/rbac.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole, User } from '../user/user.entity';
+import { User } from '../user/user.entity';
 import {
   CreateSectionDto,
   UpdateSectionDto,
@@ -51,7 +51,7 @@ export class SectionController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:section:create')
   async create(
     @Body() dto: CreateSectionDto,
     @CurrentUser() user: User,
@@ -78,14 +78,14 @@ export class SectionController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:section:delete')
   async remove(@Param('id') id: string): Promise<void> {
     return this.sectionService.remove(id);
   }
 
   // Изменить порядок разделов
   @Post('reorder')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:section:create')
   async reorder(@Body() body: { sectionIds: string[] }): Promise<void> {
     return this.sectionService.reorder(body.sectionIds);
   }

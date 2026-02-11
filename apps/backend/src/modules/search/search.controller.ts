@@ -1,9 +1,9 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Controller, Get, Query } from '@nestjs/common';
 import { SearchService, SearchOptions } from './search.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { User } from '../user/user.entity';
 
 @Controller('search')
-@UseGuards(JwtAuthGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
@@ -11,10 +11,12 @@ export class SearchController {
    * GET /api/search?q=текст&workspaceId=uuid&types=entity,comment&limit=50&offset=0
    *
    * Глобальный поиск по заявкам, комментариям и истории
+   * Результаты фильтруются по доступным workspace пользователя
    */
   @Get()
   async search(
     @Query('q') query: string,
+    @CurrentUser() user: User,
     @Query('workspaceId') workspaceId?: string,
     @Query('types') types?: string,
     @Query('limit') limit?: string,
@@ -29,7 +31,7 @@ export class SearchController {
         : ['entity', 'comment'],
     };
 
-    return this.searchService.search(query, options);
+    return this.searchService.search(query, user.id, options);
   }
 
   /**
@@ -40,12 +42,14 @@ export class SearchController {
   @Get('entities')
   async searchEntities(
     @Query('q') query: string,
+    @CurrentUser() user: User,
     @Query('workspaceId') workspaceId?: string,
     @Query('limit') limit?: string,
   ) {
+    const accessibleIds = await this.searchService.getAccessibleIds(user.id, workspaceId);
     return this.searchService.searchEntities(
       query,
-      workspaceId,
+      accessibleIds,
       limit ? parseInt(limit, 10) : 50,
     );
   }
@@ -58,12 +62,14 @@ export class SearchController {
   @Get('comments')
   async searchComments(
     @Query('q') query: string,
+    @CurrentUser() user: User,
     @Query('workspaceId') workspaceId?: string,
     @Query('limit') limit?: string,
   ) {
+    const accessibleIds = await this.searchService.getAccessibleIds(user.id, workspaceId);
     return this.searchService.searchComments(
       query,
-      workspaceId,
+      accessibleIds,
       limit ? parseInt(limit, 10) : 50,
     );
   }

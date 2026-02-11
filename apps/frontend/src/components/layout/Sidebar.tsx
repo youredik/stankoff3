@@ -23,6 +23,7 @@ import {
   Inbox,
   MessageCircle,
   BookOpen,
+  Shield,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
@@ -31,6 +32,7 @@ import { useSidebarStore } from '@/store/useSidebarStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import { useTaskStore } from '@/store/useTaskStore';
 import { useChatStore } from '@/store/useChatStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import { ImportModal } from '@/components/workspace/ImportModal';
 import { SectionMembersModal } from '@/components/section/SectionMembersModal';
 import type { Workspace, MenuSection } from '@/types';
@@ -112,8 +114,12 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
   const [importWorkspaceId, setImportWorkspaceId] = useState<string | null>(null);
   const [sectionMembersSection, setSectionMembersSection] = useState<MenuSection | null>(null);
 
-  // Проверка прав администратора
-  const isAdmin = user?.role === 'admin';
+  // Permission-based проверки
+  const can = usePermissionStore((s) => s.can);
+  const canCreateWorkspace = can('global:workspace:create');
+  const canCreateSection = can('global:section:create');
+  const canManageUsers = can('global:user:manage');
+  const canManageRoles = can('global:role:manage');
 
   // Группировка workspaces по разделам
   const grouped = useMemo(
@@ -274,8 +280,8 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
           )}
         </button>
 
-        {/* Меню настроек - только для админов */}
-        {isAdmin && (
+        {/* Меню настроек - только для пользователей с правами управления workspace */}
+        {can('workspace:settings:read', workspace.id) && (
           <div className="relative">
             <button
               onClick={(e) => {
@@ -431,8 +437,8 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             </button>
           )}
 
-          {/* Меню раздела - только для админов */}
-          {isAdmin && !isEditing && (
+          {/* Меню раздела - для пользователей с правами управления */}
+          {(canCreateSection || can('section:update')) && !isEditing && (
             <div className="relative">
               <button
                 onClick={(e) => {
@@ -563,8 +569,8 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
         </div>
 
         <nav className="p-4 flex-1 overflow-y-auto">
-          {/* Create buttons - только для админов */}
-          {isAdmin && (
+          {/* Create buttons - только для пользователей с правами создания */}
+          {(canCreateWorkspace || canCreateSection) && (
             <div className="mb-4 flex gap-2">
               <button
                 onClick={() => handleCreateWorkspace()}
@@ -696,20 +702,31 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             )}
           </div>
 
-          {/* Bottom section - только для админов */}
-          {isAdmin && (
+          {/* Bottom section - только для пользователей с правами администрирования */}
+          {(canManageUsers || canManageRoles) && (
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
               <div className="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                 Администрирование
               </div>
-              <button
-                onClick={() => router.push('/admin/users')}
-                data-testid="sidebar-admin-link"
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
-              >
-                <Users className="w-5 h-5" />
-                <span className="font-medium">Пользователи</span>
-              </button>
+              {canManageUsers && (
+                <button
+                  onClick={() => router.push('/admin/users')}
+                  data-testid="sidebar-admin-link"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
+                >
+                  <Users className="w-5 h-5" />
+                  <span className="font-medium">Пользователи</span>
+                </button>
+              )}
+              {canManageRoles && (
+                <button
+                  onClick={() => router.push('/admin/roles')}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
+                >
+                  <Shield className="w-5 h-5" />
+                  <span className="font-medium">Роли и права</span>
+                </button>
+              )}
             </div>
           )}
         </nav>

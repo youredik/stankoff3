@@ -16,6 +16,8 @@ describe('EmailService', () => {
     avatar: undefined as any,
     department: undefined as any,
     role: UserRole.EMPLOYEE,
+    roleId: null,
+    globalRole: null as any,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -4,6 +4,7 @@ import { Repository, DataSource } from 'typeorm';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { Comment } from '../entity/comment.entity';
 import { AuditLog } from '../audit-log/audit-log.entity';
+import { RbacService } from '../rbac/rbac.service';
 
 export interface SearchResult {
   type: 'entity' | 'comment' | 'audit';
@@ -34,13 +35,18 @@ export class SearchService {
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
     private readonly dataSource: DataSource,
+    private readonly rbacService: RbacService,
   ) {}
 
   /**
    * Глобальный поиск по заявкам, комментариям и истории
+   * Фильтрует результаты по доступным workspace пользователя
    */
-  async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
+  async search(query: string, userId: string, options: SearchOptions = {}): Promise<SearchResult[]> {
     const { workspaceId, limit = 50, offset = 0, types = ['entity', 'comment'] } = options;
+
+    const accessibleIds = await this.getAccessibleIds(userId, workspaceId);
+    if (accessibleIds.length === 0) return [];
 
     const results: SearchResult[] = [];
     const sanitizedQuery = this.sanitizeQuery(query);
@@ -51,19 +57,19 @@ export class SearchService {
 
     // Поиск по заявкам
     if (types.includes('entity')) {
-      const entities = await this.searchEntities(sanitizedQuery, workspaceId, limit);
+      const entities = await this.searchEntities(sanitizedQuery, accessibleIds, limit);
       results.push(...entities);
     }
 
     // Поиск по комментариям
     if (types.includes('comment')) {
-      const comments = await this.searchComments(sanitizedQuery, workspaceId, limit);
+      const comments = await this.searchComments(sanitizedQuery, accessibleIds, limit);
       results.push(...comments);
     }
 
     // Поиск по истории изменений
     if (types.includes('audit')) {
-      const audits = await this.searchAuditLogs(sanitizedQuery, workspaceId, limit);
+      const audits = await this.searchAuditLogs(sanitizedQuery, accessibleIds, limit);
       results.push(...audits);
     }
 
@@ -74,17 +80,17 @@ export class SearchService {
   }
 
   /**
-   * Поиск только по заявкам
+   * Поиск только по заявкам (фильтрация по accessible workspace IDs)
    */
   async searchEntities(
     query: string,
-    workspaceId?: string,
+    accessibleWorkspaceIds: string[],
     limit = 50,
   ): Promise<SearchResult[]> {
     const sanitizedQuery = this.sanitizeQuery(query);
-    if (!sanitizedQuery) return [];
+    if (!sanitizedQuery || accessibleWorkspaceIds.length === 0) return [];
 
-    let sql = `
+    const sql = `
       SELECT
         id,
         "customId",
@@ -94,20 +100,11 @@ export class SearchService {
         ts_rank("searchVector", plainto_tsquery('russian', $1)) as rank
       FROM entities
       WHERE "searchVector" @@ plainto_tsquery('russian', $1)
-        AND "workspaceId" NOT IN (SELECT id FROM workspaces WHERE "isInternal" = true)
+        AND "workspaceId" = ANY($2::uuid[])
+      ORDER BY rank DESC LIMIT $3
     `;
 
-    const params: any[] = [sanitizedQuery];
-
-    if (workspaceId) {
-      sql += ` AND "workspaceId" = $2`;
-      params.push(workspaceId);
-    }
-
-    sql += ` ORDER BY rank DESC LIMIT $${params.length + 1}`;
-    params.push(limit);
-
-    const rows = await this.dataSource.query(sql, params);
+    const rows = await this.dataSource.query(sql, [sanitizedQuery, accessibleWorkspaceIds, limit]);
 
     return rows.map((row: any) => ({
       type: 'entity' as const,
@@ -121,17 +118,17 @@ export class SearchService {
   }
 
   /**
-   * Поиск только по комментариям
+   * Поиск только по комментариям (фильтрация по accessible workspace IDs)
    */
   async searchComments(
     query: string,
-    workspaceId?: string,
+    accessibleWorkspaceIds: string[],
     limit = 50,
   ): Promise<SearchResult[]> {
     const sanitizedQuery = this.sanitizeQuery(query);
-    if (!sanitizedQuery) return [];
+    if (!sanitizedQuery || accessibleWorkspaceIds.length === 0) return [];
 
-    let sql = `
+    const sql = `
       SELECT
         c.id,
         c."entityId",
@@ -143,20 +140,11 @@ export class SearchService {
       FROM comments c
       JOIN entities e ON e.id = c."entityId"
       WHERE c."searchVector" @@ plainto_tsquery('russian', $1)
-        AND e."workspaceId" NOT IN (SELECT id FROM workspaces WHERE "isInternal" = true)
+        AND e."workspaceId" = ANY($2::uuid[])
+      ORDER BY rank DESC LIMIT $3
     `;
 
-    const params: any[] = [sanitizedQuery];
-
-    if (workspaceId) {
-      sql += ` AND e."workspaceId" = $2`;
-      params.push(workspaceId);
-    }
-
-    sql += ` ORDER BY rank DESC LIMIT $${params.length + 1}`;
-    params.push(limit);
-
-    const rows = await this.dataSource.query(sql, params);
+    const rows = await this.dataSource.query(sql, [sanitizedQuery, accessibleWorkspaceIds, limit]);
 
     return rows.map((row: any) => ({
       type: 'comment' as const,
@@ -171,18 +159,17 @@ export class SearchService {
   }
 
   /**
-   * Поиск по истории изменений
+   * Поиск по истории изменений (фильтрация по accessible workspace IDs)
    */
   async searchAuditLogs(
     query: string,
-    workspaceId?: string,
+    accessibleWorkspaceIds: string[],
     limit = 50,
   ): Promise<SearchResult[]> {
     const sanitizedQuery = this.sanitizeQuery(query);
-    if (!sanitizedQuery) return [];
+    if (!sanitizedQuery || accessibleWorkspaceIds.length === 0) return [];
 
-    // Поиск по description в details
-    let sql = `
+    const sql = `
       SELECT
         a.id,
         a."entityId",
@@ -193,20 +180,11 @@ export class SearchService {
       FROM audit_logs a
       LEFT JOIN entities e ON e.id = a."entityId"
       WHERE a.details->>'description' ILIKE $1
-        AND a."workspaceId" NOT IN (SELECT id FROM workspaces WHERE "isInternal" = true)
+        AND a."workspaceId" = ANY($2::uuid[])
+      ORDER BY a."createdAt" DESC LIMIT $3
     `;
 
-    const params: any[] = [`%${sanitizedQuery}%`];
-
-    if (workspaceId) {
-      sql += ` AND a."workspaceId" = $2`;
-      params.push(workspaceId);
-    }
-
-    sql += ` ORDER BY a."createdAt" DESC LIMIT $${params.length + 1}`;
-    params.push(limit);
-
-    const rows = await this.dataSource.query(sql, params);
+    const rows = await this.dataSource.query(sql, [`%${sanitizedQuery}%`, accessibleWorkspaceIds, limit]);
 
     return rows.map((row: any) => ({
       type: 'audit' as const,
@@ -218,6 +196,20 @@ export class SearchService {
       createdAt: row.createdAt,
       rank: 0.5, // История ниже по релевантности
     }));
+  }
+
+  /**
+   * Получить список доступных workspace IDs для пользователя.
+   * Если указан workspaceId — проверяет что он в списке доступных.
+   */
+  async getAccessibleIds(userId: string, workspaceId?: string): Promise<string[]> {
+    const allAccessible = await this.rbacService.getAccessibleWorkspaceIds(userId);
+
+    if (workspaceId) {
+      return allAccessible.includes(workspaceId) ? [workspaceId] : [];
+    }
+
+    return allAccessible;
   }
 
   /**

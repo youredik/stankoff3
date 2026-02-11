@@ -19,6 +19,8 @@ describe('JwtStrategy', () => {
     avatar: null,
     department: null,
     role: UserRole.EMPLOYEE,
+    roleId: null,
+    globalRole: null as any,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),

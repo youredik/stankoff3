@@ -28,8 +28,9 @@ import { GeocodingModule } from './modules/geocoding/geocoding.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
 import { SeedModule } from './seed/seed.module';
+import { RbacModule } from './modules/rbac/rbac.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
-import { RolesGuard } from './modules/auth/guards/roles.guard';
+import { PermissionGuard } from './modules/rbac/rbac.guard';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(typeOrmConfig),
 
+    RbacModule,
     SeedModule,
     WorkspaceModule,
     EntityModule,
@@ -67,14 +69,14 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     KnowledgeBaseModule,
   ],
   providers: [
-    // Глобальные guards - порядок важен: сначала JWT, потом Roles
+    // Глобальные guards - порядок важен: сначала JWT, потом Permission
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
     {
       provide: APP_GUARD,
-      useClass: RolesGuard,
+      useClass: PermissionGuard,
     },
   ],
 })

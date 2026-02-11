@@ -28,7 +28,7 @@ stankoff-portal/
 │   │   └── package.json
 │   └── backend/           # NestJS приложение
 │       ├── src/
-│       │   ├── modules/   # NestJS модули
+│       │   ├── modules/   # NestJS модули (включая rbac/)
 │       │   ├── seed/      # Seed данные (87 реальных сотрудников)
 │       │   └── main.ts
 │       └── package.json
@@ -163,7 +163,7 @@ describe('ServiceName', () => {
 - Используй `'use client'` только когда нужны хуки или браузерные API
 - Состояние храни в Zustand stores
 - Стили — Tailwind CSS классы, без отдельных CSS файлов
-- Компоненты размещай по функциональности: `kanban/`, `table/`, `entity/`, `workspace/`, `layout/`, `ui/`, `bpmn/`
+- Компоненты размещай по функциональности: `kanban/`, `table/`, `entity/`, `workspace/`, `layout/`, `ui/`, `bpmn/`, `rbac/`
 - Компоненты с bpmn-js используй только с `dynamic(() => import(...), { ssr: false })` — библиотека требует браузерных API
 
 **API запросы:**
@@ -411,6 +411,17 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 **Dev Auth (только при AUTH_DEV_MODE=true, NODE_ENV !== production):**
 - `GET /api/auth/dev/users` — список пользователей для dev login
 - `POST /api/auth/dev/login` — вход по email (body: `{ email }`) → `{ accessToken }` + refresh cookie
+
+**RBAC (Управление ролями и правами):**
+- `GET /api/rbac/roles` — список ролей (?scope=global|section|workspace)
+- `GET /api/rbac/roles/:id` — детали роли
+- `POST /api/rbac/roles` — создать роль
+- `PUT /api/rbac/roles/:id` — обновить роль
+- `DELETE /api/rbac/roles/:id` — удалить роль (не системную)
+- `GET /api/rbac/permissions` — реестр всех permissions
+- `GET /api/rbac/permissions/my` — мои effective permissions (?workspaceId=)
+- `GET /api/rbac/permissions/my/workspaces` — permissions по всем моим workspaces
+- `POST /api/rbac/assign/global` — назначить глобальную роль пользователю
 
 **Основные эндпоинты:**
 - `GET/POST /api/entities` — сущности (GET без пагинации — legacy)
@@ -668,4 +679,5 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `chat:reaction` — реакция обновлена (conversationId, messageId, reactions[])
 - `chat:message:pinned` — сообщение закреплено (conversationId, message)
 - `chat:message:unpinned` — сообщение откреплено (conversationId, messageId)
+- `rbac:permissions:changed` — permissions пользователя изменились (targeted по userId, frontend перезагружает permissions store)
 - `chat:join` / `chat:leave` (client → server) — подписка на room чата

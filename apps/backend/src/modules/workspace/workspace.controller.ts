@@ -15,9 +15,9 @@ import { Response } from 'express';
 import { WorkspaceService } from './workspace.service';
 import { Workspace } from './workspace.entity';
 import { WorkspaceRole } from './workspace-member.entity';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../rbac/rbac.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole, User } from '../user/user.entity';
+import { User } from '../user/user.entity';
 
 @Controller('workspaces')
 export class WorkspaceController {
@@ -49,7 +49,7 @@ export class WorkspaceController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:create')
   async create(
     @Body() workspaceData: Partial<Workspace>,
     @CurrentUser() user: User,
@@ -58,7 +58,7 @@ export class WorkspaceController {
   }
 
   @Put(':id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:create')
   async update(
     @Param('id') id: string,
     @Body() workspaceData: Partial<Workspace>,
@@ -67,7 +67,7 @@ export class WorkspaceController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:delete')
   async remove(@Param('id') id: string): Promise<void> {
     return this.workspaceService.remove(id);
   }
@@ -155,7 +155,7 @@ export class WorkspaceController {
   // === Дублирование, архивирование, экспорт ===
 
   @Post(':id/duplicate')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:create')
   async duplicate(
     @Param('id') id: string,
     @Body() body: { name?: string },
@@ -165,7 +165,7 @@ export class WorkspaceController {
   }
 
   @Patch(':id/archive')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:create')
   async setArchived(
     @Param('id') id: string,
     @Body() body: { isArchived: boolean },
@@ -174,7 +174,7 @@ export class WorkspaceController {
   }
 
   @Patch(':id/section')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:create')
   async setSection(
     @Param('id') id: string,
     @Body() body: { sectionId: string | null },
@@ -183,7 +183,7 @@ export class WorkspaceController {
   }
 
   @Patch(':id/show-in-menu')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:create')
   async setShowInMenu(
     @Param('id') id: string,
     @Body() body: { showInMenu: boolean },
@@ -192,7 +192,7 @@ export class WorkspaceController {
   }
 
   @Post('reorder')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:workspace:create')
   async reorder(@Body() body: { workspaceIds: string[] }): Promise<void> {
     return this.workspaceService.reorderInSection(body.workspaceIds);
   }

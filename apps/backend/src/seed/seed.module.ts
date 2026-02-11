@@ -19,6 +19,7 @@ import { EntityLink } from '../modules/bpmn/entities/entity-link.entity';
 import { AutomationRule } from '../modules/automation/automation-rule.entity';
 import { UserGroup } from '../modules/bpmn/entities/user-group.entity';
 import { FormDefinition } from '../modules/bpmn/entities/form-definition.entity';
+import { Role } from '../modules/rbac/role.entity';
 
 // Modules (forwardRef для избежания circular dependencies)
 import { AuthModule } from '../modules/auth/auth.module';
@@ -28,7 +29,7 @@ import { BpmnModule } from '../modules/bpmn/bpmn.module';
 import { SeedCleanupService } from './seed-cleanup.service';
 import { SeedUsersService } from './seed-users.service';
 import { SeedKeycloakService } from './seed-keycloak.service';
-// TODO: Будут созданы позднее
+import { SeedRbacService } from './seed-rbac.service';
 import { SeedStructureService } from './seed-structure.service';
 import { SeedEntitiesService } from './seed-entities.service';
 import { SeedItDepartmentService } from './seed-it-department.service';
@@ -56,6 +57,7 @@ import { SeedOrchestratorService } from './seed-orchestrator.service';
       AutomationRule,
       UserGroup,
       FormDefinition,
+      Role,
     ]),
     forwardRef(() => AuthModule),
     forwardRef(() => BpmnModule),
@@ -63,6 +65,7 @@ import { SeedOrchestratorService } from './seed-orchestrator.service';
   providers: [
     SeedCleanupService,
     SeedUsersService,
+    SeedRbacService,
     SeedKeycloakService,
     SeedStructureService,
     SeedEntitiesService,

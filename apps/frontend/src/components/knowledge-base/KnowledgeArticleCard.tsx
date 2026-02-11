@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { FileText, HelpCircle, Download, Trash2, Calendar, User, Tag } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useCan } from '@/hooks/useCan';
 import { useKnowledgeBaseStore } from '@/store/useKnowledgeBaseStore';
 import type { KnowledgeArticle } from '@/types/knowledge-base';
 
@@ -21,7 +22,8 @@ export function KnowledgeArticleCard({ article }: Props) {
   const { deleteArticle } = useKnowledgeBaseStore();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const canDelete = user?.role === 'admin' || user?.id === article.authorId;
+  const canManageKb = useCan('global:knowledge-base:manage');
+  const canDelete = canManageKb || user?.id === article.authorId;
   const isDocument = article.type === 'document';
 
   const handleDelete = async () => {

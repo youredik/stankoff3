@@ -29,6 +29,7 @@ import { FormDefinitionsSettings } from '@/components/forms/FormDefinitionsSetti
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import type { Field, FieldType, Workspace } from '@/types';
 
@@ -75,7 +76,14 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
   const [isInitialized, setIsInitialized] = useState(false);
 
   const { user } = useAuthStore();
-  const isGlobalAdmin = user?.role === 'admin';
+  const can = usePermissionStore((s) => s.can);
+  const canManageSettings = can('workspace:settings:update', workspaceId);
+  const canManageMembers = can('workspace:settings.members:manage', workspaceId);
+  const canManageAutomation = can('workspace:settings.automation:manage', workspaceId);
+  const canManageSla = can('workspace:settings.sla:manage', workspaceId);
+  const canManageDmn = can('workspace:settings.dmn:manage', workspaceId);
+  const canManageForms = can('workspace:settings.forms:manage', workspaceId);
+  const canManageFields = can('workspace:settings.fields:manage', workspaceId);
 
   // Редактирование названия и иконки
   const [isEditingName, setIsEditingName] = useState(false);
@@ -410,7 +418,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
               <Settings2 className="w-4 h-4" />
               <span>Структура</span>
             </button>
-            {isGlobalAdmin && (
+            {canManageMembers && (
               <button
                 onClick={() => setActiveTab('members')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -423,7 +431,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 <span>Участники</span>
               </button>
             )}
-            {isGlobalAdmin && (
+            {canManageAutomation && (
               <button
                 onClick={() => setActiveTab('automation')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -436,7 +444,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 <span>Автоматизация</span>
               </button>
             )}
-            {isGlobalAdmin && (
+            {canManageSla && (
               <button
                 onClick={() => setActiveTab('sla')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -449,7 +457,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 <span>SLA</span>
               </button>
             )}
-            {isGlobalAdmin && (
+            {canManageDmn && (
               <button
                 onClick={() => setActiveTab('dmn')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -462,7 +470,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
                 <span>Таблицы решений</span>
               </button>
             )}
-            {isGlobalAdmin && (
+            {canManageForms && (
               <button
                 onClick={() => setActiveTab('forms')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -478,7 +486,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
           </div>
 
           {/* Settings Bar - Section & Menu Visibility */}
-          {isGlobalAdmin && activeTab === 'structure' && (
+          {canManageSettings && activeTab === 'structure' && (
             <div className="px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-6">
               {/* Выбор раздела */}
               <div className="flex items-center gap-2">

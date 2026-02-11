@@ -19,6 +19,7 @@ jest.mock('./keycloak.service', () => ({
 // Import AuthService after mocking KeycloakService
 import { AuthService } from './auth.service';
 import { KeycloakService } from './keycloak.service';
+import { RoleService } from '../rbac/role.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -35,6 +36,8 @@ describe('AuthService', () => {
     avatar: undefined as any,
     department: undefined as any,
     role: UserRole.EMPLOYEE,
+    roleId: null,
+    globalRole: null as any,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -57,6 +60,11 @@ describe('AuthService', () => {
       get: jest.fn(),
     };
 
+    const mockRoleService = {
+      findBySlug: jest.fn().mockResolvedValue({ id: 'role-employee', slug: 'employee' }),
+      getDefaultRole: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -64,6 +72,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: KeycloakService, useValue: new (KeycloakService as any)() },
+        { provide: RoleService, useValue: mockRoleService },
       ],
     }).compile();
 

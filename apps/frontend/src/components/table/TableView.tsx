@@ -25,6 +25,7 @@ import {
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import { filtersToApi } from '@/lib/utils/filters';
 import { useWorkspaceFilters } from '@/hooks/useWorkspaceFilters';
 import { useFacets } from '@/hooks/useFacets';
@@ -211,11 +212,12 @@ export function TableView({ workspaceId }: TableViewProps) {
     updateAssignee,
   } = useEntityStore();
 
-  const { currentWorkspace, fetchWorkspace, canEdit, currentRole } = useWorkspaceStore();
+  const { currentWorkspace, fetchWorkspace, canEdit } = useWorkspaceStore();
   const { user } = useAuthStore();
+  const can = usePermissionStore((s) => s.can);
 
-  const isAdmin = user?.role === 'admin' || currentRole === 'admin';
-  const canEditEntities = canEdit();
+  const isAdmin = can('workspace:settings:read', workspaceId);
+  const canEditEntities = can('workspace:entity:update', workspaceId);
   const { facets } = useFacets(workspaceId, filters);
 
   // Get status options from workspace

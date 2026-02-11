@@ -8,6 +8,7 @@ import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import { CommentEditor } from '@/components/entity/CommentEditor';
 import { LinkedEntities } from '@/components/entity/LinkedEntities';
 import { EntityTimeline } from '@/components/entity/timeline';
@@ -184,11 +185,12 @@ export function EntityDetailPanel() {
 
   const { currentWorkspace, canEdit } = useWorkspaceStore();
   const { user } = useAuthStore();
+  const can = usePermissionStore((s) => s.can);
 
   // Проверка прав workspace
-  const canEditEntity = canEdit();
-  // Назначение исполнителей: admin, manager или workspace admin/editor
-  const canAssign = user?.role === 'admin' || user?.role === 'manager' || canEditEntity;
+  const wsId = currentWorkspace?.id;
+  const canEditEntity = wsId ? can('workspace:entity:update', wsId) : canEdit();
+  const canAssign = wsId ? can('workspace:entity:update', wsId) : canEditEntity;
 
   // Sentiment из AI assistance cache
   const aiSentiment = useAiStore((s) =>

@@ -3,11 +3,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Workspace } from './workspace.entity';
 import { WorkspaceMember } from './workspace-member.entity';
 import { WorkspaceEntity } from '../entity/entity.entity';
+import { Role } from '../rbac/role.entity';
 import { WorkspaceService } from './workspace.service';
 import { WorkspaceController } from './workspace.controller';
+import { WebsocketModule } from '../websocket/websocket.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Workspace, WorkspaceMember, WorkspaceEntity])],
+  imports: [
+    TypeOrmModule.forFeature([Workspace, WorkspaceMember, WorkspaceEntity, Role]),
+    WebsocketModule,
+  ],
   providers: [WorkspaceService],
   controllers: [WorkspaceController],
   exports: [WorkspaceService],

@@ -1,34 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, UserPlus } from 'lucide-react';
+import { Trash2, Loader2, UserPlus } from 'lucide-react';
 import { workspacesApi } from '@/lib/api/workspaces';
+import { rbacApi } from '@/lib/api/rbac';
 import { usersApi } from '@/lib/api/users';
-import type { WorkspaceMember, WorkspaceRole, User } from '@/types';
+import type { WorkspaceMember, User, Role } from '@/types';
 
 interface WorkspaceMembersProps {
   workspaceId: string;
 }
 
-const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  viewer: 'Просмотр',
-  editor: 'Редактор',
-  admin: 'Администратор',
-};
-
-const ROLE_COLORS: Record<WorkspaceRole, string> = {
-  viewer: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300',
-  editor: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
-  admin: 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
-};
-
 export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [wsRoles, setWsRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [selectedRole, setSelectedRole] = useState<WorkspaceRole>('editor');
+  const [selectedRoleId, setSelectedRoleId] = useState('');
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -39,46 +29,53 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [membersData, usersData] = await Promise.all([
+      const [membersData, usersData, rolesData] = await Promise.all([
         workspacesApi.getMembers(workspaceId),
         usersApi.getAll(),
+        rbacApi.getRoles('workspace'),
       ]);
       setMembers(membersData);
       setAllUsers(usersData);
+      setWsRoles(rolesData);
+
+      // Выбираем дефолтную роль
+      const defaultRole = rolesData.find((r) => r.isDefault) || rolesData.find((r) => r.slug === 'ws_editor');
+      if (defaultRole && !selectedRoleId) {
+        setSelectedRoleId(defaultRole.id);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Пользователи, которых ещё нет в workspace
   const availableUsers = allUsers.filter(
     (user) => !members.some((m) => m.userId === user.id)
   );
 
   const handleAddMember = async () => {
-    if (!selectedUserId) return;
+    if (!selectedUserId || !selectedRoleId) return;
     setAdding(true);
     try {
-      const newMember = await workspacesApi.addMember(
-        workspaceId,
-        selectedUserId,
-        selectedRole
-      );
-      // Загружаем данные заново для получения user relation
+      const role = wsRoles.find((r) => r.id === selectedRoleId);
+      const legacyRole = role ? slugToLegacyWsRole(role.slug) : 'editor';
+      await workspacesApi.addMember(workspaceId, selectedUserId, legacyRole);
       await loadData();
       setShowAddModal(false);
       setSelectedUserId('');
-      setSelectedRole('editor');
     } finally {
       setAdding(false);
     }
   };
 
-  const handleUpdateRole = async (userId: string, role: WorkspaceRole) => {
+  const handleUpdateRole = async (userId: string, roleId: string) => {
+    const role = wsRoles.find((r) => r.id === roleId);
+    const legacyRole = role ? slugToLegacyWsRole(role.slug) : 'editor';
     try {
-      await workspacesApi.updateMemberRole(workspaceId, userId, role);
+      await workspacesApi.updateMemberRole(workspaceId, userId, legacyRole);
       setMembers(
-        members.map((m) => (m.userId === userId ? { ...m, role } : m))
+        members.map((m) =>
+          m.userId === userId ? { ...m, role: legacyRole, roleId } : m,
+        )
       );
     } catch (error) {
       console.error('Failed to update role:', error);
@@ -87,7 +84,6 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
 
   const handleRemoveMember = async (userId: string) => {
     if (!window.confirm('Удалить участника из рабочего места?')) return;
-
     setRemoving(userId);
     try {
       await workspacesApi.removeMember(workspaceId, userId);
@@ -95,6 +91,12 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
     } finally {
       setRemoving(null);
     }
+  };
+
+  const getMemberRoleId = (member: WorkspaceMember): string => {
+    if (member.roleId) return member.roleId;
+    const role = wsRoles.find((r) => r.slug === legacyToSlug(member.role));
+    return role?.id || '';
   };
 
   if (loading) {
@@ -107,7 +109,6 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Участники</h2>
@@ -125,7 +126,6 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
         </button>
       </div>
 
-      {/* Members List */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         {members.length === 0 ? (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">
@@ -138,15 +138,9 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Пользователь
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Роль
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Действия
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Пользователь</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Роль</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -155,31 +149,24 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center text-white text-sm font-medium">
-                        {member.user?.firstName?.[0]}
-                        {member.user?.lastName?.[0]}
+                        {member.user?.firstName?.[0]}{member.user?.lastName?.[0]}
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 dark:text-gray-100">
                           {member.user?.firstName} {member.user?.lastName}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {member.user?.email}
-                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{member.user?.email}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <select
-                      value={member.role}
-                      onChange={(e) =>
-                        handleUpdateRole(member.userId, e.target.value as WorkspaceRole)
-                      }
+                      value={getMemberRoleId(member)}
+                      onChange={(e) => handleUpdateRole(member.userId, e.target.value)}
                       className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
                     >
-                      {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
+                      {wsRoles.map((role) => (
+                        <option key={role.id} value={role.id}>{role.name}</option>
                       ))}
                     </select>
                   </td>
@@ -204,45 +191,34 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
         )}
       </div>
 
-      {/* Roles Description */}
-      <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание ролей:</h3>
-        <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-          <li>
-            <span className="font-medium">Просмотр</span> — только просмотр
-            заявок и комментариев
-          </li>
-          <li>
-            <span className="font-medium">Редактор</span> — создание и
-            редактирование заявок, комментариев
-          </li>
-          <li>
-            <span className="font-medium">Администратор</span> — полный доступ:
-            настройки, участники, удаление
-          </li>
-        </ul>
-      </div>
+      {wsRoles.length > 0 && (
+        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Доступные роли:</h3>
+          <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+            {wsRoles.map((role) => (
+              <li key={role.id}>
+                <span className="font-medium">{role.name}</span>
+                {role.description && <span> — {role.description}</span>}
+                {!role.description && role.isSystem && (
+                  <span> — {role.permissions.includes('workspace:*') ? 'полный доступ' : `${role.permissions.length} permissions`}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-      {/* Add Member Modal */}
       {showAddModal && (
         <>
-          <div
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => setShowAddModal(false)}
-          />
+          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowAddModal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Добавить участника
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Добавить участника</h3>
               </div>
-
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Пользователь
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Пользователь</label>
                   <select
                     value={selectedUserId}
                     onChange={(e) => setSelectedUserId(e.target.value)}
@@ -256,27 +232,19 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                     ))}
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Роль
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Роль</label>
                   <select
-                    value={selectedRole}
-                    onChange={(e) =>
-                      setSelectedRole(e.target.value as WorkspaceRole)
-                    }
+                    value={selectedRoleId}
+                    onChange={(e) => setSelectedRoleId(e.target.value)}
                     className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
                   >
-                    {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
+                    {wsRoles.map((role) => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
                     ))}
                   </select>
                 </div>
               </div>
-
               <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
                 <button
                   onClick={() => setShowAddModal(false)}
@@ -286,7 +254,7 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
                 </button>
                 <button
                   onClick={handleAddMember}
-                  disabled={!selectedUserId || adding}
+                  disabled={!selectedUserId || !selectedRoleId || adding}
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                 >
                   {adding && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -299,4 +267,16 @@ export function WorkspaceMembers({ workspaceId }: WorkspaceMembersProps) {
       )}
     </div>
   );
+}
+
+function slugToLegacyWsRole(slug: string): 'viewer' | 'editor' | 'admin' {
+  if (slug === 'ws_admin') return 'admin';
+  if (slug === 'ws_viewer') return 'viewer';
+  return 'editor';
+}
+
+function legacyToSlug(role: string): string {
+  if (role === 'admin') return 'ws_admin';
+  if (role === 'viewer') return 'ws_viewer';
+  return 'ws_editor';
 }

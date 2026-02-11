@@ -9,6 +9,7 @@ import { SeedKeycloakService } from './seed-keycloak.service';
 import { SeedStructureService } from './seed-structure.service';
 import { SeedEntitiesService } from './seed-entities.service';
 import { SeedItDepartmentService } from './seed-it-department.service';
+import { SeedRbacService } from './seed-rbac.service';
 import { SeedBpmnService } from './seed-bpmn.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
 
@@ -22,6 +23,7 @@ export class SeedOrchestratorService implements OnModuleInit {
     private readonly bpmnService: BpmnService,
     private readonly cleanup: SeedCleanupService,
     private readonly seedUsers: SeedUsersService,
+    private readonly seedRbac: SeedRbacService,
     private readonly seedKeycloak: SeedKeycloakService,
     private readonly seedStructure: SeedStructureService,
     private readonly seedEntities: SeedEntitiesService,
@@ -68,19 +70,27 @@ export class SeedOrchestratorService implements OnModuleInit {
     this.logger.log('Создание пользователей...');
     const users = await this.seedUsers.createAll();
 
-    // 5. Регистрация в Keycloak (опционально)
+    // 5. RBAC фаза 1: системные роли + глобальные назначения
+    this.logger.log('Создание RBAC ролей...');
+    await this.seedRbac.seedRolesAndGlobal(users);
+
+    // 6. Регистрация в Keycloak (опционально)
     this.logger.log('Синхронизация с Keycloak...');
     await this.seedKeycloak.syncUsers(users);
 
-    // 6. Создание секций + workspace + участников
+    // 7. Создание секций + workspace + участников
     this.logger.log('Создание секций, workspace, участников...');
     const { sections, workspaces } = await this.seedStructure.createAll(users);
 
-    // 7. Создание сущностей + комментариев
+    // 7.1 RBAC фаза 2: назначение workspace/section ролей
+    this.logger.log('Назначение RBAC ролей для membership...');
+    await this.seedRbac.seedMembershipRoles();
+
+    // 8. Создание сущностей + комментариев
     this.logger.log('Создание сущностей и комментариев...');
     const entities = await this.seedEntities.createAll(workspaces, users);
 
-    // 8. Создание IT-отдела (отдельный workspace)
+    // 9. Создание IT-отдела (отдельный workspace)
     this.logger.log('Создание IT workspace...');
     const itSection = sections.find((s) => s.name === 'IT');
     if (!itSection) {
@@ -89,7 +99,7 @@ export class SeedOrchestratorService implements OnModuleInit {
     }
     const { workspace: itWs, entities: itEntities } = await this.seedItDept.createAll(users, itSection);
 
-    // 9. BPMN определения + deploy + триггеры + запуск процессов
+    // 10. BPMN определения + deploy + триггеры + запуск процессов
     if (zeebeAvailable) {
       this.logger.log('Создание BPMN определений и процессов...');
       try {
@@ -101,7 +111,7 @@ export class SeedOrchestratorService implements OnModuleInit {
       this.logger.log('BPMN seed пропущен — Zeebe недоступен');
     }
 
-    // 10. SLA + DMN
+    // 11. SLA + DMN
     this.logger.log('Создание SLA определений и DMN таблиц...');
     try {
       await this.seedSlaDmn.createAll(workspaces, itWs, users);
@@ -109,7 +119,7 @@ export class SeedOrchestratorService implements OnModuleInit {
       this.logger.warn(`Ошибка SLA/DMN seed (не критично): ${e.message}`);
     }
 
-    // 11. Итог
+    // 12. Итог
     const totalEntities = Object.values(entities).reduce(
       (sum, arr) => sum + arr.length,
       0,

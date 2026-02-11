@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +12,15 @@ import { SectionMember, SectionRole } from './section-member.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { WorkspaceMember } from '../workspace/workspace-member.entity';
 import { UserRole } from '../user/user.entity';
+import { Role } from '../rbac/role.entity';
+import { RbacService } from '../rbac/rbac.service';
+import { EventsGateway } from '../websocket/events.gateway';
+
+/** Маппинг legacy enum → системный role slug */
+const SEC_ROLE_SLUG_MAP: Record<SectionRole, string> = {
+  [SectionRole.ADMIN]: 'section_admin',
+  [SectionRole.VIEWER]: 'section_viewer',
+};
 
 @Injectable()
 export class SectionService {
@@ -22,6 +33,10 @@ export class SectionService {
     private workspaceRepository: Repository<Workspace>,
     @InjectRepository(WorkspaceMember)
     private workspaceMemberRepository: Repository<WorkspaceMember>,
+    @InjectRepository(Role)
+    private readonly roleRepository: Repository<Role>,
+    private readonly rbacService: RbacService,
+    @Optional() @Inject(EventsGateway) private readonly eventsGateway?: EventsGateway,
   ) {}
 
   // Получить все доступные разделы для пользователя
@@ -242,30 +257,40 @@ export class SectionService {
     sectionId: string,
     userId: string,
     role: SectionRole = SectionRole.VIEWER,
+    roleId?: string,
   ): Promise<SectionMember> {
     const section = await this.sectionRepository.findOne({ where: { id: sectionId } });
     if (!section) {
       throw new NotFoundException('Раздел не найден');
     }
 
+    const resolvedRoleId = roleId || await this.resolveSectionRoleId(role);
+
     // Проверяем, не является ли уже членом
     const existing = await this.memberRepository.findOne({
       where: { sectionId, userId },
     });
     if (existing) {
-      // Обновляем роль
       existing.role = role;
-      return this.memberRepository.save(existing);
+      existing.roleId = resolvedRoleId;
+      const saved = await this.memberRepository.save(existing);
+      this.rbacService.invalidateUser(userId);
+      this.eventsGateway?.emitRbacPermissionsChanged(userId);
+      return saved;
     }
 
-    const member = this.memberRepository.create({ sectionId, userId, role });
-    return this.memberRepository.save(member);
+    const member = this.memberRepository.create({ sectionId, userId, role, roleId: resolvedRoleId });
+    const saved = await this.memberRepository.save(member);
+    this.rbacService.invalidateUser(userId);
+    this.eventsGateway?.emitRbacPermissionsChanged(userId);
+    return saved;
   }
 
   async updateMemberRole(
     sectionId: string,
     userId: string,
     role: SectionRole,
+    roleId?: string,
   ): Promise<SectionMember> {
     const member = await this.memberRepository.findOne({
       where: { sectionId, userId },
@@ -274,8 +299,13 @@ export class SectionService {
       throw new NotFoundException('Участник не найден');
     }
 
+    const resolvedRoleId = roleId || await this.resolveSectionRoleId(role);
     member.role = role;
-    return this.memberRepository.save(member);
+    member.roleId = resolvedRoleId;
+    const saved = await this.memberRepository.save(member);
+    this.rbacService.invalidateUser(userId);
+    this.eventsGateway?.emitRbacPermissionsChanged(userId);
+    return saved;
   }
 
   async removeMember(sectionId: string, userId: string): Promise<void> {
@@ -283,6 +313,15 @@ export class SectionService {
     if (result.affected === 0) {
       throw new NotFoundException('Участник не найден');
     }
+    this.rbacService.invalidateUser(userId);
+    this.eventsGateway?.emitRbacPermissionsChanged(userId);
+  }
+
+  private async resolveSectionRoleId(role: SectionRole): Promise<string | null> {
+    const slug = SEC_ROLE_SLUG_MAP[role];
+    if (!slug) return null;
+    const roleEntity = await this.roleRepository.findOne({ where: { slug } });
+    return roleEntity?.id || null;
   }
 
   // === Reorder ===

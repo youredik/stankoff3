@@ -2329,6 +2329,178 @@ keycloak-theme/stankoff-portal/login/
 ### Планируется
 - Rate limiting
 
+## RBAC (Ролевая модель)
+
+Новая система управления доступом на основе permissions (разрешений) заменяет старую модель с фиксированными ролями (admin/manager/employee). Permissions проверяются на backend через глобальный guard и на frontend через хук/компонент.
+
+### Backend модуль (`apps/backend/src/modules/rbac/`)
+
+**Сущность роли (`role.entity.ts`):**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | UUID | Первичный ключ |
+| `name` | string | Название роли (отображаемое) |
+| `slug` | string | Уникальный slug (например, `super_admin`, `ws_editor`) |
+| `description` | string | Описание роли |
+| `scope` | `global` / `section` / `workspace` | Область действия роли |
+| `permissions` | string[] | Массив permission-строк |
+| `isSystem` | boolean | Системная роль (нельзя удалить/изменить permissions) |
+| `isDefault` | boolean | Роль по умолчанию для данного scope |
+
+**Сервис разрешений (`rbac.service.ts`):**
+
+Центральный сервис для проверки прав доступа. Использует in-memory кэш с TTL 5 минут для снижения нагрузки на БД.
+
+Основные методы:
+- `hasPermission(userId, permission, context?)` — проверка наличия разрешения у пользователя
+- `getEffectivePermissions(userId, workspaceId?)` — получить все эффективные permissions (объединение глобальных + секционных + workspace ролей)
+- `getAccessibleWorkspaceIds(userId)` — список ID workspaces, доступных пользователю
+- `getFieldPermissions(userId, workspaceId)` — разрешения на уровне полей сущностей
+- `invalidateUser(userId)` — сброс кэша для конкретного пользователя
+- `invalidateAll()` — полный сброс кэша
+
+**Guard (`rbac.guard.ts`):**
+
+`PermissionGuard` заменяет старый `RolesGuard`. Зарегистрирован глобально через `APP_GUARD`:
+
+```typescript
+providers: [
+  { provide: APP_GUARD, useClass: JwtAuthGuard },
+  { provide: APP_GUARD, useClass: PermissionGuard },
+]
+```
+
+Если эндпоинт помечен `@Public()`, проверка пропускается. Если нет декоратора `@RequirePermission()`, доступ разрешён аутентифицированному пользователю.
+
+**Декоратор (`rbac.decorator.ts`):**
+
+```typescript
+@RequirePermission('workspace:entity:create')
+@Post()
+createEntity(@Body() dto: CreateEntityDto) { ... }
+```
+
+**Реестр разрешений (`permission-registry.ts`):**
+
+Плоский реестр из ~40 permissions с метаданными:
+
+```typescript
+{
+  key: 'workspace:entity:create',
+  scope: 'workspace',
+  category: 'entities',
+  label: 'Создание заявок',
+  description: 'Создание новых заявок в рабочем месте'
+}
+```
+
+Категории: `entities`, `comments`, `workspace`, `bpmn`, `analytics`, `admin`, `users`, `sections`.
+
+**Системные роли (`system-roles.ts`):**
+
+8 предустановленных ролей с фиксированными UUID и маппинг старых ролей (`LEGACY_ROLE_MAPPING`).
+
+### Формат permissions
+
+Формат: `{scope}:{resource}:{action}` с поддержкой wildcard-совпадений (`*` на любом уровне).
+
+Примеры:
+| Permission | Описание |
+|-----------|----------|
+| `*` | Суперадмин — полный доступ ко всему |
+| `workspace:entity:create` | Создание заявок в workspace |
+| `workspace:entity.field.*:read` | Чтение любых полей сущности |
+| `workspace:comment:*` | Все действия с комментариями |
+| `global:user:manage` | Управление пользователями (глобально) |
+| `section:*` | Все действия внутри секции |
+
+Алгоритм проверки: точное совпадение → wildcard на уровне action → wildcard на уровне resource → wildcard scope → суперадмин `*`.
+
+### 8 системных ролей
+
+**Глобальные (scope: `global`):**
+
+| Slug | Название | Permissions | Примечание |
+|------|---------|------------|-----------|
+| `super_admin` | Суперадминистратор | `*` | Полный доступ |
+| `department_head` | Руководитель отдела | `global:analytics:read` | Доступ к глобальной аналитике |
+| `employee` | Сотрудник | — (пустой) | Роль по умолчанию (`isDefault: true`) |
+
+**Секционные (scope: `section`):**
+
+| Slug | Название | Permissions | Примечание |
+|------|---------|------------|-----------|
+| `section_admin` | Администратор раздела | `section:*` | Полный доступ в пределах секции |
+| `section_viewer` | Наблюдатель раздела | `section:read` | Только просмотр (`isDefault: true`) |
+
+**Workspace (scope: `workspace`):**
+
+| Slug | Название | Permissions | Примечание |
+|------|---------|------------|-----------|
+| `ws_admin` | Администратор workspace | `workspace:*` | Полный доступ внутри workspace |
+| `ws_editor` | Редактор | `workspace:entity:*`, `workspace:comment:*` и др. | Работа с заявками и комментариями |
+| `ws_viewer` | Наблюдатель | `workspace:entity:read` и др. | Только просмотр |
+
+### Frontend
+
+**Store (`store/usePermissionStore.ts`):**
+
+Zustand store для хранения permissions на клиенте. Содержит логику wildcard-совпадений, аналогичную backend.
+
+**Хук (`hooks/useCan.ts`):**
+
+```typescript
+const canCreate = useCan('workspace:entity:create', workspaceId);
+
+if (canCreate) {
+  // Показать кнопку создания
+}
+```
+
+**Компонент условного рендеринга (`components/rbac/Can.tsx`):**
+
+```tsx
+<Can permission="workspace:entity:create" workspaceId={wsId}>
+  <CreateButton />
+</Can>
+```
+
+**UI управления ролями (`components/admin/`):**
+- `RoleList.tsx` — список ролей с фильтрацией по scope
+- `RoleEditor.tsx` — редактор роли (название, slug, scope, permissions)
+- `PermissionTree.tsx` — дерево permissions с чекбоксами по категориям
+
+Доступ к управлению ролями: страница `/admin/roles`.
+
+Permissions загружаются в `AuthProvider` после успешной аутентификации.
+
+### API эндпоинты
+
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | /api/rbac/roles | Список ролей |
+| POST | /api/rbac/roles | Создать роль |
+| PUT | /api/rbac/roles/:id | Обновить роль |
+| DELETE | /api/rbac/roles/:id | Удалить роль (только не-системные) |
+| GET | /api/rbac/permissions | Реестр всех permissions с метаданными |
+| GET | /api/rbac/permissions/my | Эффективные permissions текущего пользователя |
+| GET | /api/rbac/permissions/my/workspaces | Permissions по каждому workspace |
+
+### WebSocket событие
+
+При изменении ролей/membership backend отправляет targeted WebSocket событие `rbac:permissions:changed` конкретному пользователю через `EventsGateway.emitRbacPermissionsChanged(userId)`. Frontend listener в `useWebSocket.ts` автоматически перезагружает `usePermissionStore`.
+
+Эмитится при: `addMember`, `updateMemberRole`, `removeMember` (workspace и section), `assignGlobalRole`, `update role permissions`.
+
+### Стратегия миграции
+
+Миграция со старой модели (enum `UserRole` + `WorkspaceRole`) на новую (RBAC с таблицей ролей) выполняется поэтапно:
+
+1. **Первая миграция:** добавлен столбец `role_id` (FK на таблицу `roles`) рядом со старым enum-полем `role`. Старый enum сохранён для возможности отката.
+2. **`LEGACY_ROLE_MAPPING`** в `system-roles.ts` маппит старые enum-значения на новые системные роли (например, `admin` → `super_admin`, `editor` → `ws_editor`).
+3. **Вторая миграция (`DropLegacyRoleColumns`):** запланирована после полной верификации на препроде. Удалит старые enum-столбцы.
+
 ## Развёртывание
 
 ### Development

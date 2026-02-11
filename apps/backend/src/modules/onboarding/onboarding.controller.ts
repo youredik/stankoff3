@@ -12,8 +12,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { User, UserRole } from '../user/user.entity';
+import { RequirePermission } from '../rbac/rbac.decorator';
+import { User } from '../user/user.entity';
 import { OnboardingService } from './onboarding.service';
 import {
   CreateTourDto,
@@ -170,7 +170,7 @@ export class OnboardingController {
    * GET /api/onboarding/admin/tours
    */
   @Get('admin/tours')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async getAllTours(
     @Query('activeOnly') activeOnly?: string,
   ): Promise<OnboardingTour[]> {
@@ -183,7 +183,7 @@ export class OnboardingController {
    * GET /api/onboarding/admin/tours/:id
    */
   @Get('admin/tours/:id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async getTour(@Param('id') id: string): Promise<OnboardingTour> {
     return this.onboardingService.getTour(id);
   }
@@ -194,7 +194,7 @@ export class OnboardingController {
    * POST /api/onboarding/admin/tours
    */
   @Post('admin/tours')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async createTour(@Body() dto: CreateTourDto): Promise<OnboardingTour> {
     return this.onboardingService.createTour(dto);
   }
@@ -205,7 +205,7 @@ export class OnboardingController {
    * PUT /api/onboarding/admin/tours/:id
    */
   @Put('admin/tours/:id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async updateTour(
     @Param('id') id: string,
     @Body() dto: UpdateTourDto,
@@ -219,7 +219,7 @@ export class OnboardingController {
    * DELETE /api/onboarding/admin/tours/:id
    */
   @Delete('admin/tours/:id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async deleteTour(@Param('id') id: string): Promise<{ success: boolean }> {
     await this.onboardingService.deleteTour(id);
     return { success: true };
@@ -231,7 +231,7 @@ export class OnboardingController {
    * POST /api/onboarding/admin/steps
    */
   @Post('admin/steps')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async createStep(@Body() dto: CreateStepDto): Promise<OnboardingStep> {
     return this.onboardingService.createStep(dto);
   }
@@ -242,7 +242,7 @@ export class OnboardingController {
    * PUT /api/onboarding/admin/steps/:id
    */
   @Put('admin/steps/:id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async updateStep(
     @Param('id') id: string,
     @Body() dto: UpdateStepDto,
@@ -256,7 +256,7 @@ export class OnboardingController {
    * DELETE /api/onboarding/admin/steps/:id
    */
   @Delete('admin/steps/:id')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async deleteStep(@Param('id') id: string): Promise<{ success: boolean }> {
     await this.onboardingService.deleteStep(id);
     return { success: true };
@@ -268,7 +268,7 @@ export class OnboardingController {
    * POST /api/onboarding/admin/tours/:tourId/reorder-steps
    */
   @Post('admin/tours/:tourId/reorder-steps')
-  @Roles(UserRole.ADMIN)
+  @RequirePermission('global:system:manage')
   async reorderSteps(
     @Param('tourId') tourId: string,
     @Body() body: { stepIds: string[] },

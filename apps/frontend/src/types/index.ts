@@ -196,6 +196,8 @@ export interface WorkspaceMember {
   userId: string;
   user?: User;
   role: WorkspaceRole;
+  roleId?: string | null;
+  workspaceRole?: Role | null;
   createdAt: Date;
 }
 
@@ -220,6 +222,8 @@ export interface MenuSectionMember {
   userId: string;
   user?: User;
   role: MenuSectionRole;
+  roleId?: string | null;
+  sectionRole?: Role | null;
   createdAt: Date;
 }
 
@@ -258,6 +262,41 @@ export interface User {
 }
 
 export type UserRole = 'admin' | 'manager' | 'employee';
+
+// ── RBAC ──────────────────────────────────────
+
+export type RoleScope = 'global' | 'section' | 'workspace';
+
+export interface Role {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  scope: RoleScope;
+  permissions: string[];
+  isSystem: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PermissionGroup {
+  category: string;
+  permissions: PermissionMeta[];
+}
+
+export interface PermissionMeta {
+  key: string;
+  label: string;
+  description: string;
+  category: string;
+  scope: string;
+}
+
+export interface MyPermissions {
+  global: string[];
+  workspaces: Record<string, string[]>;
+}
 
 export interface Comment {
   id: string;
