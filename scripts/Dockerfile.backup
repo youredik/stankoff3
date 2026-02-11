@@ -1,12 +1,11 @@
 # Backup Cron Service
 FROM alpine:3.19
 
-# Install dependencies
+# Install dependencies (no dcron — use BusyBox built-in crond for Docker compatibility)
 RUN apk add --no-cache \
     bash \
     postgresql16-client \
     aws-cli \
-    dcron \
     curl \
     tzdata
 
@@ -31,5 +30,5 @@ RUN touch /var/log/backup.log
 HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
     CMD pgrep crond || exit 1
 
-# Start cron in foreground
+# Start BusyBox crond in foreground
 CMD ["crond", "-f", "-l", "2"]
