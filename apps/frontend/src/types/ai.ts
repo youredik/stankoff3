@@ -216,3 +216,50 @@ export interface AiUsageLog {
   createdAt: string;
   userName?: string;
 }
+
+// ==================== AI Notifications ====================
+
+export type AiNotificationType =
+  | 'cluster_detected'
+  | 'critical_entity'
+  | 'sla_risk'
+  | 'duplicate_suspected'
+  | 'trend_anomaly';
+
+export interface AiNotificationItem {
+  id: string;
+  type: AiNotificationType;
+  title: string;
+  message: string;
+  workspaceId: string | null;
+  entityId: string | null;
+  metadata: Record<string, unknown>;
+  confidence: number;
+  targetUserId: string | null;
+  read: boolean;
+  dismissed: boolean;
+  createdAt: string;
+}
+
+// ==================== Knowledge Graph ====================
+
+export interface GraphNode {
+  id: string;
+  type: 'entity' | 'legacy_request' | 'expert' | 'counterparty' | 'topic';
+  label: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  type: 'similar_to' | 'assigned_to' | 'related_to' | 'belongs_to';
+  weight: number;
+  label?: string;
+}
+
+export interface KnowledgeGraphResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  centerNodeId: string;
+}

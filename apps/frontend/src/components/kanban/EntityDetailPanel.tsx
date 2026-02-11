@@ -15,6 +15,8 @@ import { AiAssistantTab } from '@/components/entity/AiAssistantTab';
 import { AiClassificationPanel } from '@/components/ai/AiClassificationPanel';
 import { AiInsightsPanel } from '@/components/ai/AiInsightsPanel';
 import { AiSummaryBanner } from '@/components/ai/AiSummaryBanner';
+import { KnowledgeGraph } from '@/components/ai/KnowledgeGraph';
+import { AiNotificationsPanel } from '@/components/ai/AiNotificationsPanel';
 import { useAiStore } from '@/store/useAiStore';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
@@ -172,6 +174,7 @@ export function EntityDetailPanel() {
     comments,
     users,
     deselectEntity,
+    selectEntity,
     updateStatus,
     updateAssignee,
     updateLinkedEntities,
@@ -750,6 +753,21 @@ export function EntityDetailPanel() {
                     description={selectedEntity.data?.description as string | undefined}
                     workspaceId={currentWorkspace?.id}
                     readOnly={!canEditEntity}
+                  />
+                </div>
+
+                {/* Knowledge Graph */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <KnowledgeGraph entityId={selectedEntity.id} />
+                </div>
+
+                {/* AI Notifications */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <AiNotificationsPanel
+                    workspaceId={currentWorkspace?.id}
+                    onNavigateToEntity={(eId) => {
+                      selectEntity(eId);
+                    }}
                   />
                 </div>
 

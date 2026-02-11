@@ -345,6 +345,25 @@ export function useWebSocket() {
       }
     });
 
+    // AI: проактивное уведомление
+    socket.on('ai:notification', (data: {
+      id: string;
+      type: string;
+      title: string;
+      message: string;
+      workspaceId: string | null;
+      entityId: string | null;
+      confidence: number;
+      createdAt: string;
+    }) => {
+      useNotificationStore.getState().addNotification({
+        text: `AI: ${data.title}`,
+        type: 'ai_suggestion',
+        entityId: data.entityId || undefined,
+        workspaceId: data.workspaceId || undefined,
+      });
+    });
+
     // ─── Chat events ───────────────────────────────────────
 
     socket.on('chat:message', (data: { conversationId: string; message: any }) => {

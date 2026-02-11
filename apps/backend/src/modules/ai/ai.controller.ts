@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -18,6 +20,8 @@ import { KnowledgeBaseService } from './services/knowledge-base.service';
 import { RagIndexerService, IndexingStats } from './services/rag-indexer.service';
 import { AiAssistantService } from './services/ai-assistant.service';
 import { AiUsageService, UsageStatsDto } from './services/ai-usage.service';
+import { AiNotificationService } from './services/ai-notification.service';
+import { KnowledgeGraphService, KnowledgeGraphResponse } from './services/knowledge-graph.service';
 import { LegacyUrlService } from '../legacy/services/legacy-url.service';
 import {
   ClassifyRequestDto,
@@ -31,6 +35,7 @@ import {
   GeneratedResponseDto,
 } from './dto/ai.dto';
 import { AiClassification } from './entities/ai-classification.entity';
+import { AiNotification } from './entities/ai-notification.entity';
 
 @Controller('ai')
 export class AiController {
@@ -42,6 +47,8 @@ export class AiController {
     private readonly ragIndexerService: RagIndexerService,
     private readonly aiAssistantService: AiAssistantService,
     private readonly aiUsageService: AiUsageService,
+    private readonly aiNotificationService: AiNotificationService,
+    private readonly knowledgeGraphService: KnowledgeGraphService,
     private readonly legacyUrlService: LegacyUrlService,
   ) {}
 
@@ -615,6 +622,147 @@ export class AiController {
       createdAt: log.createdAt,
       userName: log.user ? `${log.user.firstName} ${log.user.lastName}` : undefined,
     }));
+  }
+
+  // ==================== AI NOTIFICATIONS ====================
+
+  /**
+   * Получить AI уведомления
+   *
+   * GET /api/ai/notifications
+   */
+  @Get('notifications')
+  async getNotifications(
+    @Query('workspaceId') workspaceId?: string,
+    @Query('unreadOnly') unreadOnly?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @CurrentUser() user?: User,
+  ): Promise<{ notifications: AiNotification[]; total: number }> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+
+    return this.aiNotificationService.getNotifications({
+      workspaceId,
+      userId: user.id,
+      unreadOnly: unreadOnly === 'true',
+      limit: limit ? parseInt(limit, 10) : 20,
+      offset: offset ? parseInt(offset, 10) : 0,
+    });
+  }
+
+  /**
+   * Количество непрочитанных AI уведомлений
+   *
+   * GET /api/ai/notifications/unread-count
+   */
+  @Get('notifications/unread-count')
+  async getUnreadCount(
+    @Query('workspaceId') workspaceId?: string,
+    @CurrentUser() user?: User,
+  ): Promise<{ count: number }> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+
+    const count = await this.aiNotificationService.getUnreadCount(workspaceId, user.id);
+    return { count };
+  }
+
+  /**
+   * Отметить уведомление прочитанным
+   *
+   * PATCH /api/ai/notifications/:id/read
+   */
+  @Patch('notifications/:id/read')
+  async markNotificationRead(
+    @Param('id') id: string,
+    @CurrentUser() user?: User,
+  ): Promise<{ success: boolean }> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+    await this.aiNotificationService.markRead(id);
+    return { success: true };
+  }
+
+  /**
+   * Отметить все уведомления прочитанными
+   *
+   * POST /api/ai/notifications/mark-all-read
+   */
+  @Post('notifications/mark-all-read')
+  async markAllRead(
+    @Body() body: { workspaceId?: string },
+    @CurrentUser() user?: User,
+  ): Promise<{ success: boolean }> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+    await this.aiNotificationService.markAllRead(body.workspaceId, user.id);
+    return { success: true };
+  }
+
+  /**
+   * Отклонить уведомление
+   *
+   * DELETE /api/ai/notifications/:id
+   */
+  @Delete('notifications/:id')
+  async dismissNotification(
+    @Param('id') id: string,
+    @CurrentUser() user?: User,
+  ): Promise<{ success: boolean }> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+    await this.aiNotificationService.dismiss(id);
+    return { success: true };
+  }
+
+  /**
+   * Включить/выключить проактивные уведомления
+   *
+   * POST /api/ai/notifications/toggle
+   */
+  @Post('notifications/toggle')
+  toggleNotifications(
+    @Body() body: { enabled: boolean },
+    @CurrentUser() user?: User,
+  ): { enabled: boolean } {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+    this.aiNotificationService.setEnabled(body.enabled);
+    return { enabled: this.aiNotificationService.isEnabled() };
+  }
+
+  // ==================== KNOWLEDGE GRAPH ====================
+
+  /**
+   * Получить граф знаний для entity
+   *
+   * GET /api/ai/knowledge-graph/:entityId
+   */
+  @Get('knowledge-graph/:entityId')
+  async getKnowledgeGraph(
+    @Param('entityId') entityId: string,
+    @CurrentUser() user?: User,
+  ): Promise<KnowledgeGraphResponse> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+
+    try {
+      return await this.knowledgeGraphService.buildGraph(entityId);
+    } catch (error) {
+      this.logger.error(`Ошибка построения графа знаний: ${error.message}`);
+      throw new HttpException(
+        'Ошибка построения графа знаний',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**

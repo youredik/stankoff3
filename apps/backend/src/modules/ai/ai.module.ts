@@ -12,9 +12,12 @@ import { KnowledgeBaseService } from './services/knowledge-base.service';
 import { RagIndexerService } from './services/rag-indexer.service';
 import { AiAssistantService } from './services/ai-assistant.service';
 import { AiUsageService } from './services/ai-usage.service';
+import { AiNotificationService } from './services/ai-notification.service';
+import { KnowledgeGraphService } from './services/knowledge-graph.service';
 import { KnowledgeChunk } from './entities/knowledge-chunk.entity';
 import { AiUsageLog } from './entities/ai-usage-log.entity';
 import { AiClassification } from './entities/ai-classification.entity';
+import { AiNotification } from './entities/ai-notification.entity';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { Comment } from '../entity/comment.entity';
 import { LegacyModule } from '../legacy/legacy.module';
@@ -22,7 +25,7 @@ import { LegacyModule } from '../legacy/legacy.module';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([KnowledgeChunk, AiUsageLog, AiClassification, WorkspaceEntity, Comment]),
+    TypeOrmModule.forFeature([KnowledgeChunk, AiUsageLog, AiClassification, AiNotification, WorkspaceEntity, Comment]),
     forwardRef(() => LegacyModule),
   ],
   controllers: [AiController],
@@ -39,6 +42,8 @@ import { LegacyModule } from '../legacy/legacy.module';
     RagIndexerService,
     AiAssistantService,
     AiUsageService,
+    AiNotificationService,
+    KnowledgeGraphService,
   ],
   exports: [
     // Реестр - основной способ доступа к AI
@@ -53,6 +58,8 @@ import { LegacyModule } from '../legacy/legacy.module';
     RagIndexerService,
     AiAssistantService,
     AiUsageService,
+    AiNotificationService,
+    KnowledgeGraphService,
   ],
 })
 export class AiModule {}

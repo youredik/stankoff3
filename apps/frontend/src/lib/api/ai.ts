@@ -14,6 +14,8 @@ import type {
   GeneratedResponse,
   AiUsageStats,
   AiUsageLog,
+  AiNotificationItem,
+  KnowledgeGraphResponse,
 } from '@/types/ai';
 
 /**
@@ -155,4 +157,38 @@ export const aiApi = {
     const query = params.toString();
     return apiClient.get<AiUsageLog[]>(`/ai/usage/logs${query ? `?${query}` : ''}`).then((r) => r.data);
   },
+
+  // ==================== AI Notifications ====================
+
+  getNotifications: (options?: { workspaceId?: string; unreadOnly?: boolean; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.workspaceId) params.append('workspaceId', options.workspaceId);
+    if (options?.unreadOnly) params.append('unreadOnly', 'true');
+    if (options?.limit) params.append('limit', String(options.limit));
+    if (options?.offset) params.append('offset', String(options.offset));
+    const query = params.toString();
+    return apiClient.get<{ notifications: AiNotificationItem[]; total: number }>(`/ai/notifications${query ? `?${query}` : ''}`).then((r) => r.data);
+  },
+
+  getNotificationUnreadCount: (workspaceId?: string) => {
+    const params = workspaceId ? `?workspaceId=${workspaceId}` : '';
+    return apiClient.get<{ count: number }>(`/ai/notifications/unread-count${params}`).then((r) => r.data);
+  },
+
+  markNotificationRead: (id: string) =>
+    apiClient.patch<{ success: boolean }>(`/ai/notifications/${id}/read`).then((r) => r.data),
+
+  markAllNotificationsRead: (workspaceId?: string) =>
+    apiClient.post<{ success: boolean }>('/ai/notifications/mark-all-read', { workspaceId }).then((r) => r.data),
+
+  dismissNotification: (id: string) =>
+    apiClient.delete<{ success: boolean }>(`/ai/notifications/${id}`).then((r) => r.data),
+
+  toggleNotifications: (enabled: boolean) =>
+    apiClient.post<{ enabled: boolean }>('/ai/notifications/toggle', { enabled }).then((r) => r.data),
+
+  // ==================== Knowledge Graph ====================
+
+  getKnowledgeGraph: (entityId: string) =>
+    apiClient.get<KnowledgeGraphResponse>(`/ai/knowledge-graph/${entityId}`).then((r) => r.data),
 };
