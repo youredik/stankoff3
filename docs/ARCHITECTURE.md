@@ -2974,20 +2974,25 @@ modules/ai/
 
 | Провайдер | Тип | Embeddings | LLM | Стоимость |
 |-----------|-----|------------|-----|-----------|
-| **Yandex Cloud** | Облачный | ❌ (256 dims) | ✅ yandexgpt-lite, yandexgpt | Платно (дешёвый) |
+| **Yandex Cloud** | Облачный | ✅ text-search-doc/latest (256 dims) | ✅ yandexgpt/latest (Pro) | Платно (дешёвый) |
 | **Ollama** | Локальный | ✅ nomic-embed-text | ✅ qwen2.5:7b | Бесплатно |
 | **Groq** | Облачный | ❌ | ✅ llama-3.3-70b | Бесплатно (14K req/day) |
 | **OpenAI** | Облачный | ✅ text-embedding-3-large | ✅ gpt-4o | Платно |
 
-**Yandex Cloud** — приоритетный LLM для препрода (Yandex Cloud ВМ): нет гео-блокировки, нативный русский, 0 ГБ RAM на сервере. Embeddings не совместимы (256 dims vs 768 в БД) — для embeddings используется Ollama.
+**Yandex Cloud** — основной провайдер для LLM и Embeddings на препроде:
+- Нет гео-блокировки (сервер в Yandex Cloud), нативный русский, 0 ГБ RAM на сервере
+- LLM: `yandexgpt/latest` (Pro модель), Embeddings: `text-search-doc/latest` (256 dims)
+- Rate limit: 10 req/sec для embeddings — RAG индексатор использует 150ms задержку
+- **Ollama отключён на препроде** (удалён из docker-compose, потреблял ~5 ГБ RAM)
 
 **Приоритеты провайдеров (настраиваются в .env):**
 ```env
-AI_LLM_PRIORITY=yandex,ollama,groq,openai  # Для генерации текста
-AI_EMBEDDING_PRIORITY=ollama,openai         # Для embeddings
+AI_LLM_PRIORITY=yandex,groq,openai         # Для генерации текста
+AI_EMBEDDING_PRIORITY=yandex,openai         # Для embeddings
+AI_EMBEDDING_DIMENSION=256                  # Размерность embeddings
 ```
 
-**Запуск Ollama локально:**
+**Запуск Ollama локально (опционально, для разработки):**
 ```bash
 ./scripts/setup-ollama.sh
 # или
@@ -3000,23 +3005,25 @@ docker compose -f docker-compose.ollama.yml exec ollama ollama pull qwen2.5:14b
 
 **Технологии:**
 - **pgvector** - расширение PostgreSQL для векторного поиска
-- **text-embedding-3-large** - OpenAI модель для embeddings (1536 измерений)
+- **Yandex Cloud Embeddings** - text-search-doc/latest (256 измерений, нативный русский)
 - **Cosine similarity** - метрика схожести
+- **HNSW индекс** - для быстрого приближённого поиска
 
 **Схема таблицы knowledge_chunks:**
 ```sql
 CREATE TABLE knowledge_chunks (
   id UUID PRIMARY KEY,
   content TEXT NOT NULL,
-  embedding VECTOR(1536),
-  source_type VARCHAR(50),  -- 'legacy_request', 'entity', 'document'
-  source_id VARCHAR(255),
+  embedding VECTOR(256),
+  source_type VARCHAR(50),  -- 'legacy_request', 'entity', 'document', 'faq'
+  source_id VARCHAR(255),   -- VARCHAR для поддержки legacy числовых ID
   metadata JSONB,
   created_at TIMESTAMP
 );
 
--- Индекс для быстрого поиска
-CREATE INDEX ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops);
+-- HNSW индекс для быстрого приближённого поиска
+CREATE INDEX ON knowledge_chunks USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
 ```
 
 ### RAG Indexer
@@ -3175,17 +3182,17 @@ interface SearchResultDto {
 ### Конфигурация
 
 ```env
-# Приоритеты провайдеров
-AI_LLM_PRIORITY=yandex,ollama,groq,openai
-AI_EMBEDDING_PRIORITY=ollama,openai
-AI_EMBEDDING_DIMENSION=768
+# Приоритеты провайдеров (на preprod: Ollama отключён)
+AI_LLM_PRIORITY=yandex,groq,openai
+AI_EMBEDDING_PRIORITY=yandex,openai
+AI_EMBEDDING_DIMENSION=256
 
-# Yandex Cloud (YandexGPT, нет гео-блокировки, нативный русский)
+# Yandex Cloud (YandexGPT Pro + Embeddings, нет гео-блокировки, нативный русский)
 YANDEX_CLOUD_API_KEY=...
 YANDEX_CLOUD_FOLDER_ID=...
-YANDEX_CLOUD_MODEL=yandexgpt-lite/latest
+YANDEX_CLOUD_MODEL=yandexgpt/latest
 
-# Ollama (локально, бесплатно)
+# Ollama (локально, бесплатно — на preprod отключён)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:7b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
