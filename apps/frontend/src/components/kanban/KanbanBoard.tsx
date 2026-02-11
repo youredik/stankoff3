@@ -24,6 +24,7 @@ import {
   FilterPanel,
   createEmptyFilters,
   isFilterActive,
+  applyFilters,
   type FilterState,
 } from './FilterPanel';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -103,10 +104,34 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     return DEFAULT_COLUMNS;
   }, [currentWorkspace]);
 
+  // Check if custom (data-field) filters are active
+  const hasCustomFilters = useMemo(() => {
+    return Object.values(filters.customFilters).some((v) => isFilterActive(v));
+  }, [filters.customFilters]);
+
+  // Apply custom field filters client-side (server handles search/assignee/priority/date)
+  const filteredColumns = useMemo(() => {
+    if (!hasCustomFilters) return kanbanColumns;
+    const customOnly: FilterState = {
+      search: '',
+      assigneeIds: [],
+      priorities: [],
+      dateFrom: '',
+      dateTo: '',
+      customFilters: filters.customFilters,
+    };
+    const result: typeof kanbanColumns = {};
+    for (const [key, col] of Object.entries(kanbanColumns)) {
+      const filtered = applyFilters(col.items, customOnly);
+      result[key] = { ...col, items: filtered };
+    }
+    return result;
+  }, [kanbanColumns, hasCustomFilters, filters.customFilters]);
+
   // Count loaded entities across all columns
   const loadedCount = useMemo(() => {
-    return Object.values(kanbanColumns).reduce((sum, col) => sum + col.items.length, 0);
-  }, [kanbanColumns]);
+    return Object.values(filteredColumns).reduce((sum, col) => sum + col.items.length, 0);
+  }, [filteredColumns]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -180,7 +205,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     setKanbanFilters({});
   };
 
-  if (kanbanLoading && Object.keys(kanbanColumns).length === 0) {
+  if (kanbanLoading && Object.keys(filteredColumns).length === 0) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4">
         <SkeletonColumn />
@@ -279,7 +304,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         >
           <div className="flex overflow-x-auto pb-4">
             {columns.map((column) => {
-              const colData = kanbanColumns[column.id] || {
+              const colData = filteredColumns[column.id] || {
                 items: [],
                 total: 0,
                 hasMore: false,

@@ -20,6 +20,7 @@ import {
   FilterPanel,
   createEmptyFilters,
   isFilterActive,
+  applyFilters,
   type FilterState,
 } from '@/components/kanban/FilterPanel';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -232,6 +233,21 @@ export function TableView({ workspaceId }: TableViewProps) {
     return map;
   }, [statuses]);
 
+  // Apply custom field filters client-side (server handles search/assignee/priority/date)
+  const filteredTableItems = useMemo(() => {
+    const hasCustom = Object.values(filters.customFilters).some((v) => isFilterActive(v));
+    if (!hasCustom) return tableItems;
+    const customOnly: FilterState = {
+      search: '',
+      assigneeIds: [],
+      priorities: [],
+      dateFrom: '',
+      dateTo: '',
+      customFilters: filters.customFilters,
+    };
+    return applyFilters(tableItems, customOnly);
+  }, [tableItems, filters.customFilters]);
+
   // Load data
   useEffect(() => {
     fetchWorkspace(workspaceId);
@@ -289,12 +305,12 @@ export function TableView({ workspaceId }: TableViewProps) {
   }, []);
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === tableItems.length) {
+    if (selectedIds.size === filteredTableItems.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(tableItems.map((e) => e.id)));
+      setSelectedIds(new Set(filteredTableItems.map((e) => e.id)));
     }
-  }, [selectedIds.size, tableItems]);
+  }, [selectedIds.size, filteredTableItems]);
 
   const activeFilterCount =
     (filters.search ? 1 : 0) +
@@ -378,7 +394,7 @@ export function TableView({ workspaceId }: TableViewProps) {
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      checked={tableItems.length > 0 && selectedIds.size === tableItems.length}
+                      checked={filteredTableItems.length > 0 && selectedIds.size === filteredTableItems.length}
                       onChange={toggleSelectAll}
                       className="rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500"
                     />
@@ -395,7 +411,7 @@ export function TableView({ workspaceId }: TableViewProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {tableLoading && tableItems.length === 0 ? (
+                {tableLoading && filteredTableItems.length === 0 ? (
                   // Skeleton rows
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
@@ -409,14 +425,14 @@ export function TableView({ workspaceId }: TableViewProps) {
                       <td className="px-4 py-3"><div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
                     </tr>
                   ))
-                ) : tableItems.length === 0 ? (
+                ) : filteredTableItems.length === 0 ? (
                   <tr>
                     <td colSpan={TABLE_COLUMNS.length + 1} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                       {activeFilterCount > 0 ? 'Нет заявок, подходящих под фильтры' : 'Нет заявок'}
                     </td>
                   </tr>
                 ) : (
-                  tableItems.map((entity) => {
+                  filteredTableItems.map((entity) => {
                     const statusOption = statusMap.get(entity.status);
                     const priorityInfo = entity.priority ? PRIORITY_LABELS[entity.priority] : null;
 

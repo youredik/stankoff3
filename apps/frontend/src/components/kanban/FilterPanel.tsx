@@ -77,8 +77,10 @@ export function FilterPanel({
 }: FilterPanelProps) {
   const { users } = useEntityStore();
   const { currentWorkspace } = useWorkspaceStore();
+  // «Детали» (ws-details) — всегда развёрнута по умолчанию
   const [expandedSections, setExpandedSections] = useState<string[]>([
     'common',
+    'ws-details',
   ]);
 
   // Collect filterable fields grouped by workspace section
@@ -401,7 +403,7 @@ export function FilterPanel({
 
           {/* ====== Секции из workspace ====== */}
           {workspaceSections.map((section) => (
-            <div key={section.id} className="mb-3">
+            <div key={section.id} className="mb-3" data-testid={`filter-section-${section.id}`}>
               <button
                 onClick={() => toggleSection(`ws-${section.id}`)}
                 className="flex items-center justify-between w-full text-left cursor-pointer py-1"
@@ -425,7 +427,7 @@ export function FilterPanel({
                     const activeCount = fieldFilterCount(field.id);
 
                     return (
-                      <div key={field.id}>
+                      <div key={field.id} data-testid={`filter-field-${field.id}`}>
                         <button
                           onClick={() => toggleSection(`field-${field.id}`)}
                           className="flex items-center justify-between w-full text-left cursor-pointer"

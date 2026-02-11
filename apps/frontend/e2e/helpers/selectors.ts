@@ -75,6 +75,8 @@ export const filterPanel = {
   root: '[data-testid="filter-panel"]',
   searchInput: '[data-testid="filter-search-input"]',
   resetButton: '[data-testid="filter-reset-button"]',
+  detailsSection: '[data-testid="filter-section-details"]',
+  field: (id: string) => `[data-testid="filter-field-${id}"]`,
 };
 
 // ============================================================================
