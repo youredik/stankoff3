@@ -302,7 +302,7 @@ Push в ветку
 - `PREPROD_SSH_KEY` — Приватный SSH ключ (весь, включая BEGIN/END)
 - `GHCR_TOKEN` — Personal Access Token с `write:packages`, `read:packages`
 
-**Docker образы:** `ghcr.io/youredik/stankoff3/frontend:preprod`, `ghcr.io/youredik/stankoff3/backend:preprod`
+**Docker образы:** `ghcr.io/youredik/stankoff3/frontend:preprod`, `ghcr.io/youredik/stankoff3/backend:preprod`, `ghcr.io/youredik/stankoff3/backup:preprod`
 
 ### Docker Swarm (Zero-Downtime Deployment)
 
@@ -332,6 +332,17 @@ deploy:
 **Файлы конфигурации:**
 - `docker-compose.preprod.yml` — Swarm stack для preprod
 - `nginx/nginx.preprod.conf` — Nginx с динамическим DNS resolver
+
+### Автоматические бэкапы PostgreSQL
+
+- Сервис `backup` в `docker-compose.preprod.yml` (image: `ghcr.io/youredik/stankoff3/backup:preprod`)
+- Cron: каждый час (`0 * * * *`) → `pg_dump` → gzip → S3 (Yandex Object Storage)
+- Retention: 7 дней (локально и S3)
+- **Telegram нотификации**: алерт при ошибке, отчёт при успехе
+- Env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+- Скрипт: `scripts/backup.sh`, Dockerfile: `scripts/Dockerfile.backup`
+- Ручной запуск: `docker exec <backup_container> /scripts/backup.sh list-s3`
+- Build образа: CI/CD job `build-backup` → GHCR
 
 ### SSL сертификаты
 

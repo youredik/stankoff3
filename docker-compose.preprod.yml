@@ -241,6 +241,44 @@ services:
         condition: any
         delay: 10s
 
+  # Automated PostgreSQL Backup (hourly to S3 + Telegram alerts)
+  backup:
+    image: ghcr.io/youredik/stankoff3/backup:preprod
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=${DATABASE_NAME:-stankoff_preprod}
+      - DATABASE_USER=${DATABASE_USER:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-postgres}
+      - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
+      - S3_REGION=${S3_REGION:-ru-central1}
+      - S3_BUCKET=${S3_BUCKET:-stankoff-preprod}
+      - S3_BACKUP_PREFIX=${S3_BACKUP_PREFIX:-backups/preprod}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - backup-data:/backups
+    networks:
+      - stankoff-preprod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep crond || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+      restart_policy:
+        condition: any
+        delay: 10s
+
 volumes:
   # IMPORTANT: Use external volume to preserve data across Swarm redeployments
   # The volume was originally created by Docker Compose with this name
@@ -260,6 +298,8 @@ volumes:
     name: stankoff-portal_certbot-www
   # Camunda data
   camunda-data:
+  # Backup data
+  backup-data:
   # Ollama models data
   ollama-data:
     external: true

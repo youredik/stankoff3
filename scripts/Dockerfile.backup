@@ -7,6 +7,7 @@ RUN apk add --no-cache \
     postgresql16-client \
     aws-cli \
     dcron \
+    curl \
     tzdata
 
 # Set timezone

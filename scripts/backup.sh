@@ -4,6 +4,7 @@
 # Usage: ./backup.sh [backup|backup-s3|restore|restore-s3|list|list-s3|cleanup|cleanup-s3|scheduled]
 #
 
+# Exit on error (disabled in scheduled mode, errors handled explicitly)
 set -e
 
 # Configuration
@@ -21,6 +22,10 @@ S3_BUCKET="${S3_BUCKET:-}"
 S3_BACKUP_PREFIX="${S3_BACKUP_PREFIX:-backups/postgres}"
 S3_ACCESS_KEY="${S3_ACCESS_KEY:-}"
 S3_SECRET_KEY="${S3_SECRET_KEY:-}"
+
+# Telegram Configuration
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -42,6 +47,19 @@ log_warn() {
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') $1"
+}
+
+# Send Telegram notification
+notify_telegram() {
+    local message="$1"
+    if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+        curl -sf -m 10 -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${message}" \
+            -d "parse_mode=HTML" > /dev/null 2>&1 || \
+            log_warn "Failed to send Telegram notification"
+    fi
 }
 
 # Check S3 configuration
@@ -302,8 +320,21 @@ cleanup_s3() {
 scheduled() {
     log_info "=== Starting scheduled backup ==="
 
+    # Disable exit-on-error to handle failures gracefully
+    set +e
+
+    local start_time=$(date +%s)
+
     # Create backup and upload to S3
-    backup_s3
+    if ! backup_s3; then
+        local error_msg="<b>BACKUP FAILED</b>
+DB: ${DB_NAME}
+Host: $(hostname)
+Time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+        notify_telegram "$error_msg"
+        log_error "Scheduled backup FAILED"
+        exit 1
+    fi
 
     # Cleanup old local backups
     cleanup
@@ -311,7 +342,17 @@ scheduled() {
     # Cleanup old S3 backups
     cleanup_s3
 
-    log_info "=== Scheduled backup completed ==="
+    local end_time=$(date +%s)
+    local duration=$(( end_time - start_time ))
+    local size=$(du -h "${BACKUP_DIR}/latest.sql.gz" 2>/dev/null | cut -f1 || echo "N/A")
+
+    local success_msg="<b>Backup OK</b>
+DB: ${DB_NAME} (${size})
+Duration: ${duration}s
+Time: $(date '+%H:%M %Z')"
+    notify_telegram "$success_msg"
+
+    log_info "=== Scheduled backup completed in ${duration}s ==="
 }
 
 # Main
@@ -373,6 +414,10 @@ case "${1:-backup}" in
         echo "  S3_BACKUP_PREFIX S3 key prefix (default: backups/postgres)"
         echo "  S3_ACCESS_KEY    S3 access key (required for S3 commands)"
         echo "  S3_SECRET_KEY    S3 secret key (required for S3 commands)"
+        echo ""
+        echo "Telegram Notifications:"
+        echo "  TELEGRAM_BOT_TOKEN  Telegram bot token (optional)"
+        echo "  TELEGRAM_CHAT_ID    Telegram chat ID for alerts (optional)"
         exit 1
         ;;
 esac
