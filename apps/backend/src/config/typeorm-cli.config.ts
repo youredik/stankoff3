@@ -26,6 +26,7 @@ const entityPatterns = [
   join(__dirname, '/../modules/user/*.entity{.ts,.js}'),
   join(__dirname, '/../modules/websocket/*.entity{.ts,.js}'),
   join(__dirname, '/../modules/onboarding/**/*.entity{.ts,.js}'),
+  join(__dirname, '/../modules/rbac/*.entity{.ts,.js}'),
   join(__dirname, '/../modules/workspace/*.entity{.ts,.js}'),
   // Только migration-log (PostgreSQL), остальные legacy entities на MySQL DataSource
   join(__dirname, '/../modules/legacy/entities/legacy-migration-log.entity{.ts,.js}'),
