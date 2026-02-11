@@ -65,7 +65,7 @@ export class KnowledgeArticleService {
 
     const total = await qb.getCount();
     const items = await qb
-      .orderBy('article.created_at', 'DESC')
+      .orderBy('article.createdAt', 'DESC')
       .skip((page - 1) * perPage)
       .take(perPage)
       .getMany();
