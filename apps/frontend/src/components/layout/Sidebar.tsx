@@ -22,6 +22,7 @@ import {
   FolderPlus,
   Inbox,
   MessageCircle,
+  BookOpen,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
@@ -661,6 +662,22 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                 )}
               </div>
               <span className="font-medium">Чат</span>
+            </button>
+
+            {/* База знаний */}
+            <button
+              onClick={() => {
+                router.push('/knowledge-base');
+                close();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer mt-1 ${
+                pathname === '/knowledge-base'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+              }`}
+            >
+              <BookOpen className="w-5 h-5" />
+              <span className="font-medium">База знаний</span>
             </button>
           </div>
 
