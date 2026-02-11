@@ -160,8 +160,8 @@ describe('CommentService', () => {
       commentRepo.findOne.mockResolvedValue(mockComment);
       entityRepo.findOne.mockResolvedValue(mockEntity);
 
-      const dto = { authorId: 'user-1', content: 'New comment' };
-      const result = await service.create('entity-1', dto);
+      const dto = { content: 'New comment' };
+      const result = await service.create('entity-1', dto, 'user-1');
 
       expect(result.content).toBe('Test comment');
       expect(eventsGateway.emitCommentCreated).toHaveBeenCalled();
@@ -180,11 +180,10 @@ describe('CommentService', () => {
       s3Service.getSignedUrlsBatch.mockResolvedValue(new Map([['s3-key', 'https://signed-url']]));
 
       const dto = {
-        authorId: 'user-1',
         content: 'Comment with attachment',
         attachments: [{ id: 'att-1', name: 'file.pdf', size: 1000, mimeType: 'application/pdf', key: 's3-key' }],
       };
-      const result = await service.create('entity-1', dto);
+      const result = await service.create('entity-1', dto, 'user-1');
 
       expect(result.attachments).toHaveLength(1);
       expect(result.attachments[0].url).toBe('https://signed-url');
@@ -200,8 +199,8 @@ describe('CommentService', () => {
       commentRepo.findOne.mockResolvedValue(mockComment);
       entityRepo.findOne.mockResolvedValue(entityWithAssignee as any);
 
-      const dto = { authorId: 'user-1', content: 'Client response' };
-      await service.create('entity-1', dto);
+      const dto = { content: 'Client response' };
+      await service.create('entity-1', dto, 'user-1');
 
       // user-1 !== assignee-1 → messages sent
       expect(bpmnService.sendMessage).toHaveBeenCalledWith(
@@ -226,8 +225,8 @@ describe('CommentService', () => {
       commentRepo.findOne.mockResolvedValue(mockComment);
       entityRepo.findOne.mockResolvedValue(entityWithAssignee as any);
 
-      const dto = { authorId: 'user-1', content: 'Staff comment' };
-      await service.create('entity-1', dto);
+      const dto = { content: 'Staff comment' };
+      await service.create('entity-1', dto, 'user-1');
 
       expect(bpmnService.sendMessage).not.toHaveBeenCalled();
     });
@@ -238,8 +237,8 @@ describe('CommentService', () => {
       commentRepo.findOne.mockResolvedValue(mockComment);
       entityRepo.findOne.mockResolvedValue(mockEntity); // no assigneeId
 
-      const dto = { authorId: 'user-1', content: 'Comment' };
-      await service.create('entity-1', dto);
+      const dto = { content: 'Comment' };
+      await service.create('entity-1', dto, 'user-1');
 
       expect(bpmnService.sendMessage).not.toHaveBeenCalled();
     });
@@ -255,9 +254,9 @@ describe('CommentService', () => {
       entityRepo.findOne.mockResolvedValue(entityWithAssignee as any);
       bpmnService.sendMessage.mockRejectedValue(new Error('Zeebe not connected'));
 
-      const dto = { authorId: 'user-1', content: 'Client response' };
+      const dto = { content: 'Client response' };
       // Should not throw
-      const result = await service.create('entity-1', dto);
+      const result = await service.create('entity-1', dto, 'user-1');
 
       expect(result.content).toBe('Test comment');
     });
@@ -268,8 +267,8 @@ describe('CommentService', () => {
       commentRepo.findOne.mockResolvedValue(mockComment);
       entityRepo.findOne.mockResolvedValue(null);
 
-      const dto = { authorId: 'user-1', content: 'New comment' };
-      await service.create('entity-1', dto);
+      const dto = { content: 'New comment' };
+      await service.create('entity-1', dto, 'user-1');
 
       expect(auditLogService.log).not.toHaveBeenCalled();
     });

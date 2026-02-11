@@ -1044,3 +1044,29 @@ export interface FacetResult {
   };
   custom: Record<string, FieldFacet>;
 }
+
+// ==================== Invitations ====================
+
+export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
+
+export interface InvitationMembership {
+  type: 'section' | 'workspace';
+  targetId: string;
+  roleSlug: string;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  status: InvitationStatus;
+  firstName: string | null;
+  lastName: string | null;
+  department: string | null;
+  globalRoleSlug: string;
+  memberships: InvitationMembership[];
+  invitedBy: User;
+  acceptedBy: User | null;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+}

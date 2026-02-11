@@ -29,6 +29,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
 import { SeedModule } from './seed/seed.module';
 import { RbacModule } from './modules/rbac/rbac.module';
+import { InvitationModule } from './modules/invitation/invitation.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PermissionGuard } from './modules/rbac/rbac.guard';
 
@@ -67,6 +68,7 @@ import { PermissionGuard } from './modules/rbac/rbac.guard';
     GeocodingModule,
     ChatModule,
     KnowledgeBaseModule,
+    InvitationModule,
   ],
   providers: [
     // Глобальные guards - порядок важен: сначала JWT, потом Permission

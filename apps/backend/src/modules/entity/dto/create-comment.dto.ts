@@ -24,9 +24,6 @@ export class AttachmentDto {
 
 export class CreateCommentDto {
   @IsString()
-  authorId: string;
-
-  @IsString()
   content: string;
 
   @IsArray()

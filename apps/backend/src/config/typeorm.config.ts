@@ -28,6 +28,7 @@ const entityPatterns = [
   __dirname + '/../modules/websocket/*.entity{.ts,.js}',
   __dirname + '/../modules/onboarding/**/*.entity{.ts,.js}',
   __dirname + '/../modules/rbac/*.entity{.ts,.js}',
+  __dirname + '/../modules/invitation/*.entity{.ts,.js}',
   __dirname + '/../modules/workspace/*.entity{.ts,.js}',
   // Только migration-log (PostgreSQL), остальные legacy entities на MySQL DataSource
   __dirname + '/../modules/legacy/entities/legacy-migration-log.entity{.ts,.js}',

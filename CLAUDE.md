@@ -655,6 +655,23 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 
 **Frontend API клиент:** `lib/api/knowledge-base.ts`, Store: `store/useKnowledgeBaseStore.ts`
 
+**Invitations (приглашение сотрудников по email):**
+- `GET /api/invitations` — список приглашений (query: status?, search?) [требует global:user:manage]
+- `POST /api/invitations` — создать приглашение (body: email, firstName?, lastName?, department?, globalRoleSlug?, memberships[]) [требует global:user:manage]
+- `POST /api/invitations/bulk` — массовое приглашение до 50 штук [требует global:user:manage]
+- `POST /api/invitations/:id/revoke` — отозвать приглашение [требует global:user:manage]
+- `POST /api/invitations/:id/resend` — повторно отправить email [требует global:user:manage]
+- `GET /api/invitations/verify/:token` — проверить токен (@Public, без auth)
+- `POST /api/invitations/accept` — принять приглашение (body: token, password, firstName?, lastName?) (@Public, без auth)
+
+**Два сценария:** Новый пользователь → email с токеном → страница `/invite/accept` → регистрация (пароль + Keycloak). Существующий пользователь → memberships назначаются сразу → email-уведомление.
+
+**Frontend компоненты Invitations (`components/admin/`):**
+- `InvitationList` — таблица приглашений с табами по статусу, поиском, действиями (повторить/отозвать)
+- `InviteModal` — одиночное приглашение (с проверкой существующего пользователя) + массовый режим (textarea)
+
+**Frontend API клиент:** `lib/api/invitations.ts` (apiClient для admin, plain axios для public)
+
 ## WebSocket события
 
 - `entity:created`, `entity:updated` — сущности

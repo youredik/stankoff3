@@ -416,12 +416,8 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
   deselectEntity: () => set({ selectedEntity: null, comments: [] }),
 
   addComment: async (entityId: string, content: string, attachments?: UploadedAttachment[]) => {
-    const users = get().users;
-    const author = users.find((u) => u.role === 'admin') || users[0];
-    if (!author) return;
     try {
       const comment = await commentsApi.create(entityId, {
-        authorId: author.id,
         content,
         attachments,
       });

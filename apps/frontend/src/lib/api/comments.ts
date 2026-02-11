@@ -3,7 +3,6 @@ import type { Comment, UploadedAttachment } from '@/types';
 
 // Backend expects attachments with key/thumbnailKey
 interface CreateCommentData {
-  authorId: string;
   content: string;
   attachments?: {
     id: string;
@@ -23,11 +22,10 @@ export const commentsApi = {
 
   create: (
     entityId: string,
-    data: { authorId: string; content: string; attachments?: UploadedAttachment[] }
+    data: { content: string; attachments?: UploadedAttachment[] }
   ) => {
     // Map UploadedAttachment to backend DTO format (remove url/thumbnailUrl)
     const payload: CreateCommentData = {
-      authorId: data.authorId,
       content: data.content,
       attachments: data.attachments?.map((att) => ({
         id: att.id,

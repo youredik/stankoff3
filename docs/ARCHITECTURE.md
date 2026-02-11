@@ -53,6 +53,8 @@ Stankoff Portal - это корпоративная система управл�
 - `/workspace/[id]/processes` - Управление бизнес-процессами (определения, экземпляры, редактор BPMN)
 - `/tasks` - Входящие задания (глобальный inbox пользовательских задач BPMN из всех workspace'ов)
 - `/admin/users` - Управление пользователями (только admin)
+- `/admin/invitations` - Управление приглашениями сотрудников (только admin, permission: global:user:manage)
+- `/invite/accept` - Публичная страница принятия приглашения (без AuthProvider, по токену из email)
 
 #### Компоненты
 
@@ -62,6 +64,8 @@ Stankoff Portal - это корпоративная система управл�
 **Admin**
 - `UserList.tsx` - Таблица пользователей с поиском, CRUD операциями
 - `UserModal.tsx` - Модальное окно создания/редактирования пользователя
+- `InvitationList.tsx` - Таблица приглашений с фильтрацией по статусу (табы), поиском, действиями (повторить/отозвать)
+- `InviteModal.tsx` - Модальное окно приглашения сотрудника (одиночное с проверкой существующего пользователя + массовое со сводкой результатов)
 
 **Kanban**
 - `KanbanBoard.tsx` - Основной контейнер с DndContext, серверной пагинацией и фильтрацией (debounce 300ms)
@@ -804,6 +808,8 @@ interface EmailService {
   sendStatusChangeNotification(recipient, entity, changedBy, oldStatus, newStatus, frontendUrl): Promise<boolean>;
   sendSlaWarningNotification(recipient, entity, slaName, type, remainingMinutes, usedPercent, frontendUrl): Promise<boolean>;
   sendSlaBreachNotification(recipient, entity, slaName, type, frontendUrl): Promise<boolean>;
+  sendInvitationEmail(email, invitedBy, acceptUrl, expiryDays, recipientName?): Promise<boolean>;
+  sendAccessGrantedEmail(user, grantedBy, frontendUrl): Promise<boolean>;
 }
 ```
 
@@ -813,6 +819,31 @@ interface EmailService {
 - `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` - отправитель
 
 > **Типы уведомлений:** Email отправляется исполнителю при: назначении на заявку, изменении статуса заявки другим пользователем.
+
+**InvitationModule**
+Приглашение сотрудников по email. Два сценария: новый пользователь (регистрация через токен) и существующий (назначение memberships).
+
+```
+invitation/
+├── invitation.module.ts
+├── invitation.controller.ts       # REST API (защищённые + публичные)
+├── invitation.service.ts          # Бизнес-логика (create, accept, verify, revoke, resend)
+├── invitation.entity.ts           # Invitation entity (tokenHash SHA-256, status enum, memberships JSONB)
+├── invitation.service.spec.ts     # Unit-тесты сервиса (~12 кейсов)
+├── invitation.controller.spec.ts  # Unit-тесты контроллера
+└── dto/
+    ├── create-invitation.dto.ts   # email, firstName?, lastName?, globalRoleSlug?, memberships[]
+    ├── invitation-membership.dto.ts # type (section/workspace), targetId, roleSlug
+    ├── bulk-invite.dto.ts         # invitations[] (1-50)
+    └── accept-invitation.dto.ts   # token, password (min 6), firstName?, lastName?
+```
+
+**Ключевые решения:**
+- Token security: raw token в email-ссылке, SHA-256 hash в БД (паттерн GitHub/Stripe)
+- Срок действия: 7 дней (env `INVITATION_EXPIRY_DAYS`)
+- При повторном приглашении на тот же email — отзыв предыдущего pending
+- Keycloak graceful degradation: в dev-mode пропускает создание в Keycloak
+- Bulk: последовательная обработка (без race conditions)
 
 **AutomationModule**
 Автоматизация действий по событиям (триггеры, условия, действия).

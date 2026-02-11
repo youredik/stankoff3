@@ -64,7 +64,7 @@ export class CommentController {
     if (!access) {
       throw new ForbiddenException('Недостаточно прав для создания комментариев');
     }
-    return this.commentService.create(entityId, dto);
+    return this.commentService.create(entityId, dto, user.id);
   }
 
   @Put(':id')

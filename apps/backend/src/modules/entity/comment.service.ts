@@ -99,10 +99,11 @@ export class CommentService {
   async create(
     entityId: string,
     dto: CreateCommentDto,
+    authorId: string,
   ): Promise<CommentWithUrls> {
     const comment = this.commentRepository.create({
       entityId,
-      authorId: dto.authorId,
+      authorId,
       content: dto.content,
       attachments: dto.attachments || [],
     });
@@ -147,7 +148,7 @@ export class CommentService {
       await this.auditLogService.log(
         AuditActionType.COMMENT_CREATED,
         entity.workspaceId,
-        dto.authorId,
+        authorId,
         {
           description: 'Добавлен комментарий',
           commentId: saved.id,
@@ -165,7 +166,7 @@ export class CommentService {
               entityId,
               workspaceId: entity.workspaceId,
               commentId: saved.id,
-              authorId: dto.authorId,
+              authorId: authorId,
               hasAttachments: (dto.attachments || []).length > 0,
               attachmentCount: (dto.attachments || []).length,
               contentLength: dto.content?.length || 0,
@@ -182,17 +183,17 @@ export class CommentService {
 
       // BPMN message correlation: уведомить ожидающие процессы о комментарии
       // Публикуем только если комментарий НЕ от исполнителя (т.е. от клиента)
-      if (this.bpmnService && entity.assigneeId && entity.assigneeId !== dto.authorId) {
+      if (this.bpmnService && entity.assigneeId && entity.assigneeId !== authorId) {
         try {
           // service-support-v2: Event-Based Gateway ожидает "client-response"
           await this.bpmnService.sendMessage('client-response', entityId, {
             commentId: saved.id,
-            authorId: dto.authorId,
+            authorId: authorId,
           });
           // support-ticket: ожидает "customer-response"
           await this.bpmnService.sendMessage('customer-response', entityId, {
             commentId: saved.id,
-            authorId: dto.authorId,
+            authorId: authorId,
           });
           this.logger.debug(`BPMN messages published for entity ${entityId} comment`);
         } catch (err) {

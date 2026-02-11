@@ -268,6 +268,88 @@ export class EmailService {
     });
   }
 
+  // Приглашение нового сотрудника
+  async sendInvitationEmail(
+    email: string,
+    invitedBy: User,
+    acceptUrl: string,
+    expiryDays: number,
+    recipientName?: string | null,
+  ): Promise<boolean> {
+    const greeting = recipientName ? `${recipientName}, вас` : 'Вас';
+
+    return this.send({
+      to: email,
+      subject: 'Приглашение в Stankoff Portal',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #0d9488; color: white; padding: 24px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">Stankoff Portal</h1>
+          </div>
+          <div style="padding: 32px; background: #f9fafb;">
+            <h2 style="margin: 0 0 16px; color: #111827;">Приглашение в систему</h2>
+            <p style="margin: 0 0 24px; color: #6b7280;">
+              ${greeting} приглашает ${invitedBy.firstName} ${invitedBy.lastName} присоединиться к корпоративному порталу Stankoff.
+            </p>
+            <div style="background: white; border-radius: 8px; padding: 20px; border: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px; color: #111827;">
+                Для завершения регистрации перейдите по ссылке и установите пароль.
+              </p>
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">
+                Ссылка действительна ${expiryDays} дней.
+              </p>
+            </div>
+            <div style="margin-top: 24px; text-align: center;">
+              <a href="${acceptUrl}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+                Принять приглашение
+              </a>
+            </div>
+          </div>
+          <div style="padding: 16px; text-align: center; color: #9ca3af; font-size: 12px;">
+            Если вы получили это письмо по ошибке, просто проигнорируйте его.
+          </div>
+        </div>
+      `,
+      text: `${greeting} приглашает ${invitedBy.firstName} ${invitedBy.lastName} в Stankoff Portal. Перейдите по ссылке для регистрации: ${acceptUrl}. Ссылка действительна ${expiryDays} дней.`,
+    });
+  }
+
+  // Уведомление о назначении доступа (существующий пользователь)
+  async sendAccessGrantedEmail(
+    user: User,
+    grantedBy: User,
+    frontendUrl: string,
+  ): Promise<boolean> {
+    const portalUrl = `${frontendUrl}/dashboard`;
+
+    return this.send({
+      to: user.email,
+      subject: 'Новый доступ в Stankoff Portal',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #0d9488; color: white; padding: 24px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">Stankoff Portal</h1>
+          </div>
+          <div style="padding: 32px; background: #f9fafb;">
+            <h2 style="margin: 0 0 16px; color: #111827;">Вам назначен новый доступ</h2>
+            <p style="margin: 0 0 24px; color: #6b7280;">
+              ${grantedBy.firstName} ${grantedBy.lastName} предоставил(а) вам доступ к новым разделам портала.
+            </p>
+            <div style="margin-top: 24px; text-align: center;">
+              <a href="${portalUrl}" style="display: inline-block; background: #0d9488; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+                Перейти в портал
+              </a>
+            </div>
+          </div>
+          <div style="padding: 16px; text-align: center; color: #9ca3af; font-size: 12px;">
+            Это автоматическое уведомление от Stankoff Portal
+          </div>
+        </div>
+      `,
+      text: `${grantedBy.firstName} ${grantedBy.lastName} предоставил(а) вам доступ к новым разделам Stankoff Portal. Перейдите в портал: ${portalUrl}`,
+    });
+  }
+
   // Уведомление о нарушении SLA
   async sendSlaBreachNotification(
     recipient: User,
