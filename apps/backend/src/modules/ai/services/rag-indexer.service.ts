@@ -52,6 +52,9 @@ export class RagIndexerService {
   private readonly CHUNK_OVERLAP = 50; // токенов overlap между чанками
   private readonly CHARS_PER_TOKEN = 4; // примерное соотношение символов к токенам
 
+  // Rate limiting для Yandex Cloud Embeddings API (лимит 10 req/sec)
+  private readonly EMBED_DELAY_MS = 150; // задержка между embed вызовами
+
   // Статус индексации
   private indexingStats: IndexingStats | null = null;
 
@@ -79,7 +82,7 @@ export class RagIndexerService {
    */
   async indexAll(options: IndexingOptions = {}): Promise<IndexingStats> {
     const {
-      batchSize = 50,
+      batchSize = 10,
       maxRequests,
       modifiedAfter,
       onProgress,
@@ -225,6 +228,11 @@ export class RagIndexerService {
         createdCount++;
       } catch (error) {
         this.logger.warn(`Не удалось создать чанк ${i} для заявки ${request.id}: ${error.message}`);
+      }
+
+      // Rate limiting: задержка между embed вызовами (Yandex Cloud: 10 req/sec)
+      if (i < chunks.length - 1) {
+        await this.delay(this.EMBED_DELAY_MS);
       }
     }
 
@@ -626,5 +634,9 @@ export class RagIndexerService {
     }
 
     return chunks.filter(chunk => chunk.length > 50); // Минимальная длина чанка
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
