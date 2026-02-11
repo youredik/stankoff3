@@ -17,9 +17,14 @@ export class ChangeSourceIdToVarchar1772500000000 implements MigrationInterface 
       ALTER COLUMN source_id TYPE VARCHAR(255)
     `);
 
-    // 2. Обновляем функцию search_similar_chunks — source_id теперь VARCHAR
+    // 2. DROP старую функцию (нельзя изменить return type через CREATE OR REPLACE)
     await queryRunner.query(`
-      CREATE OR REPLACE FUNCTION search_similar_chunks(
+      DROP FUNCTION IF EXISTS search_similar_chunks(vector, UUID, VARCHAR, INT, FLOAT)
+    `);
+
+    // 3. Создаём функцию с новым return type (source_id VARCHAR)
+    await queryRunner.query(`
+      CREATE FUNCTION search_similar_chunks(
         query_embedding vector(256),
         workspace_filter UUID DEFAULT NULL,
         source_filter VARCHAR(50) DEFAULT NULL,
@@ -70,7 +75,11 @@ export class ChangeSourceIdToVarchar1772500000000 implements MigrationInterface 
     `);
 
     await queryRunner.query(`
-      CREATE OR REPLACE FUNCTION search_similar_chunks(
+      DROP FUNCTION IF EXISTS search_similar_chunks(vector, UUID, VARCHAR, INT, FLOAT)
+    `);
+
+    await queryRunner.query(`
+      CREATE FUNCTION search_similar_chunks(
         query_embedding vector(256),
         workspace_filter UUID DEFAULT NULL,
         source_filter VARCHAR(50) DEFAULT NULL,
