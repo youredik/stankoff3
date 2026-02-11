@@ -341,8 +341,7 @@ Time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
     # Cleanup old local backups
     cleanup
 
-    # Cleanup old S3 backups
-    cleanup_s3
+    # S3 cleanup handled by lifecycle policy (auto-delete after 7 days by prefix)
 
     local end_time=$(date +%s)
     local duration=$(( end_time - start_time ))
