@@ -31,6 +31,14 @@ export class SeedOrchestratorService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    // 0. Защита от запуска на production/preprod — seed только при явном ENABLE_SEED=true
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_SEED !== 'true') {
+      this.logger.log(
+        `Seed отключён (NODE_ENV=${process.env.NODE_ENV}, ENABLE_SEED=${process.env.ENABLE_SEED || 'not set'})`,
+      );
+      return;
+    }
+
     // 1. Проверка маркера: если секция "Продажи" существует — данные уже созданы
     const existing = await this.sectionRepo.findOne({ where: { name: 'Продажи' } });
     if (existing) {

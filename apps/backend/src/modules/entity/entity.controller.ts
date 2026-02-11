@@ -265,6 +265,9 @@ export class EntityController {
   @Delete('cleanup/test-data')
   @Roles(UserRole.ADMIN)
   removeTestData() {
+    if (process.env.NODE_ENV === 'production' && process.env.ENABLE_TEST_CLEANUP !== 'true') {
+      throw new ForbiddenException('Очистка тестовых данных недоступна в production');
+    }
     return this.entityService.removeTestData();
   }
 

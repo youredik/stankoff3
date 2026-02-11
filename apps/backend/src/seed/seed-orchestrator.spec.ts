@@ -27,6 +27,8 @@ describe('SeedOrchestratorService', () => {
   let seedBpmn: jest.Mocked<SeedBpmnService>;
   let seedSlaDmn: jest.Mocked<SeedSlaDmnService>;
 
+  const originalEnv = process.env;
+
   const mockUsers = [{ id: '1', email: 'youredik@gmail.com' }] as any[];
 
   const mockItSection = { id: 'it-section', name: 'IT' } as Section;
@@ -63,6 +65,9 @@ describe('SeedOrchestratorService', () => {
   const mockItEntities = [{ id: 'it-e1' }] as any[];
 
   beforeEach(async () => {
+    // Устанавливаем env для разрешения seed в тестах
+    process.env = { ...originalEnv, NODE_ENV: 'development', ENABLE_SEED: 'true' };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SeedOrchestratorService,
@@ -126,7 +131,31 @@ describe('SeedOrchestratorService', () => {
     seedSlaDmn = module.get(SeedSlaDmnService);
   });
 
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   describe('onModuleInit', () => {
+    it('должен пропустить seed в production окружении', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.ENABLE_SEED = undefined;
+
+      await service.onModuleInit();
+
+      expect(sectionRepo.findOne).not.toHaveBeenCalled();
+      expect(cleanup.cleanupAll).not.toHaveBeenCalled();
+    });
+
+    it('должен пропустить seed если ENABLE_SEED не установлен', async () => {
+      process.env.NODE_ENV = 'development';
+      delete process.env.ENABLE_SEED;
+
+      await service.onModuleInit();
+
+      expect(sectionRepo.findOne).not.toHaveBeenCalled();
+      expect(cleanup.cleanupAll).not.toHaveBeenCalled();
+    });
+
     it('должен пропустить seed, если секция "Продажи" уже существует', async () => {
       sectionRepo.findOne.mockResolvedValue({ id: '1', name: 'Продажи' } as Section);
 
