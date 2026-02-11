@@ -36,17 +36,17 @@ NC='\033[0m' # No Color
 # Ensure backup directory exists
 mkdir -p "$BACKUP_DIR"
 
-# Functions
+# Functions (output to stderr so $(command) captures only return values)
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') $1"
+    echo -e "${GREEN}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') $1" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $(date '+%Y-%m-%d %H:%M:%S') $1"
+    echo -e "${YELLOW}[WARN]${NC} $(date '+%Y-%m-%d %H:%M:%S') $1" >&2
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') $1"
+    echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') $1" >&2
 }
 
 # Send Telegram notification
@@ -296,7 +296,9 @@ cleanup_s3() {
 
     log_info "Cleaning up S3 backups older than ${RETENTION_DAYS} days..."
 
-    local cutoff_date=$(date -d "-${RETENTION_DAYS} days" +%Y-%m-%d 2>/dev/null || date -v-${RETENTION_DAYS}d +%Y-%m-%d)
+    # BusyBox-compatible date arithmetic (works in Alpine Docker)
+    local cutoff_epoch=$(( $(date +%s) - RETENTION_DAYS * 86400 ))
+    local cutoff_date=$(date -d "@${cutoff_epoch}" +%Y-%m-%d 2>/dev/null || date -D '%s' -d "${cutoff_epoch}" +%Y-%m-%d 2>/dev/null || echo "1970-01-01")
     local count=0
 
     aws s3 ls "s3://${S3_BUCKET}/${S3_BACKUP_PREFIX}/" \
