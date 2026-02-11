@@ -90,7 +90,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   }, [conversationId, loadMoreMessages]);
 
   return (
-    <div className="flex flex-col h-full bg-[#E8EFFA] dark:bg-[#0E1621]">
+    <div data-testid="chat-view" className="flex flex-col h-full bg-[#E8EFFA] dark:bg-[#0E1621]">
       <ChatHeader
         conversationId={conversationId}
         onSearchClick={() => setShowSearch(!showSearch)}
@@ -100,7 +100,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
       {/* Pinned message banner */}
       {pinned.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-1.5 bg-white/80 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+        <div data-testid="chat-pinned-banner" className="flex items-center gap-2 px-4 py-1.5 bg-white/80 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700 backdrop-blur-sm">
           <div className="w-0.5 h-6 bg-primary-500 rounded-full flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <span className="text-xs font-medium text-primary-600 dark:text-primary-400">

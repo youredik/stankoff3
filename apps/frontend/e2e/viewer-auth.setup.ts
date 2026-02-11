@@ -10,8 +10,8 @@ setup('authenticate as viewer', async ({ page }) => {
   // Ждём загрузки карточек dev-пользователей
   await expect(page.getByText('Выберите пользователя для входа')).toBeVisible({ timeout: 15000 });
 
-  // Белов — viewer в Рекламациях (REK), менеджер в других workspace'ах
-  const viewerCard = page.locator('button').filter({ hasText: 'belov@stankoff.ru' });
+  // Грачев — manager (используется как viewer для RBAC тестов)
+  const viewerCard = page.locator('button').filter({ hasText: 'grachev@stankoff.ru' });
   await viewerCard.click();
 
   // Ждём редиректа на dashboard

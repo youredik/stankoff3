@@ -10,8 +10,8 @@ setup('authenticate', async ({ page }) => {
   // Ждём загрузки карточек dev-пользователей
   await expect(page.getByText('Выберите пользователя для входа')).toBeVisible({ timeout: 15000 });
 
-  // Кликаем на admin пользователя
-  const adminCard = page.locator('button').filter({ hasText: 'admin@stankoff.ru' });
+  // Кликаем на admin пользователя (youredik)
+  const adminCard = page.locator('button').filter({ hasText: 'youredik@gmail.com' });
   await adminCard.click();
 
   // Ждём редиректа на dashboard

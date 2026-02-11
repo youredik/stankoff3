@@ -94,6 +94,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
       <div className="fixed inset-0 z-40" onClick={onClose} />
 
       <div
+        data-testid="chat-menu-panel"
         ref={menuRef}
         className="absolute right-2 top-12 z-50 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
       >
@@ -114,6 +115,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
+                  data-testid="chat-menu-member-search"
                   type="text"
                   value={memberSearch}
                   onChange={e => setMemberSearch(e.target.value)}
@@ -126,6 +128,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
               {availableUsers.map(u => (
                 <button
                   key={u.id}
+                  data-testid="chat-menu-add-user"
                   onClick={() => handleAddMembers(u.id)}
                   disabled={loading}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
@@ -146,13 +149,14 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
           /* Main menu */
           <div>
             {/* Participants */}
-            <div className="px-4 py-2">
+            <div data-testid="chat-menu-participants" className="px-4 py-2">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-500 uppercase">
+                <span data-testid="chat-menu-participant-count" className="text-xs font-medium text-gray-500 uppercase">
                   Участники ({activeParticipants.length})
                 </span>
                 {canManageMembers && (
                   <button
+                    data-testid="chat-menu-add-btn"
                     onClick={() => setShowAddMembers(true)}
                     className="text-xs text-primary-500 hover:text-primary-600 flex items-center gap-1"
                   >
@@ -162,7 +166,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
               </div>
               <div className="max-h-[180px] overflow-y-auto space-y-0.5">
                 {activeParticipants.map(p => (
-                  <div key={p.id} className="flex items-center gap-2.5 py-1.5 group">
+                  <div key={p.id} data-testid="chat-menu-participant" className="flex items-center gap-2.5 py-1.5 group">
                     <UserAvatar
                       firstName={p.user?.firstName || ''}
                       lastName={p.user?.lastName || ''}
@@ -178,6 +182,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
                     </div>
                     {isOwner && p.userId !== user?.id && canManageMembers && (
                       <button
+                        data-testid="chat-menu-remove-btn"
                         onClick={() => handleRemoveMember(p.userId)}
                         className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 transition-opacity"
                         title="Удалить"
@@ -194,6 +199,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
             <div className="border-t border-gray-100 dark:border-gray-700 py-1">
               {canManageMembers && (
                 <button
+                  data-testid="chat-menu-leave-btn"
                   onClick={handleLeave}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
                 >

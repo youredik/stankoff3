@@ -475,6 +475,9 @@ export class AiController {
     try {
       return await this.aiAssistantService.summarizeConversation(entityId);
     } catch (error) {
+      if (error.message?.includes('Недостаточно комментариев')) {
+        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      }
       this.logger.error(`Ошибка генерации резюме: ${error.message}`);
       throw new HttpException(
         error.message || 'Ошибка генерации резюме',

@@ -55,7 +55,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+      <div data-testid="ai-assistant-loading" className="flex flex-col items-center justify-center py-12 text-gray-500">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mb-3" />
         <span>Анализирую...</span>
       </div>
@@ -64,7 +64,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
   if (!data?.available) {
     return (
-      <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+      <div data-testid="ai-assistant-unavailable" className="py-8 text-center text-gray-500 dark:text-gray-400">
         <p>AI помощник недоступен</p>
         <p className="text-sm mt-1">Проверьте настройки AI провайдеров</p>
       </div>
@@ -79,7 +79,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
   if (!hasContent) {
     return (
-      <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+      <div data-testid="ai-assistant-no-data" className="py-8 text-center text-gray-500 dark:text-gray-400">
         <p>Недостаточно данных для анализа</p>
         <p className="text-sm mt-1">Добавьте описание к заявке</p>
       </div>
@@ -87,10 +87,11 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
   }
 
   return (
-    <div className="space-y-6 p-4">
+    <div data-testid="ai-assistant-tab" className="space-y-6 p-4">
       {/* Кнопка генерации ответа */}
       <section className="pb-4 border-b border-gray-200 dark:border-gray-700">
         <button
+          data-testid="ai-generate-response-btn"
           onClick={handleGenerateResponse}
           disabled={isGenerating}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -110,7 +111,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
         {/* Streaming: текст появляется по мере генерации */}
         {isGenerating && streamingDraft && (
-          <div className="mt-4">
+          <div data-testid="ai-streaming-draft" className="mt-4">
             <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
               <h4 className="text-sm font-medium text-teal-700 dark:text-teal-300 mb-2">
                 Черновик ответа
@@ -125,7 +126,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
         {/* Сгенерированный ответ (после завершения) */}
         {!isGenerating && generatedResponse && (
-          <div className="mt-4 space-y-3">
+          <div data-testid="ai-generated-draft" className="mt-4 space-y-3">
             <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-teal-700 dark:text-teal-300">
@@ -133,6 +134,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
                 </h4>
                 <div className="flex items-center gap-1">
                   <button
+                    data-testid="ai-copy-draft-btn"
                     onClick={handleCopy}
                     className="p-1.5 text-gray-500 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                     title="Копировать"
@@ -145,6 +147,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
                   </button>
                   {onInsertDraft && (
                     <button
+                      data-testid="ai-insert-draft-btn"
                       onClick={handleInsert}
                       className="p-1.5 text-gray-500 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                       title="Вставить в комментарий"
@@ -154,14 +157,14 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
                   )}
                 </div>
               </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+              <p data-testid="ai-draft-text" className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                 {generatedResponse.draft}
               </p>
             </div>
 
             {/* Источники */}
             {generatedResponse.sources.length > 0 && (
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div data-testid="ai-draft-sources" className="text-xs text-gray-500 dark:text-gray-400">
                 <span className="font-medium">Источники: </span>
                 {generatedResponse.sources.map((source, i) => (
                   <span key={source.id}>
@@ -178,7 +181,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
       {/* Рекомендуемые действия */}
       {data.suggestedActions && data.suggestedActions.length > 0 && (
-        <section>
+        <section data-testid="ai-actions-section">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
             <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -189,6 +192,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
             {data.suggestedActions.map((action, index) => (
               <li
                 key={index}
+                data-testid="ai-action-item"
                 className="flex items-start gap-2 p-2 bg-teal-50 dark:bg-teal-900/20 rounded-lg text-sm"
               >
                 <span className="text-teal-500 mt-0.5">-</span>
@@ -201,7 +205,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
       {/* Похожие случаи */}
       {data.similarCases.length > 0 && (
-        <section>
+        <section data-testid="ai-similar-cases-section">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
             <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -218,7 +222,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
       {/* Эксперты */}
       {data.suggestedExperts.length > 0 && (
-        <section>
+        <section data-testid="ai-experts-section">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
             <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -235,7 +239,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
       {/* Связанный контекст */}
       {data.relatedContext && (
-        <section>
+        <section data-testid="ai-related-context">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
             <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -248,7 +252,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
 
       {/* Ключевые слова */}
       {data.keywords && data.keywords.length > 0 && (
-        <section>
+        <section data-testid="ai-keywords-section">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
             Теги
           </h3>
@@ -256,6 +260,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
             {data.keywords.map((keyword, index) => (
               <span
                 key={index}
+                data-testid="ai-keyword-tag"
                 className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-xs text-gray-600 dark:text-gray-300"
               >
                 {keyword}
@@ -286,6 +291,7 @@ function SimilarCaseCard({ caseItem }: { caseItem: SimilarCase }) {
 
   return (
     <a
+      data-testid="ai-similar-case"
       href={caseItem.legacyUrl}
       target="_blank"
       rel="noopener noreferrer"
@@ -344,7 +350,7 @@ function SimilarCaseCard({ caseItem }: { caseItem: SimilarCase }) {
  */
 function ExpertCard({ expert }: { expert: SuggestedExpert }) {
   return (
-    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+    <div data-testid="ai-expert-card" className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-800 dark:text-gray-200">

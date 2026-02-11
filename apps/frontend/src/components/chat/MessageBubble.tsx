@@ -52,7 +52,7 @@ function SystemMessage({ message }: { message: ChatMessage }) {
   }
 
   return (
-    <div className="flex justify-center my-1">
+    <div data-testid="chat-system-message" className="flex justify-center my-1">
       <span className="text-xs bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-400 px-3 py-1 rounded-full">
         {text}
       </span>
@@ -117,12 +117,13 @@ function ReactionBar({ reactions, messageId, conversationId, isOwn }: {
   if (!reactions || reactions.length === 0) return null;
 
   return (
-    <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+    <div data-testid="chat-reaction-bar" className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
       {reactions.map(r => {
         const isMine = user?.id ? r.userIds.includes(user.id) : false;
         return (
           <button
             key={r.emoji}
+            data-testid="chat-reaction"
             onClick={() => toggleReaction(conversationId, messageId, r.emoji)}
             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
               isMine
@@ -192,6 +193,7 @@ export function MessageBubble({
   return (
     <div
       id={`msg-${message.id}`}
+      data-testid="chat-message-bubble"
       className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${isLastInGroup ? 'mb-2' : 'mb-0.5'} transition-all`}
     >
       {!isOwn && (
@@ -202,7 +204,7 @@ export function MessageBubble({
         </div>
       )}
 
-      <div className={`relative max-w-[65%] group ${isOwn ? 'mr-1' : ''}`} onContextMenu={handleContextMenu}>
+      <div data-testid="chat-message-content" className={`relative max-w-[65%] group ${isOwn ? 'mr-1' : ''}`} onContextMenu={handleContextMenu}>
         {message.replyTo && (
           <div className={`mb-0.5 px-3 py-1.5 border-l-2 border-primary-400 ${isOwn ? 'bg-[#D8F6C6] dark:bg-[#1F3F2E] rounded-t-xl' : 'bg-gray-50 dark:bg-gray-700 rounded-t-xl'}`}>
             <span className="text-xs font-medium text-primary-600 dark:text-primary-400">{message.replyTo.author?.firstName}</span>
@@ -211,7 +213,7 @@ export function MessageBubble({
         )}
 
         <div className={`relative px-3 py-1.5 ${isOwn ? `bg-[#EFFDDE] dark:bg-[#2B5278] ${ownRadius}` : `bg-white dark:bg-[#212121] ${otherRadius}`}`}>
-          {message.isPinned && <Pin className="absolute -top-1 -right-1 w-3 h-3 text-primary-500 rotate-45" />}
+          {message.isPinned && <Pin data-testid="chat-message-pin-icon" className="absolute -top-1 -right-1 w-3 h-3 text-primary-500 rotate-45" />}
 
           {showName && message.author && (
             <div className="text-xs font-medium text-primary-600 dark:text-primary-400 mb-0.5">
@@ -233,7 +235,7 @@ export function MessageBubble({
             <>
               {editing ? (
                 <div className="flex items-center gap-2">
-                  <input type="text" value={editContent} onChange={e => setEditContent(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditing(false); }} className="flex-1 bg-transparent border-b border-primary-400 outline-none text-sm py-0.5" autoFocus />
+                  <input data-testid="chat-edit-input" type="text" value={editContent} onChange={e => setEditContent(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditing(false); }} className="flex-1 bg-transparent border-b border-primary-400 outline-none text-sm py-0.5" autoFocus />
                   <button onClick={handleSaveEdit} className="text-xs text-primary-500 hover:text-primary-600">OK</button>
                 </div>
               ) : (
@@ -256,7 +258,7 @@ export function MessageBubble({
           {firstUrl && !editing && <LinkPreview url={firstUrl} />}
 
           <span className="float-right ml-2 mt-1 flex items-center gap-0.5">
-            {message.isEdited && <span className="text-[10px] text-gray-400 dark:text-gray-500 mr-0.5">ред.</span>}
+            {message.isEdited && <span data-testid="chat-message-edited" className="text-[10px] text-gray-400 dark:text-gray-500 mr-0.5">ред.</span>}
             <span className={`text-[11px] ${isOwn ? 'text-green-600/60 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`}>{time}</span>
             {isOwn && <CheckCheck className="w-3.5 h-3.5 text-green-600/60 dark:text-blue-400" />}
           </span>
@@ -267,10 +269,10 @@ export function MessageBubble({
 
         {/* Hover actions: reply + reaction */}
         <div className={`absolute top-0 ${isOwn ? '-left-16' : '-right-16'} hidden group-hover:flex items-start pt-1 gap-0.5`}>
-          <button onClick={onReply} className="p-1 rounded-full bg-white dark:bg-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600" title="Ответить">
+          <button data-testid="chat-hover-reply" onClick={onReply} className="p-1 rounded-full bg-white dark:bg-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600" title="Ответить">
             <Reply className="w-3.5 h-3.5 text-gray-500" />
           </button>
-          <button onClick={() => setShowReactions(!showReactions)} className="p-1 rounded-full bg-white dark:bg-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600" title="Реакция">
+          <button data-testid="chat-hover-reaction" onClick={() => setShowReactions(!showReactions)} className="p-1 rounded-full bg-white dark:bg-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600" title="Реакция">
             <SmilePlus className="w-3.5 h-3.5 text-gray-500" />
           </button>
         </div>
@@ -279,7 +281,7 @@ export function MessageBubble({
         {showReactions && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowReactions(false)} />
-            <div className={`absolute z-50 ${isOwn ? 'right-0' : 'left-0'} -top-8 flex gap-0.5 bg-white dark:bg-gray-800 rounded-full shadow-xl border border-gray-200 dark:border-gray-700 px-1.5 py-1`}>
+            <div data-testid="chat-quick-reactions" className={`absolute z-50 ${isOwn ? 'right-0' : 'left-0'} -top-8 flex gap-0.5 bg-white dark:bg-gray-800 rounded-full shadow-xl border border-gray-200 dark:border-gray-700 px-1.5 py-1`}>
               {QUICK_REACTIONS.map(emoji => (
                 <button key={emoji} onClick={() => { toggleReaction(conversationId, message.id, emoji); setShowReactions(false); }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-base">
                   {emoji}
@@ -293,23 +295,23 @@ export function MessageBubble({
         {showMenu && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-            <div ref={menuRef} className={`absolute z-50 ${isOwn ? 'right-0' : 'left-0'} top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[160px]`}>
-              <button onClick={() => { onReply(); setShowMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <div data-testid="chat-context-menu" ref={menuRef} className={`absolute z-50 ${isOwn ? 'right-0' : 'left-0'} top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[160px]`}>
+              <button data-testid="chat-ctx-reply" onClick={() => { onReply(); setShowMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                 <Reply className="w-4 h-4" /> Ответить
               </button>
-              <button onClick={handleCopy} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+              <button data-testid="chat-ctx-copy" onClick={handleCopy} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                 <Copy className="w-4 h-4" /> Копировать
               </button>
-              <button onClick={handlePin} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+              <button data-testid="chat-ctx-pin" onClick={handlePin} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                 <Pin className="w-4 h-4" /> {message.isPinned ? 'Открепить' : 'Закрепить'}
               </button>
               {isOwn && message.type === 'text' && (
-                <button onClick={handleEdit} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <button data-testid="chat-ctx-edit" onClick={handleEdit} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                   <Pencil className="w-4 h-4" /> Редактировать
                 </button>
               )}
               {isOwn && (
-                <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <button data-testid="chat-ctx-delete" onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700">
                   <Trash2 className="w-4 h-4" /> Удалить
                 </button>
               )}

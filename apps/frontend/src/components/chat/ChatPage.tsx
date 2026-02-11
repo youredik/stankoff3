@@ -28,7 +28,7 @@ export function ChatPage() {
   }, [searchParams, selectConversation]);
 
   return (
-    <div className="flex h-[calc(100vh-57px)] bg-gray-100 dark:bg-gray-900">
+    <div data-testid="chat-page" className="flex h-[calc(100vh-57px)] bg-gray-100 dark:bg-gray-900">
       {/* Conversation list - Telegram left panel */}
       <div className="w-[380px] flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <ConversationList />
@@ -39,7 +39,7 @@ export function ChatPage() {
         {selectedConversationId ? (
           <ChatView conversationId={selectedConversationId} />
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-[#E8EFFA] dark:bg-gray-900">
+          <div data-testid="chat-empty-state" className="flex-1 flex items-center justify-center bg-[#E8EFFA] dark:bg-gray-900">
             <div className="text-center">
               <div className="w-24 h-24 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center mx-auto mb-4">
                 <MessageCircle className="w-12 h-12 text-primary-400" />

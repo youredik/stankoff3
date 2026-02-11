@@ -49,7 +49,7 @@ export class Message {
   @Column({ type: 'varchar', length: 20, default: 'text' })
   type: MessageType;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   replyToId: string | null;
 
   @ManyToOne(() => Message, { nullable: true, onDelete: 'SET NULL' })
@@ -59,7 +59,7 @@ export class Message {
   @Column('jsonb', { default: [] })
   attachments: MessageAttachment[];
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   voiceKey: string | null;
 
   @Column({ type: 'int', nullable: true })

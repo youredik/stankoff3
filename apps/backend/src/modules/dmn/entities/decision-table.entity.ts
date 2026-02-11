@@ -52,7 +52,6 @@ export class DecisionTable {
   id: string;
 
   @Column({ name: 'workspace_id' })
-  @Index()
   workspaceId: string;
 
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })

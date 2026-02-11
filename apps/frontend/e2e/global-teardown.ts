@@ -10,7 +10,7 @@ async function globalTeardown(_config: FullConfig) {
     const loginResponse = await fetch(`${API_URL}/auth/dev/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@stankoff.ru' }),
+      body: JSON.stringify({ email: 'youredik@gmail.com' }),
     });
 
     if (!loginResponse.ok) {
@@ -19,18 +19,28 @@ async function globalTeardown(_config: FullConfig) {
     }
 
     const { accessToken } = await loginResponse.json();
+    const headers = { Authorization: `Bearer ${accessToken}` };
 
-    // Вызываем cleanup с токеном
-    const response = await fetch(`${API_URL}/entities/cleanup/test-data`, {
+    // Очистка тестовых заявок
+    const entitiesRes = await fetch(`${API_URL}/entities/cleanup/test-data`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers,
     });
 
-    if (response.ok) {
-      const result = await response.json();
+    if (entitiesRes.ok) {
+      const result = await entitiesRes.json();
       console.log(`✅ Удалено тестовых заявок: ${result.deleted}`);
-    } else {
-      console.warn(`⚠️ Не удалось очистить тестовые данные: ${response.status}`);
+    }
+
+    // Очистка тестовых чатов
+    const chatsRes = await fetch(`${API_URL}/chat/cleanup/test-data`, {
+      method: 'DELETE',
+      headers,
+    });
+
+    if (chatsRes.ok) {
+      const result = await chatsRes.json();
+      console.log(`✅ Удалено тестовых чатов: ${result.deleted}`);
     }
   } catch (error) {
     console.warn('⚠️ Ошибка при очистке тестовых данных:', error);

@@ -40,7 +40,7 @@ export class ConversationParticipant {
   @Column({ type: 'timestamptz', nullable: true })
   lastReadAt: Date | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   lastReadMessageId: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })

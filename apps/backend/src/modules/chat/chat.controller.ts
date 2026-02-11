@@ -22,6 +22,13 @@ import { MessagesQueryDto } from './dto/messages-query.dto';
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
+  // ─── Cleanup (E2E) ──────────────────────────────────────
+
+  @Delete('cleanup/test-data')
+  removeTestData() {
+    return this.chatService.removeTestData();
+  }
+
   // ─── Conversations ──────────────────────────────────────
 
   @Get('conversations')

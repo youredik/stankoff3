@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, Like } from 'typeorm';
 import { Conversation, ConversationType } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message } from './entities/message.entity';
@@ -637,6 +637,21 @@ export class ChatService {
       conversationId,
       message: full,
     });
+  }
+
+  /** Удалить тестовые чаты (Playwright, E2E) */
+  async removeTestData(): Promise<{ deleted: number }> {
+    const testConversations = await this.conversationRepo.find({
+      where: [
+        { name: Like('%Playwright%') },
+        { name: Like('%[E2E]%') },
+        { name: Like('PW %') },
+      ],
+    });
+    if (testConversations.length > 0) {
+      await this.conversationRepo.remove(testConversations);
+    }
+    return { deleted: testConversations.length };
   }
 
   private async emitToConversation(conversationId: string, event: string, data: any) {

@@ -43,7 +43,7 @@ export function ChatHeader({ conversationId, onSearchClick, onMenuClick, pinnedC
   }
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div data-testid="chat-header" className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-3">
         {conversation.type === 'direct' && otherParticipant?.user ? (
           <UserAvatar
@@ -55,10 +55,10 @@ export function ChatHeader({ conversationId, onSearchClick, onMenuClick, pinnedC
         ) : null}
 
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          <h3 data-testid="chat-header-name" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {name}
           </h3>
-          <p className={`text-xs ${
+          <p data-testid="chat-header-status" className={`text-xs ${
             typing.length > 0
               ? 'text-primary-500'
               : 'text-gray-500 dark:text-gray-400'
@@ -70,6 +70,7 @@ export function ChatHeader({ conversationId, onSearchClick, onMenuClick, pinnedC
 
       <div className="flex items-center gap-1">
         <button
+          data-testid="chat-search-btn"
           onClick={onSearchClick}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
           title="Поиск"
@@ -77,6 +78,7 @@ export function ChatHeader({ conversationId, onSearchClick, onMenuClick, pinnedC
           <Search className="w-5 h-5" />
         </button>
         <button
+          data-testid="chat-menu-btn"
           onClick={onMenuClick}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
           title="Настройки"

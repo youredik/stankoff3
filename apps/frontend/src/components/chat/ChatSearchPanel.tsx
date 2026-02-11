@@ -72,11 +72,12 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
   }, [results, selectedIndex, scrollToMessage, onClose]);
 
   return (
-    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+    <div data-testid="chat-search-panel" className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
       <div className="flex items-center gap-2">
         <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
         <input
           ref={inputRef}
+          data-testid="chat-search-input"
           type="text"
           value={query}
           onChange={handleChange}
@@ -85,13 +86,14 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
           className="flex-1 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder-gray-400"
         />
         {results.length > 0 && (
-          <span className="text-xs text-gray-400 flex-shrink-0">
+          <span data-testid="chat-search-count" className="text-xs text-gray-400 flex-shrink-0">
             {selectedIndex + 1}/{results.length}
           </span>
         )}
         {results.length > 1 && (
           <div className="flex items-center gap-0.5">
             <button
+              data-testid="chat-search-up"
               onClick={() => {
                 const idx = Math.max(selectedIndex - 1, 0);
                 setSelectedIndex(idx);
@@ -102,6 +104,7 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
               <ArrowUp className="w-3.5 h-3.5" />
             </button>
             <button
+              data-testid="chat-search-down"
               onClick={() => {
                 const idx = Math.min(selectedIndex + 1, results.length - 1);
                 setSelectedIndex(idx);
@@ -114,6 +117,7 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
           </div>
         )}
         <button
+          data-testid="chat-search-close"
           onClick={onClose}
           className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
         >
@@ -123,10 +127,11 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
 
       {/* Results dropdown */}
       {results.length > 0 && (
-        <div className="mt-2 max-h-[200px] overflow-y-auto space-y-1">
+        <div data-testid="chat-search-results" className="mt-2 max-h-[200px] overflow-y-auto space-y-1">
           {results.map((msg, i) => (
             <button
               key={msg.id}
+              data-testid="chat-search-result"
               onClick={() => { setSelectedIndex(i); scrollToMessage(msg.id); }}
               className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
                 i === selectedIndex
@@ -152,7 +157,7 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
 
       {loading && <p className="text-xs text-gray-400 mt-1">Поиск...</p>}
       {!loading && query.trim() && results.length === 0 && (
-        <p className="text-xs text-gray-400 mt-1">Ничего не найдено</p>
+        <p data-testid="chat-search-empty" className="text-xs text-gray-400 mt-1">Ничего не найдено</p>
       )}
     </div>
   );

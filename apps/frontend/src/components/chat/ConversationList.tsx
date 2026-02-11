@@ -36,13 +36,14 @@ export function ConversationList() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div data-testid="chat-conversation-list" className="flex flex-col h-full">
       {/* Search header */}
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
+              data-testid="chat-conv-search"
               type="text"
               placeholder="Поиск..."
               value={search}
@@ -51,6 +52,7 @@ export function ConversationList() {
             />
           </div>
           <button
+            data-testid="chat-new-btn"
             onClick={() => setShowNewChat(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
             title="Новый чат"

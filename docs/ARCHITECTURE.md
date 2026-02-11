@@ -3158,7 +3158,8 @@ seed/
 ```
 apps/frontend/e2e/
 ├── helpers/
-│   └── test-utils.ts              # Общие хелперы (~40 функций для BPMN API)
+│   ├── test-utils.ts              # Общие хелперы (~60 функций: BPMN + Chat + AI API)
+│   └── selectors.ts              # Централизованные data-testid селекторы
 ├── scenarios/                     # Полные workflow через реальный Zeebe
 │   ├── support-ticket.spec.ts
 │   ├── claims-management.spec.ts
@@ -3172,7 +3173,9 @@ apps/frontend/e2e/
 ├── bpmn-incidents.spec.ts         # Реальные инциденты через Zeebe (10 тестов)
 ├── bpmn-forms.spec.ts             # CRUD определений форм (4 теста)
 ├── bpmn-entity-links.spec.ts      # CRUD связей сущностей (4 теста)
-└── bpmn-lifecycle.spec.ts         # UI навигация по BPMN страницам
+├── bpmn-lifecycle.spec.ts         # UI навигация по BPMN страницам
+├── ai-assistant.spec.ts           # AI-помощник + резюме (22 теста)
+└── chat.spec.ts                   # Корпоративный чат (75 тестов)
 ```
 
 ### Покрытие BPMN функционала
@@ -3198,6 +3201,96 @@ apps/frontend/e2e/
 - **Mining:** `getMiningStatsApi`, `getMiningTimeAnalysisApi`, `getMiningElementStatsApi`, `getMiningWorkspaceStatsApi`
 - **Incidents:** `getIncidentsApi`, `getIncidentCountApi`, `retryIncidentApi`, `cancelIncidentApi`, `waitForIncident`
 - **Triggers:** `getTriggerExecutionsApi`, `getRecentExecutionsApi`, `sendWebhookApi`, `updateEntityStatusApi`, `addCommentToEntityApi`
+
+## E2E тестирование AI-помощника (Playwright)
+
+### Структура
+
+```
+apps/frontend/e2e/
+├── ai-assistant.spec.ts          # AI-помощник + резюме (22 теста)
+```
+
+### Покрытие AI-помощника
+
+| Область | Покрытие | Тесты |
+|---------|----------|-------|
+| API: AI Assistant (assist/suggest-response/summary) | 100% | 4 |
+| UI: Вкладка AI-помощника (переключение, генерация, черновик, копирование) | 100% | 6 |
+| UI: Похожие случаи (карточки, ID/%, ссылка на legacy CRM) | 100% | 3 |
+| UI: Рекомендуемые эксперты (карточки, имя/отдел/кейсы) | 100% | 2 |
+| UI: Рекомендации, теги, контекст | 100% | 3 |
+| UI: AI Резюме переписки (баннер, toggle, содержимое) | 100% | 4 |
+| Edge cases (AI недоступен, нет описания) | 100% | 2 |
+
+### Хелперы AI (test-utils.ts)
+
+- `getAiAssistanceApi(entityId)` — получить AI подсказки
+- `generateAiResponseApi(entityId, context?)` — сгенерировать черновик ответа
+- `getAiSummaryApi(entityId)` — AI резюме переписки
+- `seedCommentsForEntity(entityId, count)` — засеять N тестовых комментариев
+
+### Селекторы (selectors.ts)
+
+- `aiAssistant` — 20 селекторов (tab, generateBtn, streamingDraft, generatedDraft, draftText, copyBtn, insertBtn, draftSources, actionsSection, actionItem, similarCasesSection, similarCase, expertsSection, expertCard, relatedContext, keywordsSection, keywordTag, loading, unavailable, noData)
+- `aiSummary` — 4 селектора (banner, toggle, text, loading)
+
+## E2E тестирование корпоративного чата (Playwright)
+
+### Структура
+
+```
+apps/frontend/e2e/
+├── chat.spec.ts                  # Корпоративный чат (75 тестов)
+```
+
+### Покрытие Chat-функционала
+
+| Область | Покрытие | Тесты |
+|---------|----------|-------|
+| API: Чаты (создание/список/детали/поиск) | 100% | 4 |
+| API: Сообщения (отправка/получение/редактирование/удаление/reply) | 100% | 5 |
+| API: Реакции (добавление/toggle/несколько эмодзи) | 100% | 3 |
+| API: Закреплённые (pin/unpin/список) | 100% | 3 |
+| API: Поиск по сообщениям (полнотекстовый) | 100% | 2 |
+| API: Участники (добавление/удаление) | 100% | 2 |
+| UI: Навигация (переход /chat, список, пустое состояние) | 100% | 3 |
+| UI: Список чатов (отображение, поиск, выбор, новый чат) | 100% | 4 |
+| UI: Отправка сообщений (textarea, Enter, Shift+Enter, кнопка, микрофон) | 100% | 6 |
+| UI: Вложения файлов (прикрепление, превью, удаление, отправка) | 100% | 4 |
+| UI: Ответ на сообщение (hover, reply preview, отмена, отправка) | 100% | 4 |
+| UI: Контекстное меню (правый клик, пункты, своё/чужое, копирование) | 100% | 5 |
+| UI: Редактирование (inline input, сохранение, отмена) | 100% | 3 |
+| UI: Удаление (soft delete) | 100% | 1 |
+| UI: Реакции (hover, quick picker, добавление/удаление, подсветка) | 100% | 5 |
+| UI: Закреплённые сообщения (pin через меню, баннер, unpin) | 100% | 3 |
+| UI: Поиск (панель, debounce, результаты, счётчик, навигация, закрытие) | 100% | 8 |
+| UI: Меню и участники (панель, список, добавление, удаление, выход) | 100% | 8 |
+| UI: Header (имя, статус участников) | 100% | 2 |
+
+### Хелперы Chat (test-utils.ts)
+
+- **Чаты:** `getConversationsApi`, `createConversationApi`
+- **Сообщения:** `sendMessageApi`, `getMessagesApi`, `editMessageApi`, `deleteMessageApi`
+- **Реакции:** `toggleReactionApi`
+- **Закреплённые:** `pinMessageApi`, `unpinMessageApi`, `getPinnedMessagesApi`
+- **Поиск:** `searchChatMessagesApi`
+- **Участники:** `addChatParticipantsApi`, `removeChatParticipantApi`
+- **Прочее:** `getUnreadCountsApi`, `getUsersListApi`
+
+### Селекторы (selectors.ts)
+
+- `chat` — 65+ селекторов, организованных по группам:
+  - **Страница:** page, emptyState
+  - **Список чатов:** conversationList, convSearch, newBtn
+  - **ChatView:** view, pinnedBanner
+  - **Header:** header, headerName, headerStatus, searchBtn, menuBtn
+  - **Input:** input, textarea, sendBtn, attachBtn, fileInput, micBtn, replyPreview, cancelReplyBtn, pendingFiles, dropZone, recording, recordingCancel, recordingSend
+  - **Сообщение:** messageBubble, messageContent, messagePinIcon, messageEdited, systemMessage, editInput
+  - **Реакции:** reactionBar, reaction, hoverReply, hoverReaction, quickReactions
+  - **Контекстное меню:** contextMenu, ctxReply, ctxCopy, ctxPin, ctxEdit, ctxDelete
+  - **Поиск:** searchPanel, searchInput, searchCount, searchResults, searchResult, searchUp, searchDown, searchClose, searchEmpty
+  - **Меню участников:** menuPanel, menuParticipants, menuParticipantCount, menuAddBtn, menuParticipant, menuRemoveBtn, menuLeaveBtn, menuMemberSearch, menuAddUser
 
 ## Масштабирование
 

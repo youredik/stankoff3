@@ -42,7 +42,7 @@ export class DevAuthController {
     const users = await this.userService.findAll();
     return users
       .filter((u) => u.isActive)
-      .slice(0, 20)
+      .slice(0, 100)
       .map((u) => ({
         id: u.id,
         email: u.email,

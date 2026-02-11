@@ -10,8 +10,8 @@ setup('authenticate as editor (volkova)', async ({ page }) => {
   // Ждём загрузки карточек dev-пользователей
   await expect(page.getByText('Выберите пользователя для входа')).toBeVisible({ timeout: 15000 });
 
-  // Волкова — manager в workspace "Техническая поддержка" (TP)
-  const editorCard = page.locator('button').filter({ hasText: 'volkova@stankoff.ru' });
+  // Галлямова — manager в workspace
+  const editorCard = page.locator('button').filter({ hasText: 'chulpan.gallyamova@stankoff.ru' });
   await expect(editorCard).toBeVisible({ timeout: 10000 });
   await editorCard.click();
 

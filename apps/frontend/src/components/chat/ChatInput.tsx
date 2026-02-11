@@ -274,19 +274,19 @@ export function ChatInput({
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 ${isDragOver ? 'ring-2 ring-primary-500 ring-inset' : ''}`}
+      data-testid="chat-input" className={`bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 ${isDragOver ? 'ring-2 ring-primary-500 ring-inset' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {isDragOver && (
-        <div className="px-4 py-3 text-center text-sm text-primary-500 bg-primary-50 dark:bg-primary-900/20">
+        <div data-testid="chat-drop-zone" className="px-4 py-3 text-center text-sm text-primary-500 bg-primary-50 dark:bg-primary-900/20">
           Отпустите файлы для загрузки
         </div>
       )}
 
       {replyTo && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+        <div data-testid="chat-reply-preview" className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-700">
           <div className="w-0.5 h-8 bg-primary-500 rounded-full flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <span className="text-xs font-medium text-primary-600 dark:text-primary-400">
@@ -296,14 +296,14 @@ export function ChatInput({
               {(replyTo.content || '').replace(/<[^>]*>/g, '').substring(0, 60)}
             </p>
           </div>
-          <button onClick={onCancelReply} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
+          <button data-testid="chat-cancel-reply-btn" onClick={onCancelReply} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {pendingFiles.length > 0 && (
-        <div className="flex gap-2 px-4 py-2 overflow-x-auto border-b border-gray-100 dark:border-gray-700">
+        <div data-testid="chat-pending-files" className="flex gap-2 px-4 py-2 overflow-x-auto border-b border-gray-100 dark:border-gray-700">
           {pendingFiles.map((pf, i) => (
             <div key={i} className="relative flex-shrink-0 group">
               {pf.preview ? (
@@ -328,32 +328,32 @@ export function ChatInput({
       )}
 
       {recording ? (
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={cancelRecording} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 transition-colors" title="Отменить">
+        <div data-testid="chat-recording" className="flex items-center gap-3 px-4 py-3">
+          <button data-testid="chat-recording-cancel" onClick={cancelRecording} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 transition-colors" title="Отменить">
             <X className="w-5 h-5" />
           </button>
           <div className="flex-1 flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-sm text-red-500 font-medium tabular-nums">{formatTime(recordingTime)}</span>
           </div>
-          <button onClick={stopRecording} className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 text-white transition-colors" title="Отправить">
+          <button data-testid="chat-recording-send" onClick={stopRecording} className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 text-white transition-colors" title="Отправить">
             <Send className="w-5 h-5" />
           </button>
         </div>
       ) : (
         <div className="flex items-end gap-2 px-4 py-3">
           <button
-            onClick={() => fileInputRef.current?.click()}
+            data-testid="chat-attach-btn" onClick={() => fileInputRef.current?.click()}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5"
             title="Прикрепить файл"
           >
             <Paperclip className="w-5 h-5" />
           </button>
-          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,audio/*" />
+          <input ref={fileInputRef} data-testid="chat-file-input" type="file" multiple className="hidden" onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,audio/*" />
 
           <div className="flex-1 relative">
             <textarea
-              ref={textareaRef}
+              ref={textareaRef} data-testid="chat-input-textarea"
               value={content}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
@@ -365,11 +365,11 @@ export function ChatInput({
           </div>
 
           {content.trim() || pendingFiles.length > 0 ? (
-            <button onClick={handleSend} disabled={uploading} className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white transition-colors flex-shrink-0 mb-0.5">
+            <button data-testid="chat-send-btn" onClick={handleSend} disabled={uploading} className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white transition-colors flex-shrink-0 mb-0.5">
               <Send className="w-5 h-5" />
             </button>
           ) : (
-            <button onClick={startRecording} className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5" title="Голосовое сообщение">
+            <button data-testid="chat-mic-btn" onClick={startRecording} className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5" title="Голосовое сообщение">
               <Mic className="w-5 h-5" />
             </button>
           )}

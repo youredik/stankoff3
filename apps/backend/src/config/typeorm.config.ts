@@ -42,8 +42,8 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   entities: entityPatterns,
   // ВАЖНО: synchronize всегда false — все изменения через миграции
   synchronize: false,
-  // Автозапуск миграций при старте приложения
-  migrationsRun: true,
+  // ВРЕМЕННО false: схема создана через synchronize, миграции конфликтуют с ней
+  migrationsRun: false,
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   logging: process.env.NODE_ENV === 'development',
 };

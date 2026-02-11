@@ -27,17 +27,17 @@ export class Conversation {
   @Column({ type: 'varchar', length: 20 })
   type: ConversationType;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   name: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   entityId: string | null;
 
   @ManyToOne(() => WorkspaceEntity, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'entityId' })
   entity: WorkspaceEntity | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   workspaceId: string | null;
 
   @ManyToOne(() => Workspace, { nullable: true, onDelete: 'SET NULL' })
@@ -54,10 +54,10 @@ export class Conversation {
   @Column({ type: 'timestamptz', nullable: true })
   lastMessageAt: Date | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   lastMessagePreview: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   lastMessageAuthorId: string | null;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })

@@ -18,7 +18,7 @@ export class AddChatTables1771500000000 implements MigrationInterface {
         "lastMessageAuthorId" UUID,
         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        CONSTRAINT "fk_conversations_entity" FOREIGN KEY ("entityId") REFERENCES "workspace_entities"("id") ON DELETE SET NULL,
+        CONSTRAINT "fk_conversations_entity" FOREIGN KEY ("entityId") REFERENCES "entities"("id") ON DELETE SET NULL,
         CONSTRAINT "fk_conversations_workspace" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE SET NULL,
         CONSTRAINT "fk_conversations_created_by" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE CASCADE,
         CONSTRAINT "fk_conversations_last_author" FOREIGN KEY ("lastMessageAuthorId") REFERENCES "users"("id") ON DELETE SET NULL

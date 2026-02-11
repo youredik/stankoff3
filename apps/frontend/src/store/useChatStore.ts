@@ -123,16 +123,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (conversationId, data) => {
     const message = await chatApi.sendMessage(conversationId, data);
-    set({ replyToMessage: null });
+    // Add to local state immediately (WebSocket will dedup via onNewMessage)
+    set((state) => {
+      const existing = state.messages[conversationId] || [];
+      if (existing.some((m) => m.id === message.id)) return { replyToMessage: null };
+      return {
+        messages: { ...state.messages, [conversationId]: [...existing, message] },
+        replyToMessage: null,
+      };
+    });
     return message;
   },
 
   editMessage: async (conversationId, messageId, content) => {
-    await chatApi.editMessage(conversationId, messageId, content);
+    const updated = await chatApi.editMessage(conversationId, messageId, content);
+    set((state) => {
+      const existing = state.messages[conversationId];
+      if (!existing) return state;
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: existing.map((m) =>
+            m.id === messageId ? { ...m, content: updated.content ?? content, isEdited: true } : m,
+          ),
+        },
+      };
+    });
   },
 
   deleteMessage: async (conversationId, messageId) => {
     await chatApi.deleteMessage(conversationId, messageId);
+    set((state) => {
+      const existing = state.messages[conversationId];
+      if (!existing) return state;
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: existing.filter((m) => m.id !== messageId),
+        },
+      };
+    });
   },
 
   markAsRead: async (conversationId, lastReadMessageId) => {
@@ -160,7 +190,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   toggleReaction: async (conversationId, messageId, emoji) => {
     try {
-      await chatApi.toggleReaction(conversationId, messageId, emoji);
+      const result = await chatApi.toggleReaction(conversationId, messageId, emoji);
+      const reactions = Array.isArray(result) ? result : result?.reactions;
+      if (reactions) {
+        set((state) => {
+          const existing = state.messages[conversationId];
+          if (!existing) return state;
+          return {
+            messages: {
+              ...state.messages,
+              [conversationId]: existing.map((m) =>
+                m.id === messageId ? { ...m, reactions } : m,
+              ),
+            },
+          };
+        });
+      }
     } catch {
       // Silently fail
     }
@@ -169,6 +214,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
   pinMessage: async (conversationId, messageId) => {
     try {
       await chatApi.pinMessage(conversationId, messageId);
+      set((state) => {
+        const msgs = state.messages[conversationId] || [];
+        const msg = msgs.find((m) => m.id === messageId);
+        return {
+          messages: {
+            ...state.messages,
+            [conversationId]: msgs.map((m) =>
+              m.id === messageId ? { ...m, isPinned: true } : m,
+            ),
+          },
+          pinnedMessages: {
+            ...state.pinnedMessages,
+            [conversationId]: msg
+              ? [
+                  ...(state.pinnedMessages[conversationId] || []).filter((m) => m.id !== messageId),
+                  { ...msg, isPinned: true },
+                ]
+              : state.pinnedMessages[conversationId] || [],
+          },
+        };
+      });
     } catch {
       // Silently fail
     }
@@ -177,6 +243,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
   unpinMessage: async (conversationId, messageId) => {
     try {
       await chatApi.unpinMessage(conversationId, messageId);
+      set((state) => {
+        const msgs = state.messages[conversationId] || [];
+        return {
+          messages: {
+            ...state.messages,
+            [conversationId]: msgs.map((m) =>
+              m.id === messageId ? { ...m, isPinned: false } : m,
+            ),
+          },
+          pinnedMessages: {
+            ...state.pinnedMessages,
+            [conversationId]: (state.pinnedMessages[conversationId] || []).filter(
+              (m) => m.id !== messageId,
+            ),
+          },
+        };
+      });
     } catch {
       // Silently fail
     }

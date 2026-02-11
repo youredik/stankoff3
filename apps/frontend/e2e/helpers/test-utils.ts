@@ -293,7 +293,7 @@ export async function switchView(page: Page, view: 'kanban' | 'table' | 'analyti
 // ============================================================================
 
 /** Получить access token через dev login */
-export async function getDevToken(email = 'admin@stankoff.ru'): Promise<string | null> {
+export async function getDevToken(email = 'youredik@gmail.com'): Promise<string | null> {
   try {
     const res = await fetch(`${API_URL}/auth/dev/login`, {
       method: 'POST',
@@ -379,20 +379,22 @@ export async function getWorkspacesApi(): Promise<any[]> {
 export async function createEntityApi(
   workspaceId: string,
   title: string,
-  options?: { status?: string; priority?: string },
+  options?: { status?: string; priority?: string; data?: Record<string, unknown> },
 ): Promise<{ id: string; customId: string } | null> {
   try {
     const token = await getDevToken();
     if (!token) return null;
+    const body: Record<string, unknown> = {
+      title,
+      workspaceId,
+      status: options?.status || 'new',
+      priority: options?.priority || 'medium',
+    };
+    if (options?.data) body.data = options.data;
     const res = await fetch(`${API_URL}/entities`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        title,
-        workspaceId,
-        status: options?.status || 'new',
-        priority: options?.priority || 'medium',
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -689,7 +691,7 @@ export async function getTaskStatisticsApi(workspaceId: string): Promise<any | n
 
 /** Получить токен второго пользователя (для тестов delegation) */
 export async function getSecondUserToken(): Promise<string | null> {
-  return getDevToken('orlov@stankoff.ru');
+  return getDevToken('grachev@stankoff.ru');
 }
 
 // ============================================================================
@@ -1027,10 +1029,367 @@ export async function updateEntityStatusApi(entityId: string, newStatus: string)
   }
 }
 
-/** Добавить комментарий к entity */
-export async function addCommentToEntityApi(entityId: string, content: string): Promise<any | null> {
+// ============================================================================
+// Chat API helpers
+// ============================================================================
+
+/** Получить список чатов пользователя */
+export async function getConversationsApi(search?: string, email?: string): Promise<any[]> {
   try {
-    const token = await getDevToken();
+    const token = await getDevToken(email);
+    if (!token) return [];
+    const url = search
+      ? `${API_URL}/chat/conversations?search=${encodeURIComponent(search)}`
+      : `${API_URL}/chat/conversations`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+/** Создать чат */
+export async function createConversationApi(
+  data: { type: string; name?: string; participantIds: string[]; entityId?: string },
+  email?: string,
+): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/chat/conversations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Отправить сообщение */
+export async function sendMessageApi(
+  conversationId: string,
+  content: string,
+  options?: { replyToId?: string; type?: string },
+  email?: string,
+): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content, type: options?.type || 'text', replyToId: options?.replyToId }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Получить сообщения чата */
+export async function getMessagesApi(
+  conversationId: string,
+  options?: { cursor?: string; limit?: number },
+  email?: string,
+): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const params = new URLSearchParams();
+    if (options?.cursor) params.set('cursor', options.cursor);
+    if (options?.limit) params.set('limit', String(options.limit));
+    const qs = params.toString() ? `?${params}` : '';
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages${qs}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Редактировать сообщение */
+export async function editMessageApi(
+  conversationId: string,
+  messageId: string,
+  content: string,
+  email?: string,
+): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Удалить сообщение (soft delete) */
+export async function deleteMessageApi(
+  conversationId: string,
+  messageId: string,
+  email?: string,
+): Promise<boolean> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return false;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Toggle реакция на сообщение */
+export async function toggleReactionApi(
+  conversationId: string,
+  messageId: string,
+  emoji: string,
+  email?: string,
+): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages/${messageId}/reactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ emoji }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Закрепить сообщение */
+export async function pinMessageApi(
+  conversationId: string,
+  messageId: string,
+  email?: string,
+): Promise<boolean> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return false;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages/${messageId}/pin`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Открепить сообщение */
+export async function unpinMessageApi(
+  conversationId: string,
+  messageId: string,
+  email?: string,
+): Promise<boolean> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return false;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/messages/${messageId}/pin`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Получить закреплённые сообщения */
+export async function getPinnedMessagesApi(
+  conversationId: string,
+  email?: string,
+): Promise<any[]> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return [];
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/pinned`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+/** Поиск по сообщениям чата */
+export async function searchChatMessagesApi(query: string, email?: string): Promise<any[]> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return [];
+    const res = await fetch(`${API_URL}/chat/search?q=${encodeURIComponent(query)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+/** Добавить участников в чат */
+export async function addChatParticipantsApi(
+  conversationId: string,
+  userIds: string[],
+  email?: string,
+): Promise<boolean> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return false;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/participants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userIds }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Удалить участника из чата */
+export async function removeChatParticipantApi(
+  conversationId: string,
+  userId: string,
+  email?: string,
+): Promise<boolean> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return false;
+    const res = await fetch(`${API_URL}/chat/conversations/${conversationId}/participants/${userId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Получить количество непрочитанных */
+export async function getUnreadCountsApi(email?: string): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/chat/unread-counts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Получить список пользователей (для тестов добавления участников) */
+export async function getUsersListApi(email?: string): Promise<any[]> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return [];
+    const res = await fetch(`${API_URL}/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================================
+// AI Assistant API helpers
+// ============================================================================
+
+/** Получить AI помощь по заявке */
+export async function getAiAssistanceApi(entityId: string, email?: string): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/ai/assist/${entityId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Сгенерировать AI ответ (non-streaming) */
+export async function generateAiResponseApi(
+  entityId: string,
+  context?: string,
+  email?: string,
+): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/ai/assist/${entityId}/suggest-response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ context: context || '' }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Получить AI резюме переписки */
+export async function getAiSummaryApi(entityId: string, email?: string): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
+    if (!token) return null;
+    const res = await fetch(`${API_URL}/ai/assist/${entityId}/summary`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Засеять комментарии к заявке (для тестов резюме — нужно >= 5 комментариев) */
+export async function seedCommentsForEntity(entityId: string, count: number, email?: string): Promise<number> {
+  let created = 0;
+  for (let i = 0; i < count; i++) {
+    const result = await addCommentToEntityApi(entityId, `Тестовый комментарий Playwright #${i + 1} — автоматическая генерация`, email);
+    if (result) created++;
+  }
+  return created;
+}
+
+// ============================================================================
+// Entity Comments
+// ============================================================================
+
+/** Добавить комментарий к entity */
+export async function addCommentToEntityApi(entityId: string, content: string, email?: string): Promise<any | null> {
+  try {
+    const token = await getDevToken(email);
     if (!token) return null;
     // Получаем userId через /auth/me (нужен для authorId в DTO)
     const meRes = await fetch(`${API_URL}/auth/me`, {

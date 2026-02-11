@@ -32,8 +32,9 @@ export function AiSummaryBanner({ entityId, commentCount }: AiSummaryBannerProps
   if (!loading && !summary) return null;
 
   return (
-    <div className="mb-3">
+    <div data-testid="ai-summary-banner" className="mb-3">
       <button
+        data-testid="ai-summary-toggle"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center gap-2 px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
       >
@@ -52,12 +53,12 @@ export function AiSummaryBanner({ entityId, commentCount }: AiSummaryBannerProps
       {isExpanded && (
         <div className="mt-1 px-3 py-2 bg-amber-50/50 dark:bg-amber-900/10 rounded-b-lg border border-t-0 border-amber-200 dark:border-amber-800">
           {loading ? (
-            <div className="space-y-1.5">
+            <div data-testid="ai-summary-loading" className="space-y-1.5">
               <div className="h-3 bg-amber-200 dark:bg-amber-800 rounded animate-pulse w-full" />
               <div className="h-3 bg-amber-200 dark:bg-amber-800 rounded animate-pulse w-4/5" />
             </div>
           ) : summary ? (
-            <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+            <p data-testid="ai-summary-text" className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
               {summary.summary}
             </p>
           ) : null}

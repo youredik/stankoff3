@@ -150,11 +150,132 @@ export const dmn = {
 };
 
 // ============================================================================
-// AI
+// AI Classification
 // ============================================================================
 export const ai = {
   classificationPanel: '[data-testid="ai-classification-panel"]',
   classifyButton: '[data-testid="ai-classify-button"]',
+};
+
+// ============================================================================
+// AI Assistant
+// ============================================================================
+export const aiAssistant = {
+  tab: '[data-testid="ai-assistant-tab"]',
+  generateBtn: '[data-testid="ai-generate-response-btn"]',
+  streamingDraft: '[data-testid="ai-streaming-draft"]',
+  generatedDraft: '[data-testid="ai-generated-draft"]',
+  draftText: '[data-testid="ai-draft-text"]',
+  copyBtn: '[data-testid="ai-copy-draft-btn"]',
+  insertBtn: '[data-testid="ai-insert-draft-btn"]',
+  draftSources: '[data-testid="ai-draft-sources"]',
+  actionsSection: '[data-testid="ai-actions-section"]',
+  actionItem: '[data-testid="ai-action-item"]',
+  similarCasesSection: '[data-testid="ai-similar-cases-section"]',
+  similarCase: '[data-testid="ai-similar-case"]',
+  expertsSection: '[data-testid="ai-experts-section"]',
+  expertCard: '[data-testid="ai-expert-card"]',
+  relatedContext: '[data-testid="ai-related-context"]',
+  keywordsSection: '[data-testid="ai-keywords-section"]',
+  keywordTag: '[data-testid="ai-keyword-tag"]',
+  loading: '[data-testid="ai-assistant-loading"]',
+  unavailable: '[data-testid="ai-assistant-unavailable"]',
+  noData: '[data-testid="ai-assistant-no-data"]',
+};
+
+// ============================================================================
+// AI Summary Banner
+// ============================================================================
+export const aiSummary = {
+  banner: '[data-testid="ai-summary-banner"]',
+  toggle: '[data-testid="ai-summary-toggle"]',
+  text: '[data-testid="ai-summary-text"]',
+  loading: '[data-testid="ai-summary-loading"]',
+};
+
+// ============================================================================
+// Chat
+// ============================================================================
+export const chat = {
+  // Page
+  page: '[data-testid="chat-page"]',
+  emptyState: '[data-testid="chat-empty-state"]',
+
+  // Conversation list
+  conversationList: '[data-testid="chat-conversation-list"]',
+  convSearch: '[data-testid="chat-conv-search"]',
+  newBtn: '[data-testid="chat-new-btn"]',
+
+  // Chat view
+  view: '[data-testid="chat-view"]',
+  pinnedBanner: '[data-testid="chat-pinned-banner"]',
+
+  // Header
+  header: '[data-testid="chat-header"]',
+  headerName: '[data-testid="chat-header-name"]',
+  headerStatus: '[data-testid="chat-header-status"]',
+  searchBtn: '[data-testid="chat-search-btn"]',
+  menuBtn: '[data-testid="chat-menu-btn"]',
+
+  // Input
+  input: '[data-testid="chat-input"]',
+  textarea: '[data-testid="chat-input-textarea"]',
+  sendBtn: '[data-testid="chat-send-btn"]',
+  attachBtn: '[data-testid="chat-attach-btn"]',
+  fileInput: '[data-testid="chat-file-input"]',
+  micBtn: '[data-testid="chat-mic-btn"]',
+  replyPreview: '[data-testid="chat-reply-preview"]',
+  cancelReplyBtn: '[data-testid="chat-cancel-reply-btn"]',
+  pendingFiles: '[data-testid="chat-pending-files"]',
+  dropZone: '[data-testid="chat-drop-zone"]',
+  recording: '[data-testid="chat-recording"]',
+  recordingCancel: '[data-testid="chat-recording-cancel"]',
+  recordingSend: '[data-testid="chat-recording-send"]',
+
+  // Message bubble
+  messageBubble: '[data-testid="chat-message-bubble"]',
+  messageContent: '[data-testid="chat-message-content"]',
+  messagePinIcon: '[data-testid="chat-message-pin-icon"]',
+  messageEdited: '[data-testid="chat-message-edited"]',
+  systemMessage: '[data-testid="chat-system-message"]',
+  editInput: '[data-testid="chat-edit-input"]',
+
+  // Reactions
+  reactionBar: '[data-testid="chat-reaction-bar"]',
+  reaction: '[data-testid="chat-reaction"]',
+  hoverReply: '[data-testid="chat-hover-reply"]',
+  hoverReaction: '[data-testid="chat-hover-reaction"]',
+  quickReactions: '[data-testid="chat-quick-reactions"]',
+
+  // Context menu
+  contextMenu: '[data-testid="chat-context-menu"]',
+  ctxReply: '[data-testid="chat-ctx-reply"]',
+  ctxCopy: '[data-testid="chat-ctx-copy"]',
+  ctxPin: '[data-testid="chat-ctx-pin"]',
+  ctxEdit: '[data-testid="chat-ctx-edit"]',
+  ctxDelete: '[data-testid="chat-ctx-delete"]',
+
+  // Search panel
+  searchPanel: '[data-testid="chat-search-panel"]',
+  searchInput: '[data-testid="chat-search-input"]',
+  searchCount: '[data-testid="chat-search-count"]',
+  searchResults: '[data-testid="chat-search-results"]',
+  searchResult: '[data-testid="chat-search-result"]',
+  searchUp: '[data-testid="chat-search-up"]',
+  searchDown: '[data-testid="chat-search-down"]',
+  searchClose: '[data-testid="chat-search-close"]',
+  searchEmpty: '[data-testid="chat-search-empty"]',
+
+  // Menu panel
+  menuPanel: '[data-testid="chat-menu-panel"]',
+  menuParticipants: '[data-testid="chat-menu-participants"]',
+  menuParticipantCount: '[data-testid="chat-menu-participant-count"]',
+  menuAddBtn: '[data-testid="chat-menu-add-btn"]',
+  menuParticipant: '[data-testid="chat-menu-participant"]',
+  menuRemoveBtn: '[data-testid="chat-menu-remove-btn"]',
+  menuLeaveBtn: '[data-testid="chat-menu-leave-btn"]',
+  menuMemberSearch: '[data-testid="chat-menu-member-search"]',
+  menuAddUser: '[data-testid="chat-menu-add-user"]',
 };
 
 // ============================================================================
