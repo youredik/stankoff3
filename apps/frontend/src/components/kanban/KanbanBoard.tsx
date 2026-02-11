@@ -85,11 +85,9 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
   useEffect(() => {
     const apiFilters = filtersToApi(filters);
-    const hasServerFilters = Object.values(apiFilters).some((v) => v !== undefined);
-    if (hasServerFilters) {
-      setKanbanFilters(apiFilters);
-    }
-    fetchKanban(workspaceId);
+    // Always sync store filters — clears stale filters from previous workspace
+    useEntityStore.setState({ kanbanFilters: apiFilters });
+    fetchKanban(workspaceId, apiFilters);
     fetchUsers();
     fetchWorkspace(workspaceId);
   }, [workspaceId, fetchKanban, fetchUsers, fetchWorkspace]); // eslint-disable-line react-hooks/exhaustive-deps

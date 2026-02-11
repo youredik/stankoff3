@@ -127,7 +127,6 @@ function urlParamsToFilters(params: URLSearchParams): FilterState | null {
 export function useWorkspaceFilters(workspaceId: string): [FilterState, (filters: FilterState) => void] {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const currentWsRef = useRef(workspaceId);
   const isInitRef = useRef(false);
 
   const [filters, setFiltersInternal] = useState<FilterState>(() => {
@@ -136,15 +135,15 @@ export function useWorkspaceFilters(workspaceId: string): [FilterState, (filters
     return loadFilters(workspaceId);
   });
 
-  // When workspaceId changes, load filters for the new workspace
-  useEffect(() => {
-    if (currentWsRef.current !== workspaceId) {
-      currentWsRef.current = workspaceId;
-      isInitRef.current = false;
-      const fromUrl = urlParamsToFilters(searchParams);
-      setFiltersInternal(fromUrl || loadFilters(workspaceId));
-    }
-  }, [workspaceId, searchParams]);
+  // Synchronous state reset when workspace changes — ensures filters are
+  // correct BEFORE effects run (avoids stale filters from previous workspace)
+  const [prevWorkspaceId, setPrevWorkspaceId] = useState(workspaceId);
+  if (prevWorkspaceId !== workspaceId) {
+    setPrevWorkspaceId(workspaceId);
+    isInitRef.current = false;
+    const fromUrl = urlParamsToFilters(searchParams);
+    setFiltersInternal(fromUrl || loadFilters(workspaceId));
+  }
 
   // Sync filters to URL (after init)
   useEffect(() => {
