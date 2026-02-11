@@ -24,8 +24,8 @@ test.describe('BPMN Inbox -- Задачи', () => {
     await page.goto('/tasks');
     await page.waitForTimeout(2000);
 
-    // Должен быть заголовок "Входящие задачи"
-    const heading = page.getByText('Входящие задачи');
+    // Должен быть заголовок "Входящие задания"
+    const heading = page.getByText('Входящие задания');
     const hasSidebar = await page.locator(sidebar.root).isVisible().catch(() => false);
 
     // Страница загружена — виден sidebar или заголовок задач

@@ -616,7 +616,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             </div>
           )}
 
-          {/* Входящие задачи */}
+          {/* Входящие задания */}
           <div className="mb-4">
             <button
               onClick={() => {
@@ -638,7 +638,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
                   </span>
                 )}
               </div>
-              <span className="font-medium">Входящие задачи</span>
+              <span className="font-medium">Входящие задания</span>
             </button>
 
             {/* Чат */}

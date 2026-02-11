@@ -35,12 +35,12 @@ test.describe('Sidebar - Структура', () => {
     await expect(page.locator(sidebar.logout)).toBeVisible();
   });
 
-  test('Sidebar содержит кнопку "Входящие задачи"', async ({ page }) => {
+  test('Sidebar содержит кнопку "Входящие задания"', async ({ page }) => {
     await goToDashboard(page);
 
     const inboxButton = page.locator(sidebar.inboxButton);
     await expect(inboxButton).toBeVisible();
-    await expect(inboxButton).toContainText('Входящие задачи');
+    await expect(inboxButton).toContainText('Входящие задания');
   });
 
   test('Оба seed workspace видны: "Техническая поддержка" и "Рекламации"', async ({ page }) => {
@@ -345,7 +345,7 @@ test.describe('Sidebar - Admin и Inbox', () => {
     expect(page.url()).toContain('/admin/users');
   });
 
-  test('Кнопка "Входящие задачи" в sidebar кликабельна', async ({ page }) => {
+  test('Кнопка "Входящие задания" в sidebar кликабельна', async ({ page }) => {
     await goToDashboard(page);
 
     const inbox = page.locator(sidebar.inboxButton);

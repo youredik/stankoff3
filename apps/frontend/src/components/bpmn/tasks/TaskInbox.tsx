@@ -259,7 +259,7 @@ export function TaskInbox({
         <div className="flex items-center gap-2">
           <Inbox className="w-5 h-5 text-teal-600" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Входящие задачи
+            Входящие задания
           </h2>
           {overdueCount > 0 && (
             <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 rounded">
