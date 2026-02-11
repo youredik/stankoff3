@@ -12,6 +12,7 @@ import { SeedItDepartmentService } from './seed-it-department.service';
 import { SeedRbacService } from './seed-rbac.service';
 import { SeedBpmnService } from './seed-bpmn.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
+import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
 
 @Injectable()
 export class SeedOrchestratorService implements OnModuleInit {
@@ -30,6 +31,7 @@ export class SeedOrchestratorService implements OnModuleInit {
     private readonly seedItDept: SeedItDepartmentService,
     private readonly seedBpmn: SeedBpmnService,
     private readonly seedSlaDmn: SeedSlaDmnService,
+    private readonly seedKnowledgeBase: SeedKnowledgeBaseService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -119,7 +121,15 @@ export class SeedOrchestratorService implements OnModuleInit {
       this.logger.warn(`Ошибка SLA/DMN seed (не критично): ${e.message}`);
     }
 
-    // 12. Итог
+    // 12. Knowledge Base
+    this.logger.log('Создание базы знаний...');
+    try {
+      await this.seedKnowledgeBase.createAll(workspaces, itWs, users);
+    } catch (e) {
+      this.logger.warn(`Ошибка Knowledge Base seed (не критично): ${e.message}`);
+    }
+
+    // 13. Итог
     const totalEntities = Object.values(entities).reduce(
       (sum, arr) => sum + arr.length,
       0,

@@ -3410,7 +3410,7 @@ Seed данные основаны на **реальных сотрудника�
 
 ```
 seed/
-├── seed.module.ts                # NestJS модуль (17 entities, forwardRef: AuthModule, BpmnModule)
+├── seed.module.ts                # NestJS модуль (18 entities, forwardRef: AuthModule, BpmnModule)
 ├── seed-orchestrator.service.ts  # Главный оркестратор (OnModuleInit)
 ├── seed-cleanup.service.ts       # Полная очистка ВСЕХ данных (FK-safe порядок)
 ├── seed-users.service.ts         # 87 пользователей из legacy + Коршунов
@@ -3420,9 +3420,11 @@ seed/
 ├── seed-it-department.service.ts # IT workspace: 25 задач разработки с диалогами
 ├── seed-bpmn.service.ts          # 10 BPMN definitions + deploy + triggers + instances
 ├── seed-sla-dmn.service.ts       # 6 SLA definitions + 3 DMN tables
+├── seed-knowledge-base.service.ts # 57 FAQ статей базы знаний (все отделы)
 └── data/
     ├── employees.ts              # 87 сотрудников (hardcoded из legacy)
-    └── departments.ts            # 14 отделов + 8 секций
+    ├── departments.ts            # 14 отделов + 8 секций
+    └── knowledge-base-articles.ts # 57 статей: 5 глобальных + 52 по workspace
 ```
 
 **Порядок выполнения (seed-orchestrator):**
@@ -3436,6 +3438,7 @@ seed/
 8. IT workspace: 25 задач + ~150 комментариев (seed-it-department)
 9. BPMN: 10 definitions → deploy → triggers → instances (seed-bpmn)
 10. SLA/DMN: 6 SLA + 3 DMN (seed-sla-dmn)
+11. Knowledge Base: 57 FAQ статей для всех отделов (seed-knowledge-base)
 
 **Данные сотрудников (87 человек):**
 - 86 из legacy `manager` + `SS_customers` (реальные email, имена, отделы)

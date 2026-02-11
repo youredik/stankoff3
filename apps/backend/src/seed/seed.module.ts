@@ -20,6 +20,7 @@ import { AutomationRule } from '../modules/automation/automation-rule.entity';
 import { UserGroup } from '../modules/bpmn/entities/user-group.entity';
 import { FormDefinition } from '../modules/bpmn/entities/form-definition.entity';
 import { Role } from '../modules/rbac/role.entity';
+import { KnowledgeArticle } from '../modules/knowledge-base/entities/knowledge-article.entity';
 
 // Modules (forwardRef для избежания circular dependencies)
 import { AuthModule } from '../modules/auth/auth.module';
@@ -35,6 +36,7 @@ import { SeedEntitiesService } from './seed-entities.service';
 import { SeedItDepartmentService } from './seed-it-department.service';
 import { SeedBpmnService } from './seed-bpmn.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
+import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
 import { SeedOrchestratorService } from './seed-orchestrator.service';
 
 @Module({
@@ -58,6 +60,7 @@ import { SeedOrchestratorService } from './seed-orchestrator.service';
       UserGroup,
       FormDefinition,
       Role,
+      KnowledgeArticle,
     ]),
     forwardRef(() => AuthModule),
     forwardRef(() => BpmnModule),
@@ -72,6 +75,7 @@ import { SeedOrchestratorService } from './seed-orchestrator.service';
     SeedItDepartmentService,
     SeedBpmnService,
     SeedSlaDmnService,
+    SeedKnowledgeBaseService,
     SeedOrchestratorService,
   ],
 })

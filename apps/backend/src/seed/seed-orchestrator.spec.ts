@@ -13,6 +13,7 @@ import { SeedItDepartmentService } from './seed-it-department.service';
 import { SeedBpmnService } from './seed-bpmn.service';
 import { SeedRbacService } from './seed-rbac.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
+import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
 import { Workspace } from '../modules/workspace/workspace.entity';
 
 describe('SeedOrchestratorService', () => {
@@ -28,6 +29,7 @@ describe('SeedOrchestratorService', () => {
   let seedRbac: jest.Mocked<SeedRbacService>;
   let seedBpmn: jest.Mocked<SeedBpmnService>;
   let seedSlaDmn: jest.Mocked<SeedSlaDmnService>;
+  let seedKnowledgeBase: jest.Mocked<SeedKnowledgeBaseService>;
 
   const originalEnv = process.env;
 
@@ -121,6 +123,10 @@ describe('SeedOrchestratorService', () => {
           provide: SeedSlaDmnService,
           useValue: { createAll: jest.fn() },
         },
+        {
+          provide: SeedKnowledgeBaseService,
+          useValue: { createAll: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -136,6 +142,7 @@ describe('SeedOrchestratorService', () => {
     seedItDept = module.get(SeedItDepartmentService);
     seedBpmn = module.get(SeedBpmnService);
     seedSlaDmn = module.get(SeedSlaDmnService);
+    seedKnowledgeBase = module.get(SeedKnowledgeBaseService);
   });
 
   afterEach(() => {
@@ -189,6 +196,7 @@ describe('SeedOrchestratorService', () => {
       } as any);
       seedBpmn.createAll.mockResolvedValue(undefined);
       seedSlaDmn.createAll.mockResolvedValue(undefined);
+      seedKnowledgeBase.createAll.mockResolvedValue(undefined);
 
       const callOrder: string[] = [];
       cleanup.cleanupAll.mockImplementation(async () => { callOrder.push('cleanup'); });
@@ -207,6 +215,7 @@ describe('SeedOrchestratorService', () => {
       });
       seedBpmn.createAll.mockImplementation(async () => { callOrder.push('bpmn'); });
       seedSlaDmn.createAll.mockImplementation(async () => { callOrder.push('slaDmn'); });
+      seedKnowledgeBase.createAll.mockImplementation(async () => { callOrder.push('knowledgeBase'); });
 
       await service.onModuleInit();
 
@@ -221,6 +230,7 @@ describe('SeedOrchestratorService', () => {
         'itDept',
         'bpmn',
         'slaDmn',
+        'knowledgeBase',
       ]);
     });
 
@@ -239,6 +249,7 @@ describe('SeedOrchestratorService', () => {
         entities: mockItEntities,
       } as any);
       seedSlaDmn.createAll.mockResolvedValue(undefined);
+      seedKnowledgeBase.createAll.mockResolvedValue(undefined);
 
       await service.onModuleInit();
 
@@ -253,6 +264,7 @@ describe('SeedOrchestratorService', () => {
       expect(seedEntities.createAll).toHaveBeenCalled();
       expect(seedItDept.createAll).toHaveBeenCalled();
       expect(seedSlaDmn.createAll).toHaveBeenCalled();
+      expect(seedKnowledgeBase.createAll).toHaveBeenCalled();
     });
 
     it('должен перехватить ошибку BPMN seed, залогировать и продолжить', async () => {
@@ -271,6 +283,7 @@ describe('SeedOrchestratorService', () => {
       } as any);
       seedBpmn.createAll.mockRejectedValue(new Error('Deploy failed'));
       seedSlaDmn.createAll.mockResolvedValue(undefined);
+      seedKnowledgeBase.createAll.mockResolvedValue(undefined);
 
       // Не должен выбросить исключение
       await expect(service.onModuleInit()).resolves.not.toThrow();
@@ -298,6 +311,7 @@ describe('SeedOrchestratorService', () => {
       } as any);
       seedBpmn.createAll.mockResolvedValue(undefined);
       seedSlaDmn.createAll.mockRejectedValue(new Error('SLA creation failed'));
+      seedKnowledgeBase.createAll.mockResolvedValue(undefined);
 
       await expect(service.onModuleInit()).resolves.not.toThrow();
       expect(seedSlaDmn.createAll).toHaveBeenCalled();
@@ -319,6 +333,7 @@ describe('SeedOrchestratorService', () => {
       } as any);
       seedBpmn.createAll.mockResolvedValue(undefined);
       seedSlaDmn.createAll.mockResolvedValue(undefined);
+      seedKnowledgeBase.createAll.mockResolvedValue(undefined);
 
       await service.onModuleInit();
 
@@ -347,6 +362,7 @@ describe('SeedOrchestratorService', () => {
       } as any);
       seedBpmn.createAll.mockResolvedValue(undefined);
       seedSlaDmn.createAll.mockResolvedValue(undefined);
+      seedKnowledgeBase.createAll.mockResolvedValue(undefined);
 
       await service.onModuleInit();
 

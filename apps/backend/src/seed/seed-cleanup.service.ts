@@ -40,6 +40,9 @@ export class SeedCleanupService {
     await this.safeDelete('decision_evaluations');
     await this.safeDelete('decision_tables');
 
+    // 5.1 Knowledge Base
+    await this.safeDelete('knowledge_articles');
+
     // 6. Automation, User Groups
     await this.safeDelete('automation_rules');
     await this.safeDelete('user_group_members');
