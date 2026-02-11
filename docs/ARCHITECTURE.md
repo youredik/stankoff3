@@ -1517,7 +1517,7 @@ import { AiUsageDashboard } from '@/components/ai';
 
 Дашборд показывает:
 - Общую статистику: запросы, токены (вх/вых), среднее время ответа, успешность
-- Распределение по провайдерам (OpenAI, Ollama, Groq)
+- Распределение по провайдерам (Yandex Cloud, Ollama, Groq, OpenAI)
 - Распределение по операциям (классификация, генерация, поиск)
 - График использования по дням
 - Таблицу последних запросов с деталями
@@ -2954,6 +2954,7 @@ modules/ai/
 │   └── ai-notification.entity.ts    # Проактивные AI уведомления
 ├── providers/
 │   ├── base-llm.provider.ts         # Базовый интерфейс провайдера
+│   ├── yandex-cloud.provider.ts      # Yandex Cloud YandexGPT (облачный, нативный русский)
 │   ├── ollama.provider.ts           # Ollama (локальные модели, бесплатно)
 │   ├── groq.provider.ts             # Groq API (облачный, бесплатный tier)
 │   ├── openai.provider.ts           # OpenAI API (облачный, платно)
@@ -2973,14 +2974,17 @@ modules/ai/
 
 | Провайдер | Тип | Embeddings | LLM | Стоимость |
 |-----------|-----|------------|-----|-----------|
-| **Ollama** | Локальный | ✅ nomic-embed-text | ✅ qwen2.5, llama3.1 | Бесплатно |
-| **Groq** | Облачный | ❌ | ✅ llama-3.1-70b | Бесплатно (14K req/day) |
+| **Yandex Cloud** | Облачный | ❌ (256 dims) | ✅ yandexgpt-lite, yandexgpt | Платно (дешёвый) |
+| **Ollama** | Локальный | ✅ nomic-embed-text | ✅ qwen2.5:7b | Бесплатно |
+| **Groq** | Облачный | ❌ | ✅ llama-3.3-70b | Бесплатно (14K req/day) |
 | **OpenAI** | Облачный | ✅ text-embedding-3-large | ✅ gpt-4o | Платно |
+
+**Yandex Cloud** — приоритетный LLM для препрода (Yandex Cloud ВМ): нет гео-блокировки, нативный русский, 0 ГБ RAM на сервере. Embeddings не совместимы (256 dims vs 768 в БД) — для embeddings используется Ollama.
 
 **Приоритеты провайдеров (настраиваются в .env):**
 ```env
-AI_LLM_PRIORITY=groq,ollama,openai       # Для генерации текста
-AI_EMBEDDING_PRIORITY=ollama,openai      # Для embeddings
+AI_LLM_PRIORITY=yandex,ollama,groq,openai  # Для генерации текста
+AI_EMBEDDING_PRIORITY=ollama,openai         # Для embeddings
 ```
 
 **Запуск Ollama локально:**
@@ -3172,16 +3176,21 @@ interface SearchResultDto {
 
 ```env
 # Приоритеты провайдеров
-AI_LLM_PRIORITY=groq,ollama,openai
+AI_LLM_PRIORITY=yandex,ollama,groq,openai
 AI_EMBEDDING_PRIORITY=ollama,openai
-AI_EMBEDDING_DIMENSION=1536
+AI_EMBEDDING_DIMENSION=768
+
+# Yandex Cloud (YandexGPT, нет гео-блокировки, нативный русский)
+YANDEX_CLOUD_API_KEY=...
+YANDEX_CLOUD_FOLDER_ID=...
+YANDEX_CLOUD_MODEL=yandexgpt-lite/latest
 
 # Ollama (локально, бесплатно)
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:14b
+OLLAMA_MODEL=qwen2.5:7b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 
-# Groq (облако, бесплатный tier - 14,400 req/day)
+# Groq (облако, бесплатный tier - 14,400 req/day, гео-блокирован с РФ)
 GROQ_API_KEY=gsk_...
 GROQ_MODEL=llama-3.3-70b-versatile
 
