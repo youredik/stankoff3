@@ -73,7 +73,7 @@ function DashboardContent() {
         />
 
         <main
-          className="flex-1 relative"
+          className="flex-1 min-w-0 relative"
           style={currentView === 'kanban' ? {
             backgroundImage: 'url(/kanban-bg.svg)',
             backgroundSize: '200px 200px',

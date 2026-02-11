@@ -21,20 +21,6 @@ interface MessageBubbleProps {
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 const URL_REGEX = /https?:\/\/[^\s<]+/g;
 
-function BubbleTail({ isOwn }: { isOwn: boolean }) {
-  if (isOwn) {
-    return (
-      <svg className="absolute -right-[6px] bottom-0 text-[#EFFDDE] dark:text-[#2B5278]" width="9" height="17" viewBox="0 0 9 17">
-        <path d="M0 17V0C0 0 1 8 9 17H0Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  return (
-    <svg className="absolute -left-[6px] bottom-0 text-white dark:text-[#212121]" width="9" height="17" viewBox="0 0 9 17">
-      <path d="M9 17V0C9 0 8 8 0 17H9Z" fill="currentColor" />
-    </svg>
-  );
-}
 
 function SystemMessage({ message }: { message: ChatMessage }) {
   let text = '';
@@ -161,10 +147,8 @@ export function MessageBubble({
   const time = format(new Date(message.createdAt), 'HH:mm');
   const showAvatar = !isOwn && isLastInGroup;
   const showName = !isOwn && isFirstInGroup;
-  const showTail = isLastInGroup;
-
-  const ownRadius = `${isFirstInGroup ? 'rounded-tl-2xl' : 'rounded-tl-lg'} ${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-lg'} rounded-bl-2xl ${showTail ? 'rounded-br-sm' : 'rounded-br-lg'}`;
-  const otherRadius = `${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-lg'} ${isFirstInGroup ? 'rounded-tl-2xl' : 'rounded-tl-lg'} rounded-br-2xl ${showTail ? 'rounded-bl-sm' : 'rounded-bl-lg'}`;
+  const ownRadius = `${isFirstInGroup ? 'rounded-tl-2xl' : 'rounded-tl-lg'} ${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-lg'} rounded-bl-2xl rounded-br-lg`;
+  const otherRadius = `${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-lg'} ${isFirstInGroup ? 'rounded-tl-2xl' : 'rounded-tl-lg'} rounded-br-2xl rounded-bl-lg`;
 
   const handleContextMenu = (e: React.MouseEvent) => { e.preventDefault(); setShowMenu(!showMenu); };
   const handleCopy = () => { navigator.clipboard.writeText((message.content || '').replace(/<[^>]*>/g, '')); setShowMenu(false); };
@@ -265,7 +249,6 @@ export function MessageBubble({
         </div>
 
         <ReactionBar reactions={message.reactions || []} messageId={message.id} conversationId={conversationId} isOwn={isOwn} />
-        {showTail && <BubbleTail isOwn={isOwn} />}
 
         {/* Hover actions: reply + reaction */}
         <div className={`absolute top-0 ${isOwn ? '-left-16' : '-right-16'} hidden group-hover:flex items-start pt-1 gap-0.5`}>
