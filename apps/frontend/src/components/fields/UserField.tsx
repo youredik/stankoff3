@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
-import { X } from 'lucide-react';
-import type { UserFieldConfig } from '@/types';
+import { useMemo, useCallback } from 'react';
+import { X, ChevronDown } from 'lucide-react';
+import type { UserFieldConfig, User } from '@/types';
 import type { FieldRenderer } from './types';
 import { usePresenceStore } from '@/store/usePresenceStore';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { useFilterableList } from '@/hooks/useFilterableList';
 
 // Фильтрация пользователей по отделу
 function useFilteredUsers(users: any[], config?: UserFieldConfig) {
@@ -169,38 +170,83 @@ function UserFilter({ field, filterValue, users, toggleMultiSelect, facetData }:
     return new Map(facet.values.map((v) => [v.value, v.count]));
   }, [facet]);
 
-  return (
-    <div className="mt-2 space-y-1">
-      {users.map((user) => {
-        const count = countMap.get(user.id);
-        const isDisabled = facet && count === undefined;
+  const selectedIds = useMemo(() => filterValue || [], [filterValue]);
+  const getUserSearchText = useCallback((u: User) => `${u.firstName} ${u.lastName} ${u.email || ''}`, []);
+  const getUserId = useCallback((u: User) => u.id, []);
 
-        return (
-          <label
-            key={user.id}
-            className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
-              isDisabled
-                ? 'opacity-40 cursor-default'
-                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={filterValue?.includes(user.id) || false}
-              onChange={() => toggleMultiSelect(user.id)}
-              disabled={!!isDisabled}
-              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-            />
-            <UserAvatar firstName={user.firstName} lastName={user.lastName} size="xs" />
-            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-              {user.firstName} {user.lastName}
-            </span>
-            {count != null && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
-            )}
-          </label>
-        );
-      })}
+  const list = useFilterableList({
+    items: users,
+    selectedIds,
+    getSearchText: getUserSearchText,
+    getId: getUserId,
+  });
+
+  const renderUser = (user: User, checked: boolean) => {
+    const count = countMap.get(user.id);
+    const isDisabled = !checked && facet && count === undefined;
+
+    return (
+      <label
+        key={user.id}
+        className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+          isDisabled ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => toggleMultiSelect(user.id)}
+          disabled={!!isDisabled}
+          className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+        />
+        <UserAvatar firstName={user.firstName} lastName={user.lastName} size="xs" />
+        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+          {user.firstName} {user.lastName}
+        </span>
+        {count != null && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+        )}
+      </label>
+    );
+  };
+
+  return (
+    <div className="mt-2">
+      {list.needsControls && (
+        <input
+          type="text"
+          value={list.searchQuery}
+          onChange={(e) => list.setSearchQuery(e.target.value)}
+          placeholder="Поиск по имени..."
+          className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+        />
+      )}
+      <div className="space-y-1">
+        {list.selectedItems.map((u) => renderUser(u, true))}
+        {list.selectedItems.length > 0 && list.unselectedItems.length > 0 && (
+          <div className="border-t border-dashed border-gray-200 dark:border-gray-700 my-1" />
+        )}
+        {list.unselectedItems.map((u) => renderUser(u, false))}
+        {list.needsControls && !list.searchQuery && (
+          list.hasMore ? (
+            <button
+              onClick={list.toggleShowAll}
+              className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 cursor-pointer py-1 px-2"
+            >
+              <ChevronDown className="w-3 h-3" />
+              <span>Ещё {list.hiddenCount}</span>
+            </button>
+          ) : list.showAll ? (
+            <button
+              onClick={list.toggleShowAll}
+              className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 cursor-pointer py-1 px-2"
+            >
+              <ChevronDown className="w-3 h-3 rotate-180" />
+              <span>Свернуть</span>
+            </button>
+          ) : null
+        )}
+      </div>
     </div>
   );
 }

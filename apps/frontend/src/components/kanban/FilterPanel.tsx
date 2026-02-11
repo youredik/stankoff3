@@ -1,11 +1,13 @@
 'use client';
 
-import { X, Search, User, Tag, Calendar, Hash, Type, ToggleLeft, Link2, MapPin, Users } from 'lucide-react';
+import { useCallback } from 'react';
+import { X, Search, User, Tag, Calendar, Hash, Type, ToggleLeft, Link2, MapPin, Users, ChevronDown } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { fieldRegistry } from '@/components/fields';
-import type { Field, FieldType, FieldOption, FacetResult } from '@/types';
+import { useFilterableList } from '@/hooks/useFilterableList';
+import type { Field, FieldType, FieldOption, User as UserType, FacetResult } from '@/types';
 
 export interface FilterState {
   search: string;
@@ -78,6 +80,19 @@ export function FilterPanel({
 }: FilterPanelProps) {
   const { users } = useEntityStore();
   const { currentWorkspace } = useWorkspaceStore();
+
+  const getUserSearchText = useCallback(
+    (user: UserType) => `${user.firstName} ${user.lastName} ${user.email || ''}`,
+    [],
+  );
+  const getUserId = useCallback((user: UserType) => user.id, []);
+
+  const assigneeList = useFilterableList({
+    items: users,
+    selectedIds: filters.assigneeIds,
+    getSearchText: getUserSearchText,
+    getId: getUserId,
+  });
 
   // Collect filterable fields grouped by workspace section
   const workspaceSections = (currentWorkspace?.sections || [])
@@ -251,43 +266,91 @@ export function FilterPanel({
                     </span>
                   )}
                 </div>
-                <div className="mt-2 space-y-1">
-                  {users.map((user) => {
-                    const count = assigneeCountMap.get(user.id);
-                    const isDisabled = facets && count === undefined;
-                    return (
-                      <label
-                        key={user.id}
-                        className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
-                          isDisabled
-                            ? 'opacity-40 cursor-default'
-                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={filters.assigneeIds.includes(user.id)}
-                          onChange={() =>
-                            toggleArrayFilter('assigneeIds', user.id)
-                          }
-                          disabled={!!isDisabled}
-                          className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-                        />
-                        <UserAvatar
-                          firstName={user.firstName}
-                          lastName={user.lastName}
-                          userId={user.id}
-                          size="sm"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                          {user.firstName} {user.lastName}
-                        </span>
-                        {count != null && (
-                          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
-                        )}
-                      </label>
-                    );
-                  })}
+                <div className="mt-2">
+                  {assigneeList.needsControls && (
+                    <input
+                      type="text"
+                      value={assigneeList.searchQuery}
+                      onChange={(e) => assigneeList.setSearchQuery(e.target.value)}
+                      placeholder="Поиск по имени..."
+                      className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2"
+                    />
+                  )}
+                  <div className="space-y-1">
+                    {/* Selected users (always visible) */}
+                    {assigneeList.selectedItems.map((user) => {
+                      const count = assigneeCountMap.get(user.id);
+                      return (
+                        <label key={user.id} className="flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <input
+                            type="checkbox"
+                            checked
+                            onChange={() => toggleArrayFilter('assigneeIds', user.id)}
+                            className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+                          />
+                          <UserAvatar firstName={user.firstName} lastName={user.lastName} userId={user.id} size="sm" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                            {user.firstName} {user.lastName}
+                          </span>
+                          {count != null && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+                          )}
+                        </label>
+                      );
+                    })}
+                    {/* Separator between selected and unselected */}
+                    {assigneeList.selectedItems.length > 0 && assigneeList.unselectedItems.length > 0 && (
+                      <div className="border-t border-dashed border-gray-200 dark:border-gray-700 my-1" />
+                    )}
+                    {/* Unselected users (limited by collapse) */}
+                    {assigneeList.unselectedItems.map((user) => {
+                      const count = assigneeCountMap.get(user.id);
+                      const isDisabled = facets && count === undefined;
+                      return (
+                        <label
+                          key={user.id}
+                          className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+                            isDisabled ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={() => toggleArrayFilter('assigneeIds', user.id)}
+                            disabled={!!isDisabled}
+                            className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+                          />
+                          <UserAvatar firstName={user.firstName} lastName={user.lastName} userId={user.id} size="sm" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                            {user.firstName} {user.lastName}
+                          </span>
+                          {count != null && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+                          )}
+                        </label>
+                      );
+                    })}
+                    {/* Show more / collapse button */}
+                    {assigneeList.needsControls && !assigneeList.searchQuery && (
+                      assigneeList.hasMore ? (
+                        <button
+                          onClick={assigneeList.toggleShowAll}
+                          className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 cursor-pointer py-1 px-2"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                          <span>Ещё {assigneeList.hiddenCount}</span>
+                        </button>
+                      ) : assigneeList.showAll ? (
+                        <button
+                          onClick={assigneeList.toggleShowAll}
+                          className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 cursor-pointer py-1 px-2"
+                        >
+                          <ChevronDown className="w-3 h-3 rotate-180" />
+                          <span>Свернуть</span>
+                        </button>
+                      ) : null
+                    )}
+                  </div>
                 </div>
               </div>
 
