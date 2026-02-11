@@ -198,10 +198,45 @@ export class YandexCloudProvider extends BaseLlmProvider {
   }
 
   /**
-   * Yandex Cloud embeddings несовместимы с текущей БД (256 dims vs 768)
-   * Используйте Ollama для embeddings
+   * Генерация embeddings через Yandex Cloud Foundation Models
+   * Модель: text-search-doc/latest (256 dims)
+   * API: https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding
    */
-  async embed(_text: string): Promise<LlmEmbeddingResult> {
-    throw new Error('Yandex Cloud embeddings несовместимы (256 dims vs 768 в БД). Используйте Ollama.');
+  async embed(text: string): Promise<LlmEmbeddingResult> {
+    if (!this.apiKey || !this.folderId) {
+      throw new Error('Yandex Cloud не настроен');
+    }
+
+    const startTime = Date.now();
+
+    const response = await fetch(`${this.baseUrl}/textEmbedding`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Api-Key ${this.apiKey}`,
+        'x-folder-id': this.folderId,
+      },
+      body: JSON.stringify({
+        modelUri: `emb://${this.folderId}/text-search-doc/latest`,
+        text,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Yandex Cloud embeddings ошибка: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    this.logger.debug(
+      `Yandex Cloud embedding: ${Date.now() - startTime}ms, dim: ${data.embedding?.length || 0}, tokens: ${data.numTokens || 0}`,
+    );
+
+    return {
+      embedding: data.embedding,
+      inputTokens: parseInt(data.numTokens || '0', 10),
+      model: 'text-search-doc/latest',
+    };
   }
 }

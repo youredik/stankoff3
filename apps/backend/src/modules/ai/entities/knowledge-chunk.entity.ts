@@ -20,7 +20,7 @@ export class KnowledgeChunk {
   @Column({ type: 'text' })
   content: string;
 
-  @Column({ type: 'vector', length: 1536, nullable: true })
+  @Column({ type: 'vector', length: 256, nullable: true })
   embedding: number[];
 
   @Column({ name: 'source_type', type: 'varchar', length: 50 })

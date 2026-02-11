@@ -25,7 +25,7 @@ interface ProviderConfig {
  * Реестр AI провайдеров с приоритетами и fallback
  *
  * Стратегия по умолчанию:
- * - Embeddings: Ollama (бесплатно, локально) → OpenAI (платно, fallback)
+ * - Embeddings: Yandex (облако, 256 dims) → Ollama (локально) → OpenAI (платно, fallback)
  * - Completions: Yandex (облако, YandexGPT) → Ollama (локально) → Groq (облако) → OpenAI (платно)
  *
  * Настраивается через переменные окружения:
@@ -38,7 +38,7 @@ export class AiProviderRegistry implements OnModuleInit {
   private readonly providers = new Map<ProviderName, BaseLlmProvider>();
 
   private readonly providerConfigs: ProviderConfig[] = [
-    { name: 'yandex', priority: 0, supportsEmbeddings: false, supportsCompletion: true, isFree: false },
+    { name: 'yandex', priority: 0, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
     { name: 'ollama', priority: 1, supportsEmbeddings: true, supportsCompletion: true, isFree: true },
     { name: 'groq', priority: 2, supportsEmbeddings: false, supportsCompletion: true, isFree: true },
     { name: 'openai', priority: 3, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
@@ -65,7 +65,7 @@ export class AiProviderRegistry implements OnModuleInit {
       this.configService.get<string>('AI_LLM_PRIORITY') || 'yandex,ollama,groq,openai',
     );
     this.embeddingPriority = this.parsePriority(
-      this.configService.get<string>('AI_EMBEDDING_PRIORITY') || 'ollama,openai',
+      this.configService.get<string>('AI_EMBEDDING_PRIORITY') || 'yandex,ollama,openai',
     );
   }
 

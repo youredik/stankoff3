@@ -112,18 +112,15 @@ services:
       - LEGACY_DB_USER=${LEGACY_DB_USER:-}
       - LEGACY_DB_PASSWORD=${LEGACY_DB_PASSWORD:-}
       - LEGACY_DB_NAME=${LEGACY_DB_NAME:-stankoff}
-      # AI
-      - AI_LLM_PRIORITY=${AI_LLM_PRIORITY:-yandex,ollama,groq,openai}
-      - AI_EMBEDDING_PRIORITY=${AI_EMBEDDING_PRIORITY:-ollama,openai}
-      - AI_EMBEDDING_DIMENSION=${AI_EMBEDDING_DIMENSION:-768}
+      # AI (Yandex Cloud — основной LLM + Embeddings)
+      - AI_LLM_PRIORITY=${AI_LLM_PRIORITY:-yandex,groq,openai}
+      - AI_EMBEDDING_PRIORITY=${AI_EMBEDDING_PRIORITY:-yandex,openai}
+      - AI_EMBEDDING_DIMENSION=${AI_EMBEDDING_DIMENSION:-256}
       - YANDEX_CLOUD_API_KEY=${YANDEX_CLOUD_API_KEY:-}
       - YANDEX_CLOUD_FOLDER_ID=${YANDEX_CLOUD_FOLDER_ID:-}
-      - YANDEX_CLOUD_MODEL=${YANDEX_CLOUD_MODEL:-yandexgpt-lite/latest}
+      - YANDEX_CLOUD_MODEL=${YANDEX_CLOUD_MODEL:-yandexgpt/latest}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
-      - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-large}
@@ -220,30 +217,6 @@ services:
         condition: any
         delay: 10s
 
-  # Ollama (local AI inference for embeddings)
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ollama-data:/root/.ollama
-    networks:
-      - stankoff-preprod-network
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/11434' 2>/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      start_period: 30s
-      retries: 5
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-      restart_policy:
-        condition: any
-        delay: 10s
-
   # Automated PostgreSQL Backup (hourly to S3 + Telegram alerts)
   backup:
     image: ghcr.io/youredik/stankoff3/backup:preprod
@@ -303,10 +276,6 @@ volumes:
   camunda-data:
   # Backup data
   backup-data:
-  # Ollama models data
-  ollama-data:
-    external: true
-    name: stankoff-preprod_ollama-data
 
 networks:
   stankoff-preprod-network:

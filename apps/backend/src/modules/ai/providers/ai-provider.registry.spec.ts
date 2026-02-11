@@ -22,7 +22,7 @@ describe('AiProviderRegistry', () => {
   };
 
   const mockEmbeddingResult: LlmEmbeddingResult = {
-    embedding: new Array(1536).fill(0.1),
+    embedding: new Array(256).fill(0.1),
     inputTokens: 10,
     model: 'test-embedding-model',
   };
@@ -66,7 +66,7 @@ describe('AiProviderRegistry', () => {
             get: jest.fn((key: string) => {
               const config: Record<string, string> = {
                 AI_LLM_PRIORITY: 'yandex,groq,ollama,openai',
-                AI_EMBEDDING_PRIORITY: 'ollama,openai',
+                AI_EMBEDDING_PRIORITY: 'yandex,ollama,openai',
               };
               return config[key];
             }),
@@ -120,6 +120,11 @@ describe('AiProviderRegistry', () => {
   });
 
   describe('isEmbeddingAvailable', () => {
+    it('должен вернуть true если Yandex доступен (поддерживает embeddings)', () => {
+      Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
+      expect(registry.isEmbeddingAvailable()).toBe(true);
+    });
+
     it('должен вернуть true если Ollama доступен (поддерживает embeddings)', () => {
       Object.defineProperty(ollamaProvider, 'isConfigured', { value: true });
       expect(registry.isEmbeddingAvailable()).toBe(true);
@@ -132,11 +137,6 @@ describe('AiProviderRegistry', () => {
 
     it('должен вернуть false если только Groq доступен (не поддерживает embeddings)', () => {
       Object.defineProperty(groqProvider, 'isConfigured', { value: true });
-      expect(registry.isEmbeddingAvailable()).toBe(false);
-    });
-
-    it('должен вернуть false если только Yandex доступен (не поддерживает embeddings)', () => {
-      Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
       expect(registry.isEmbeddingAvailable()).toBe(false);
     });
   });
@@ -216,7 +216,17 @@ describe('AiProviderRegistry', () => {
   });
 
   describe('embed', () => {
-    it('должен использовать Ollama как первый по приоритету для embeddings', async () => {
+    it('должен использовать Yandex как первый по приоритету для embeddings', async () => {
+      Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
+      yandexProvider.embed.mockResolvedValue(mockEmbeddingResult);
+
+      const result = await registry.embed('test text');
+
+      expect(result.provider).toBe('yandex');
+      expect(yandexProvider.embed).toHaveBeenCalledWith('test text');
+    });
+
+    it('должен fallback на Ollama если Yandex недоступен', async () => {
       Object.defineProperty(ollamaProvider, 'isConfigured', { value: true });
       ollamaProvider.embed.mockResolvedValue(mockEmbeddingResult);
 
@@ -226,7 +236,7 @@ describe('AiProviderRegistry', () => {
       expect(ollamaProvider.embed).toHaveBeenCalledWith('test text');
     });
 
-    it('должен fallback на OpenAI если Ollama недоступен', async () => {
+    it('должен fallback на OpenAI если Yandex и Ollama недоступны', async () => {
       Object.defineProperty(openAiProvider, 'isConfigured', { value: true });
       openAiProvider.embed.mockResolvedValue(mockEmbeddingResult);
 
@@ -274,7 +284,7 @@ describe('AiProviderRegistry', () => {
     it('должен правильно указывать поддержку embeddings', () => {
       const info = registry.getProvidersInfo();
 
-      expect(info.find((p) => p.name === 'yandex')?.supportsEmbeddings).toBe(false);
+      expect(info.find((p) => p.name === 'yandex')?.supportsEmbeddings).toBe(true);
       expect(info.find((p) => p.name === 'ollama')?.supportsEmbeddings).toBe(true);
       expect(info.find((p) => p.name === 'groq')?.supportsEmbeddings).toBe(false);
       expect(info.find((p) => p.name === 'openai')?.supportsEmbeddings).toBe(true);
@@ -330,7 +340,14 @@ describe('AiProviderRegistry', () => {
   });
 
   describe('getEmbeddingProvider', () => {
-    it('должен вернуть первый доступный embedding провайдер', () => {
+    it('должен вернуть Yandex как первый доступный embedding провайдер', () => {
+      Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
+
+      const provider = registry.getEmbeddingProvider();
+      expect(provider).toBe(yandexProvider);
+    });
+
+    it('должен fallback на Ollama если Yandex недоступен', () => {
       Object.defineProperty(ollamaProvider, 'isConfigured', { value: true });
 
       const provider = registry.getEmbeddingProvider();

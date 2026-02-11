@@ -196,7 +196,7 @@ export function MessageBubble({
           </div>
         )}
 
-        <div className={`relative px-3 py-1.5 ${isOwn ? `bg-[#EFFDDE] dark:bg-[#2B5278] ${ownRadius}` : `bg-white dark:bg-[#212121] ${otherRadius}`}`}>
+        <div className={`relative px-3 py-1.5 after:content-[''] after:clear-both after:block ${isOwn ? `bg-[#EFFDDE] dark:bg-[#2B5278] ${ownRadius}` : `bg-white dark:bg-[#212121] ${otherRadius}`}`}>
           {message.isPinned && <Pin data-testid="chat-message-pin-icon" className="absolute -top-1 -right-1 w-3 h-3 text-primary-500 rotate-45" />}
 
           {showName && message.author && (

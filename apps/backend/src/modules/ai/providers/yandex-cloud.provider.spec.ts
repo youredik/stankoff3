@@ -254,10 +254,57 @@ describe('YandexCloudProvider', () => {
   });
 
   describe('embed', () => {
-    it('должен выбросить ошибку — embeddings не поддерживаются', async () => {
-      await expect(provider.embed('test text')).rejects.toThrow(
-        'Yandex Cloud embeddings несовместимы',
+    it('должен отправить запрос и вернуть embedding', async () => {
+      const mockEmbedding = new Array(256).fill(0.1);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          embedding: mockEmbedding,
+          numTokens: '8',
+          modelVersion: '06.12.2023',
+        }),
+      });
+
+      const result = await provider.embed('тестовый текст');
+
+      expect(result.embedding).toEqual(mockEmbedding);
+      expect(result.embedding).toHaveLength(256);
+      expect(result.inputTokens).toBe(8);
+      expect(result.model).toBe('text-search-doc/latest');
+
+      // Проверяем параметры запроса
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: 'Api-Key test-api-key',
+            'x-folder-id': 'test-folder-id',
+          }),
+        }),
       );
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.modelUri).toBe('emb://test-folder-id/text-search-doc/latest');
+      expect(body.text).toBe('тестовый текст');
+    });
+
+    it('должен выбросить ошибку при HTTP ошибке', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      });
+
+      await expect(provider.embed('test')).rejects.toThrow(
+        'Yandex Cloud embeddings ошибка: 500 - Internal Server Error',
+      );
+    });
+
+    it('должен выбросить ошибку если не настроен', async () => {
+      const p = await createProvider({});
+
+      await expect(p.embed('test')).rejects.toThrow('Yandex Cloud не настроен');
     });
   });
 
