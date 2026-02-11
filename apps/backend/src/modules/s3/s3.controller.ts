@@ -40,6 +40,8 @@ const ALLOWED_MIME_TYPES = [
   'audio/aac',
   'audio/flac',
   'audio/mp4',
+  // Generic binary (some browsers send this for Blob data)
+  'application/octet-stream',
   // Documents
   'application/pdf',
   'application/msword',
@@ -65,9 +67,11 @@ export class S3Controller {
       throw new BadRequestException('Файл не загружен');
     }
 
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    // Check base MIME type without parameters (e.g. 'audio/webm;codecs=opus' → 'audio/webm')
+    const baseMimeType = file.mimetype.split(';')[0].trim();
+    if (!ALLOWED_MIME_TYPES.includes(baseMimeType)) {
       throw new BadRequestException(
-        'Недопустимый тип файла. Разрешены: изображения, видео, аудио, PDF, Word, Excel, текстовые файлы.',
+        `Недопустимый тип файла: ${file.mimetype}. Разрешены: изображения, видео, аудио, PDF, Word, Excel, текстовые файлы.`,
       );
     }
 
