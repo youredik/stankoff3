@@ -136,7 +136,7 @@ export function EntityTimeline({
         {/* Vertical stem */}
         <div className="absolute left-[15px] top-4 bottom-4 w-0.5 bg-gray-200 dark:bg-gray-700" />
 
-        <div className="space-y-4">
+        <div className="relative z-[1] space-y-4">
           {timelineItems.map((item) => (
             <div key={item.id} className="relative">
               {item.type === 'comment' && item.comment && (

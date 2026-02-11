@@ -55,7 +55,7 @@ export function UserAvatar({
       </div>
       {isOnline && (
         <span
-          className={`absolute -bottom-0.5 -right-0.5 ${config.dot} bg-green-500 border-white dark:border-gray-800 rounded-full`}
+          className={`absolute bottom-0 right-0 ${config.dot} bg-green-500 border-white dark:border-gray-900 rounded-full`}
         />
       )}
     </div>

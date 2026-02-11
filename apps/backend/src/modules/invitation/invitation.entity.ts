@@ -43,13 +43,13 @@ export class Invitation {
   @Index()
   status: InvitationStatus;
 
-  @Column({ name: 'first_name', nullable: true })
+  @Column({ name: 'first_name', type: 'varchar', length: 255, nullable: true })
   firstName: string | null;
 
-  @Column({ name: 'last_name', nullable: true })
+  @Column({ name: 'last_name', type: 'varchar', length: 255, nullable: true })
   lastName: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   department: string | null;
 
   @Column({ name: 'global_role_slug', length: 100, default: 'employee' })
