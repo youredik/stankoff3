@@ -102,10 +102,17 @@ function DateForm({ field, value, onChange }: Parameters<FieldRenderer['Form']>[
   );
 }
 
-function DateFilter({ filterValue, onChange, inputClass }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+function DateFilter({ filterValue, onChange, inputClass, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
   const range = filterValue || {};
+  const facet = facetData as import('@/types').DateFacet | undefined;
+
   return (
     <div className="mt-2 space-y-2">
+      {facet && facet.min && facet.max && (
+        <div className="text-xs text-gray-400 dark:text-gray-500">
+          Диапазон: {facet.min.slice(0, 10)} — {facet.max.slice(0, 10)} ({facet.count})
+        </div>
+      )}
       <div>
         <label className="text-xs text-gray-500 dark:text-gray-400">От</label>
         <input
@@ -114,6 +121,8 @@ function DateFilter({ filterValue, onChange, inputClass }: Parameters<NonNullabl
           onChange={(e) =>
             onChange({ ...range, from: e.target.value || undefined })
           }
+          min={facet?.min?.slice(0, 10)}
+          max={facet?.max?.slice(0, 10)}
           className={inputClass}
         />
       </div>
@@ -125,6 +134,8 @@ function DateFilter({ filterValue, onChange, inputClass }: Parameters<NonNullabl
           onChange={(e) =>
             onChange({ ...range, to: e.target.value || undefined })
           }
+          min={facet?.min?.slice(0, 10)}
+          max={facet?.max?.slice(0, 10)}
           className={inputClass}
         />
       </div>

@@ -104,40 +104,62 @@ function NumberForm({ field, value, onChange }: Parameters<FieldRenderer['Form']
   );
 }
 
-function NumberFilter({ field, filterValue, onChange, inputClass }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+function NumberFilter({ field, filterValue, onChange, inputClass, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
   const range = filterValue || {};
+  const facet = facetData as import('@/types').NumberFacet | undefined;
+  const dataMin = facet?.min;
+  const dataMax = facet?.max;
+
   return (
-    <div className="mt-2 flex gap-2">
-      <div className="flex-1">
-        <label className="text-xs text-gray-500 dark:text-gray-400">Мин</label>
-        <input
-          type="number"
-          value={range.min ?? ''}
-          onChange={(e) =>
-            onChange({
-              ...range,
-              min: e.target.value === '' ? undefined : Number(e.target.value),
-            })
-          }
-          placeholder="Мин"
-          className={inputClass}
-        />
+    <div className="mt-2 space-y-2">
+      {facet && dataMin != null && dataMax != null && dataMin !== dataMax && (
+        <div className="text-xs text-gray-400 dark:text-gray-500">
+          Диапазон: {dataMin} — {dataMax} ({facet.count})
+        </div>
+      )}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-xs text-gray-500 dark:text-gray-400">Мин</label>
+          <input
+            type="number"
+            value={range.min ?? ''}
+            onChange={(e) =>
+              onChange({
+                ...range,
+                min: e.target.value === '' ? undefined : Number(e.target.value),
+              })
+            }
+            placeholder={dataMin != null ? String(dataMin) : 'Мин'}
+            className={inputClass}
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-xs text-gray-500 dark:text-gray-400">Макс</label>
+          <input
+            type="number"
+            value={range.max ?? ''}
+            onChange={(e) =>
+              onChange({
+                ...range,
+                max: e.target.value === '' ? undefined : Number(e.target.value),
+              })
+            }
+            placeholder={dataMax != null ? String(dataMax) : 'Макс'}
+            className={inputClass}
+          />
+        </div>
       </div>
-      <div className="flex-1">
-        <label className="text-xs text-gray-500 dark:text-gray-400">Макс</label>
+      {facet && dataMin != null && dataMax != null && dataMin !== dataMax && (
         <input
-          type="number"
-          value={range.max ?? ''}
-          onChange={(e) =>
-            onChange({
-              ...range,
-              max: e.target.value === '' ? undefined : Number(e.target.value),
-            })
-          }
-          placeholder="Макс"
-          className={inputClass}
+          type="range"
+          min={dataMin}
+          max={dataMax}
+          step={(dataMax - dataMin) / 100 || 1}
+          value={range.max ?? dataMax}
+          onChange={(e) => onChange({ ...range, max: Number(e.target.value) })}
+          className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
         />
-      </div>
+      )}
     </div>
   );
 }

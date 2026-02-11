@@ -488,6 +488,7 @@ interface AiState {
 - `task:overdue` - Уведомление о просроченной задаче (отправляется assignee/candidates)
 - `process:incident` - Процесс зависнул с ошибкой (worker retries исчерпаны, отправляется в workspace)
 - `ai:classification:ready` - AI классификация завершена (обновляет useAiStore, создаёт уведомление `ai_suggestion` при confidence >= 0.7)
+- `ai:notification` - Проактивное AI уведомление (кластер заявок, критическая заявка и др.) → обновляет useNotificationStore
 - `auth:refresh` - Client → Server: обновление JWT токена без разрыва WebSocket соединения
 
 > **Proactive token refresh:** Фронтенд автоматически обновляет access token за 60 секунд до истечения (без ожидания 401). При обновлении токена отправляет `auth:refresh` событие серверу для переаутентификации WebSocket без reconnect.
@@ -517,6 +518,16 @@ function useFocusTrap(
 ```
 
 > При активации фокус перемещается на первый фокусируемый элемент. Tab/Shift+Tab циклически перемещаются внутри контейнера. При деактивации фокус возвращается на ранее активный элемент.
+
+**useWorkspaceFilters**
+Хук для управления фильтрами, изолированными по workspace. Фильтры сохраняются в localStorage и восстанавливаются при возвращении к тому же workspace.
+```typescript
+function useWorkspaceFilters(
+  workspaceId: string
+): [FilterState, (filters: FilterState) => void];
+```
+
+> Ключ localStorage: `workspace-filters:{workspaceId}`. При смене `workspaceId` загружает сохранённые фильтры для нового workspace. Используется в KanbanBoard и TableView.
 
 ### Backend (NestJS 11)
 
@@ -1415,6 +1426,8 @@ UI-компоненты для AI функций располагаются в `
 | `AiInsightsPanel` | Компактные AI подсказки в правом сайдбаре: похожие решения, эксперты, рекомендации. Автозагрузка при открытии заявки. |
 | `AiClassificationPanel` | Панель AI классификации в карточке сущности (категория, приоритет, навыки, уверенность). Автообновляется через WebSocket при автоклассификации. |
 | `AiSummaryBanner` | Компактный баннер AI-резюме переписки над таймлайном. Показывается при >= 5 комментариях, сворачиваемый. |
+| `AiNotificationsPanel` | Панель проактивных AI уведомлений (кластеры, критические заявки). Показывает типизированные уведомления с иконками, dismiss/markRead/markAllRead, навигация к заявке. |
+| `KnowledgeGraph` | SVG-визуализация графа знаний для заявки. Radial layout: центральная заявка → похожие legacy → эксперты → контрагенты → темы. Hover-эффекты, expand/collapse, клик на legacy открывает ссылку. |
 
 **Использование:**
 ```tsx
@@ -1530,6 +1543,34 @@ geocoding/
 - Graceful degradation: если `YANDEX_GEOCODER_API_KEY` не задан, возвращает пустые результаты
 - Таймаут HTTP-запросов: 5 секунд
 
+**KnowledgeBaseModule**
+База знаний для сотрудников — загрузка документов (PDF/DOCX/TXT) и создание FAQ статей с автоматической индексацией в RAG для улучшения AI-подсказок.
+
+```
+knowledge-base/
+├── knowledge-base.module.ts
+├── knowledge-base.controller.ts       # REST API (8 endpoints)
+├── knowledge-base.controller.spec.ts  # unit-тесты контроллера
+├── entities/
+│   └── knowledge-article.entity.ts    # TypeORM entity (type: 'document' | 'faq')
+├── dto/
+│   └── knowledge-base.dto.ts          # CreateFaqDto, UpdateArticleDto, ArticleFilterDto
+└── services/
+    ├── knowledge-article.service.ts      # CRUD, права, фильтрация, RAG-индексация
+    ├── knowledge-article.service.spec.ts # unit-тесты сервиса
+    ├── document-parser.service.ts        # PDF/DOCX/TXT парсинг (pdf-parse, mammoth)
+    └── document-parser.service.spec.ts   # unit-тесты парсера
+```
+
+Ключевые особенности:
+- Загрузка документов в S3 через `S3Service.uploadFileWithThumbnail()`
+- Асинхронная индексация через `setImmediate()` — не блокирует HTTP response
+- Используется `KnowledgeBaseService.addChunk()` из AiModule для RAG
+- Graceful degradation: если AI недоступен, статья создаётся без индексации
+- Права: все сотрудники создают, удалять — автор или ADMIN
+- Chunking: 512 токенов, 50 overlap, sentence boundary detection
+- Фронтенд: страница `/knowledge-base`, табы Документы/FAQ/Статистика
+
 **ChatModule**
 Корпоративный мессенджер в стиле Telegram — личные, групповые чаты и обсуждения заявок.
 
@@ -1589,8 +1630,10 @@ chat/
 | Метод | URL | Описание |
 |-------|-----|----------|
 | GET | /api/entities | Список сущностей (query: workspaceId) — legacy, без пагинации |
-| GET | /api/entities/kanban | Канбан с серверной пагинацией (query: workspaceId, perColumn, search, assigneeId[], priority[], dateFrom, dateTo) |
-| GET | /api/entities/kanban/column | Подгрузка колонки (query: workspaceId, status, offset, limit + фильтры) |
+| GET | /api/entities/kanban | Канбан с серверной пагинацией (query: workspaceId, perColumn, search, assigneeId[], priority[], dateFrom, dateTo, customFilters) |
+| GET | /api/entities/kanban/column | Подгрузка колонки (query: workspaceId, status, offset, limit + фильтры + customFilters) |
+| GET | /api/entities/table | Табличное представление с пагинацией (query: workspaceId, page, perPage, sortBy, sortOrder, search, assigneeId[], priority[], status[], dateFrom, dateTo, customFilters) |
+| GET | /api/entities/facets | Фасетные агрегации (query: workspaceId, search, assigneeId[], priority[], dateFrom, dateTo, customFilters) — счётчики значений для фильтров |
 | GET | /api/entities/:id | Детали с комментариями |
 | POST | /api/entities | Создать |
 | PUT | /api/entities/:id | Обновить |
@@ -2700,7 +2743,8 @@ modules/ai/
 ├── entities/
 │   ├── knowledge-chunk.entity.ts    # Чанки знаний с embeddings (pgvector)
 │   ├── ai-usage-log.entity.ts       # Логи использования AI
-│   └── ai-classification.entity.ts  # Результаты классификации
+│   ├── ai-classification.entity.ts  # Результаты классификации
+│   └── ai-notification.entity.ts    # Проактивные AI уведомления
 ├── providers/
 │   ├── base-llm.provider.ts         # Базовый интерфейс провайдера
 │   ├── ollama.provider.ts           # Ollama (локальные модели, бесплатно)
@@ -2711,7 +2755,9 @@ modules/ai/
     ├── classifier.service.ts        # Классификация заявок
     ├── knowledge-base.service.ts    # Работа с векторной БД
     ├── rag-indexer.service.ts       # Индексация legacy данных
-    └── ai-assistant.service.ts      # AI помощник (похожие случаи, эксперты)
+    ├── ai-assistant.service.ts      # AI помощник (похожие случаи, эксперты)
+    ├── ai-notification.service.ts   # Проактивные уведомления (кластеры, критические)
+    └── knowledge-graph.service.ts   # Граф знаний (связи entity ↔ legacy ↔ эксперты)
 ```
 
 ### Провайдеры AI
@@ -2864,6 +2910,36 @@ CREATE INDEX ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops);
   - Параметры: limit (1-200), provider, operation
   - Возвращает: массив записей с деталями каждого запроса
 
+**Проактивные AI уведомления:**
+- `GET /api/ai/notifications` - Список уведомлений с пагинацией
+  - Параметры: workspaceId, unreadOnly, limit, offset
+  - Возвращает: `{ notifications: AiNotificationItem[], total: number }`
+- `GET /api/ai/notifications/unread-count` - Количество непрочитанных
+  - Параметры: workspaceId (опционально)
+  - Возвращает: `{ count: number }`
+- `PATCH /api/ai/notifications/:id/read` - Отметить прочитанным
+- `POST /api/ai/notifications/mark-all-read` - Отметить все прочитанными
+  - Body: `{ workspaceId? }`
+- `DELETE /api/ai/notifications/:id` - Скрыть (dismiss) уведомление
+- `POST /api/ai/notifications/toggle` - Включить/выключить проактивный анализ
+  - Body: `{ enabled: boolean }`
+
+**Типы уведомлений:**
+| Тип | Описание |
+|-----|----------|
+| `cluster_detected` | Кластер похожих заявок (3+ с одинаковыми ключевыми словами за 1 час) |
+| `critical_entity` | Критическая заявка (авария, срочно, остановка, простой и т.д.) |
+| `sla_risk` | Риск нарушения SLA |
+| `duplicate_suspected` | Подозрение на дублирование |
+| `trend_anomaly` | Аномалия в тренде заявок |
+
+**Граф знаний (контекстное обогащение):**
+- `GET /api/ai/knowledge-graph/:entityId` - Построить граф связей для заявки
+  - Возвращает: `{ nodes: GraphNode[], edges: GraphEdge[], centerNodeId: string }`
+  - Узлы: entity, legacy_request, expert, counterparty, topic
+  - Рёбра: similar_to (вес = similarity), assigned_to, related_to, belongs_to
+  - Graceful degradation: если AI недоступен, возвращает только центральный узел + assignee
+
 ### Результат поиска
 
 ```typescript
@@ -2907,6 +2983,30 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
 OPENAI_EMBEDDING_MODEL=text-embedding-3-large
 ```
+
+### Проактивные уведомления (Cron)
+
+`AiNotificationService` автоматически анализирует новые заявки каждые 5 минут (`@Cron(EVERY_5_MINUTES)`):
+
+1. **Обнаружение кластеров** — группирует заявки по workspace, извлекает ключевые слова (первые 3 слова длиной >= 4 символов), если 3+ заявок с одинаковыми ключевыми словами за последний час → уведомление `cluster_detected`
+2. **Критические заявки** — проверяет наличие ключевых слов (авария, срочно, не работает, остановка, простой, критично) в title/description → уведомление `critical_entity`
+
+In-memory `notifiedEntities` Set (max 5000) предотвращает дублирование уведомлений. WebSocket `ai:notification` доставляет уведомления в реальном времени.
+
+### Граф знаний
+
+`KnowledgeGraphService.buildGraph(entityId)` строит контекстный граф:
+
+1. Загружает entity с assignee и workspace
+2. Ищет похожие случаи через RAG (`KnowledgeBaseService.searchSimilar`)
+3. Формирует узлы и рёбра:
+   - **entity** — центральный узел (заявка)
+   - **legacy_request** — похожие legacy заявки (с URL, similarity)
+   - **expert** — эксперты (assignee + менеджеры из legacy)
+   - **counterparty** — контрагенты из legacy результатов
+   - **topic** — ключевые слова из описания заявки
+
+Frontend: SVG-визуализация с radial layout в `KnowledgeGraph.tsx`.
 
 ### Планы на будущее
 

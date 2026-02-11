@@ -6,7 +6,7 @@ import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { fieldRegistry } from '@/components/fields';
-import type { Field, FieldType, FieldOption, User as UserType } from '@/types';
+import type { Field, FieldType, FieldOption, User as UserType, FacetResult } from '@/types';
 
 export interface FilterState {
   search: string;
@@ -21,6 +21,7 @@ interface FilterPanelProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   onClose: () => void;
+  facets?: FacetResult | null;
 }
 
 const PRIORITY_OPTIONS: FieldOption[] = [
@@ -74,6 +75,7 @@ export function FilterPanel({
   filters,
   onFiltersChange,
   onClose,
+  facets,
 }: FilterPanelProps) {
   const { users } = useEntityStore();
   const { currentWorkspace } = useWorkspaceStore();
@@ -167,6 +169,14 @@ export function FilterPanel({
   // Все поля из всех секций (для cascadeFrom в фильтрах)
   const allWorkspaceFields = (currentWorkspace?.sections || []).flatMap((s) => s.fields);
 
+  // Счётчики для built-in фильтров
+  const assigneeCountMap = new Map<string, number>(
+    facets?.builtIn?.assignee?.map((a) => [a.value, a.count]) || [],
+  );
+  const priorityCountMap = new Map<string, number>(
+    facets?.builtIn?.priority?.map((p) => [p.value, p.count]) || [],
+  );
+
   const renderFieldFilter = (field: Field) => {
     const renderer = fieldRegistry[field.type];
     if (!renderer?.Filter) return null;
@@ -181,6 +191,7 @@ export function FilterPanel({
         inputClass={inputClass}
         allFields={allWorkspaceFields}
         allFilterValues={filters.customFilters}
+        facetData={facets?.custom?.[field.id]}
       />
     );
   };
@@ -273,30 +284,42 @@ export function FilterPanel({
                   </button>
                   {expandedSections.includes('assignee') && (
                     <div className="mt-2 space-y-1">
-                      {users.map((user) => (
-                        <label
-                          key={user.id}
-                          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={filters.assigneeIds.includes(user.id)}
-                            onChange={() =>
-                              toggleArrayFilter('assigneeIds', user.id)
-                            }
-                            className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-                          />
-                          <UserAvatar
-                            firstName={user.firstName}
-                            lastName={user.lastName}
-                            userId={user.id}
-                            size="sm"
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {user.firstName} {user.lastName}
-                          </span>
-                        </label>
-                      ))}
+                      {users.map((user) => {
+                        const count = assigneeCountMap.get(user.id);
+                        const isDisabled = facets && count === undefined;
+                        return (
+                          <label
+                            key={user.id}
+                            className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+                              isDisabled
+                                ? 'opacity-40 cursor-default'
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={filters.assigneeIds.includes(user.id)}
+                              onChange={() =>
+                                toggleArrayFilter('assigneeIds', user.id)
+                              }
+                              disabled={!!isDisabled}
+                              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+                            />
+                            <UserAvatar
+                              firstName={user.firstName}
+                              lastName={user.lastName}
+                              userId={user.id}
+                              size="sm"
+                            />
+                            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                              {user.firstName} {user.lastName}
+                            </span>
+                            {count != null && (
+                              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -324,28 +347,40 @@ export function FilterPanel({
                   </button>
                   {expandedSections.includes('priority') && (
                     <div className="mt-2 space-y-1">
-                      {PRIORITY_OPTIONS.map((option) => (
-                        <label
-                          key={option.id}
-                          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={filters.priorities.includes(option.id)}
-                            onChange={() =>
-                              toggleArrayFilter('priorities', option.id)
-                            }
-                            className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-                          />
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: option.color }}
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {option.label}
-                          </span>
-                        </label>
-                      ))}
+                      {PRIORITY_OPTIONS.map((option) => {
+                        const count = priorityCountMap.get(option.id);
+                        const isDisabled = facets && count === undefined;
+                        return (
+                          <label
+                            key={option.id}
+                            className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+                              isDisabled
+                                ? 'opacity-40 cursor-default'
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={filters.priorities.includes(option.id)}
+                              onChange={() =>
+                                toggleArrayFilter('priorities', option.id)
+                              }
+                              disabled={!!isDisabled}
+                              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+                            />
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: option.color }}
+                            />
+                            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                              {option.label}
+                            </span>
+                            {count != null && (
+                              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

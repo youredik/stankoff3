@@ -10,6 +10,7 @@ import { CreateEntityDto } from './dto/create-entity.dto';
 import { UpdateEntityDto } from './dto/update-entity.dto';
 import { KanbanQueryDto, ColumnLoadMoreDto } from './dto/kanban-query.dto';
 import { TableQueryDto } from './dto/table-query.dto';
+import { FacetsQueryDto } from './dto/facets-query.dto';
 import { EventsGateway } from '../websocket/events.gateway';
 import { S3Service } from '../s3/s3.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -74,6 +75,11 @@ export class EntityService {
   }> {
     const perColumn = query.perColumn || 20;
 
+    // Загружаем workspace для метаданных полей (нужно для JSONB фильтрации)
+    const workspace = query.customFilters
+      ? await this.workspaceRepository.findOne({ where: { id: query.workspaceId } }) || undefined
+      : undefined;
+
     // 1) Counts per status
     const countQb = this.entityRepository
       .createQueryBuilder('entity')
@@ -81,7 +87,7 @@ export class EntityService {
       .addSelect('COUNT(*)::int', 'count')
       .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId });
 
-    this.applyKanbanFilters(countQb, query);
+    this.applyKanbanFilters(countQb, query, workspace);
     countQb.groupBy('entity.status');
 
     const statusCounts = await countQb.getRawMany<{ status: string; count: number }>();
@@ -99,7 +105,7 @@ export class EntityService {
         .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId })
         .andWhere('entity.status = :status', { status });
 
-      this.applyKanbanFilters(qb, query);
+      this.applyKanbanFilters(qb, query, workspace);
       this.applyKanbanSort(qb);
       qb.limit(perColumn);
 
@@ -120,13 +126,17 @@ export class EntityService {
   }> {
     const limit = query.limit || 20;
 
+    const workspace = query.customFilters
+      ? await this.workspaceRepository.findOne({ where: { id: query.workspaceId } }) || undefined
+      : undefined;
+
     const qb = this.entityRepository
       .createQueryBuilder('entity')
       .leftJoinAndSelect('entity.assignee', 'assignee')
       .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId })
       .andWhere('entity.status = :status', { status: query.status });
 
-    this.applyKanbanFilters(qb, query);
+    this.applyKanbanFilters(qb, query, workspace);
     this.applyKanbanSort(qb);
     qb.offset(query.offset).limit(limit);
 
@@ -144,12 +154,16 @@ export class EntityService {
     const page = query.page || 1;
     const perPage = query.perPage || 25;
 
+    const workspace = query.customFilters
+      ? await this.workspaceRepository.findOne({ where: { id: query.workspaceId } }) || undefined
+      : undefined;
+
     const qb = this.entityRepository
       .createQueryBuilder('entity')
       .leftJoinAndSelect('entity.assignee', 'assignee')
       .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId });
 
-    this.applyKanbanFilters(qb, query);
+    this.applyKanbanFilters(qb, query, workspace);
 
     if (query.status?.length) {
       qb.andWhere('entity.status IN (:...statuses)', { statuses: query.status });
@@ -195,7 +209,8 @@ export class EntityService {
 
   private applyKanbanFilters(
     qb: SelectQueryBuilder<WorkspaceEntity>,
-    filters: { search?: string; assigneeId?: string[]; priority?: string[]; dateFrom?: string; dateTo?: string },
+    filters: { search?: string; assigneeId?: string[]; priority?: string[]; dateFrom?: string; dateTo?: string; customFilters?: string },
+    workspace?: Workspace,
   ): void {
     if (filters.search) {
       qb.andWhere(
@@ -215,6 +230,124 @@ export class EntityService {
     if (filters.dateTo) {
       qb.andWhere('entity.createdAt <= :dateTo', { dateTo: new Date(filters.dateTo + 'T23:59:59.999Z') });
     }
+    if (filters.customFilters && workspace) {
+      this.applyCustomFilters(qb, filters.customFilters, workspace);
+    }
+  }
+
+  private applyCustomFilters(
+    qb: SelectQueryBuilder<WorkspaceEntity>,
+    customFiltersJson: string,
+    workspace: Workspace,
+  ): void {
+    let parsed: Record<string, any>;
+    try {
+      parsed = JSON.parse(customFiltersJson);
+    } catch {
+      return;
+    }
+
+    // Собираем все поля workspace в map fieldId → field
+    const fieldMap = new Map<string, { type: string; config?: Record<string, any> }>();
+    for (const section of workspace.sections || []) {
+      for (const field of section.fields || []) {
+        fieldMap.set(field.id, { type: field.type, config: field.config });
+      }
+    }
+
+    let paramIndex = 0;
+    for (const [fieldId, filterValue] of Object.entries(parsed)) {
+      if (filterValue == null) continue;
+      const fieldMeta = fieldMap.get(fieldId);
+      if (!fieldMeta) continue;
+
+      const pi = paramIndex++;
+      const safeFieldId = fieldId.replace(/[^a-zA-Z0-9_-]/g, '');
+
+      switch (fieldMeta.type) {
+        case 'select':
+        case 'user': {
+          // массив выбранных значений
+          if (Array.isArray(filterValue) && filterValue.length > 0) {
+            const isMulti = fieldMeta.config?.multiSelect;
+            if (isMulti) {
+              // multiSelect хранит массив в data: проверяем пересечение
+              qb.andWhere(`entity.data->'${safeFieldId}' ?| ARRAY[:...cf_${pi}]`, {
+                [`cf_${pi}`]: filterValue,
+              });
+            } else {
+              // single select: строковое значение
+              qb.andWhere(`entity.data->>'${safeFieldId}' IN (:...cf_${pi})`, {
+                [`cf_${pi}`]: filterValue,
+              });
+            }
+          }
+          break;
+        }
+        case 'number': {
+          // { min?: number, max?: number }
+          if (typeof filterValue === 'object') {
+            if (filterValue.min != null) {
+              qb.andWhere(`(entity.data->>'${safeFieldId}')::numeric >= :cf_${pi}_min`, {
+                [`cf_${pi}_min`]: filterValue.min,
+              });
+            }
+            if (filterValue.max != null) {
+              qb.andWhere(`(entity.data->>'${safeFieldId}')::numeric <= :cf_${pi}_max`, {
+                [`cf_${pi}_max`]: filterValue.max,
+              });
+            }
+          }
+          break;
+        }
+        case 'date': {
+          // { from?: string, to?: string }
+          if (typeof filterValue === 'object') {
+            if (filterValue.from) {
+              qb.andWhere(`(entity.data->>'${safeFieldId}')::timestamp >= :cf_${pi}_from`, {
+                [`cf_${pi}_from`]: filterValue.from,
+              });
+            }
+            if (filterValue.to) {
+              qb.andWhere(`(entity.data->>'${safeFieldId}')::timestamp <= :cf_${pi}_to`, {
+                [`cf_${pi}_to`]: new Date(filterValue.to + 'T23:59:59.999Z'),
+              });
+            }
+          }
+          break;
+        }
+        case 'checkbox': {
+          // boolean
+          if (typeof filterValue === 'boolean') {
+            qb.andWhere(`(entity.data->>'${safeFieldId}')::boolean = :cf_${pi}`, {
+              [`cf_${pi}`]: filterValue,
+            });
+          }
+          break;
+        }
+        case 'text':
+        case 'textarea':
+        case 'url': {
+          // текстовый поиск
+          if (typeof filterValue === 'string' && filterValue.trim()) {
+            qb.andWhere(`LOWER(entity.data->>'${safeFieldId}') LIKE LOWER(:cf_${pi})`, {
+              [`cf_${pi}`]: `%${filterValue}%`,
+            });
+          }
+          break;
+        }
+        case 'client': {
+          // поиск по name/phone/email полям client объекта
+          if (typeof filterValue === 'string' && filterValue.trim()) {
+            qb.andWhere(
+              `LOWER(COALESCE(entity.data->'${safeFieldId}'->>'name','') || ' ' || COALESCE(entity.data->'${safeFieldId}'->>'phone','') || ' ' || COALESCE(entity.data->'${safeFieldId}'->>'email','')) LIKE LOWER(:cf_${pi})`,
+              { [`cf_${pi}`]: `%${filterValue}%` },
+            );
+          }
+          break;
+        }
+      }
+    }
   }
 
   private applyKanbanSort(qb: SelectQueryBuilder<WorkspaceEntity>): void {
@@ -223,6 +356,260 @@ export class EntityService {
       'ASC',
     )
       .addOrderBy('entity.createdAt', 'DESC');
+  }
+
+  // ==================== Faceted Search ====================
+
+  private readonly SKIP_FACET_TYPES = ['status', 'file', 'relation', 'geolocation'];
+
+  async getFacets(query: FacetsQueryDto): Promise<{
+    builtIn: {
+      status: { value: string; count: number }[];
+      priority: { value: string; count: number }[];
+      assignee: { value: string; count: number }[];
+      createdAt: { min: string | null; max: string | null };
+    };
+    custom: Record<string, any>;
+  }> {
+    const workspace = await this.workspaceRepository.findOne({ where: { id: query.workspaceId } });
+    if (!workspace) {
+      return {
+        builtIn: { status: [], priority: [], assignee: [], createdAt: { min: null, max: null } },
+        custom: {},
+      };
+    }
+
+    // Собираем фильтруемые кастомные поля
+    const filterableFields: { id: string; type: string; config?: Record<string, any>; options?: { id: string; label: string }[] }[] = [];
+    for (const section of workspace.sections || []) {
+      for (const field of section.fields || []) {
+        if (!this.SKIP_FACET_TYPES.includes(field.type) && !['title', 'assignee', 'priority'].includes(field.id)) {
+          filterableFields.push(field);
+        }
+      }
+    }
+
+    // Создаём базовый QueryBuilder с применёнными фильтрами
+    const createBaseQb = () => {
+      const qb = this.entityRepository
+        .createQueryBuilder('entity')
+        .where('entity.workspaceId = :workspaceId', { workspaceId: query.workspaceId });
+      this.applyKanbanFilters(qb, query, workspace);
+      return qb;
+    };
+
+    // Параллельно считаем все фасеты
+    const [statusFacets, priorityFacets, assigneeFacets, dateFacets, ...customFacets] = await Promise.all([
+      // Status facet
+      createBaseQb()
+        .select('entity.status', 'value')
+        .addSelect('COUNT(*)::int', 'count')
+        .groupBy('entity.status')
+        .getRawMany<{ value: string; count: number }>(),
+
+      // Priority facet
+      createBaseQb()
+        .select('entity.priority', 'value')
+        .addSelect('COUNT(*)::int', 'count')
+        .groupBy('entity.priority')
+        .getRawMany<{ value: string; count: number }>(),
+
+      // Assignee facet
+      createBaseQb()
+        .select('entity.assigneeId', 'value')
+        .addSelect('COUNT(*)::int', 'count')
+        .andWhere('entity.assigneeId IS NOT NULL')
+        .groupBy('entity.assigneeId')
+        .getRawMany<{ value: string; count: number }>(),
+
+      // CreatedAt range
+      createBaseQb()
+        .select('MIN(entity.createdAt)', 'min')
+        .addSelect('MAX(entity.createdAt)', 'max')
+        .getRawOne<{ min: string | null; max: string | null }>(),
+
+      // Custom field facets
+      ...filterableFields.map((field) => this.computeFieldFacet(createBaseQb, field)),
+    ]);
+
+    // Собираем результат custom facets
+    const customResult: Record<string, any> = {};
+    filterableFields.forEach((field, index) => {
+      customResult[field.id] = customFacets[index];
+    });
+
+    return {
+      builtIn: {
+        status: statusFacets,
+        priority: priorityFacets.filter((f) => f.value != null),
+        assignee: assigneeFacets,
+        createdAt: dateFacets || { min: null, max: null },
+      },
+      custom: customResult,
+    };
+  }
+
+  private async computeFieldFacet(
+    createBaseQb: () => SelectQueryBuilder<WorkspaceEntity>,
+    field: { id: string; type: string; config?: Record<string, any>; options?: { id: string; label: string }[] },
+  ): Promise<any> {
+    const safeFieldId = field.id.replace(/[^a-zA-Z0-9_-]/g, '');
+
+    switch (field.type) {
+      case 'select': {
+        const isMulti = field.config?.multiSelect;
+        let raw: { value: string; count: number }[];
+
+        if (isMulti) {
+          // Для multiSelect (массив в JSONB) — unnest
+          raw = await createBaseQb()
+            .select(`jsonb_array_elements_text(entity.data->'${safeFieldId}')`, 'value')
+            .addSelect('COUNT(*)::int', 'count')
+            .andWhere(`entity.data ? '${safeFieldId}'`)
+            .andWhere(`jsonb_typeof(entity.data->'${safeFieldId}') = 'array'`)
+            .groupBy('value')
+            .getRawMany();
+        } else {
+          raw = await createBaseQb()
+            .select(`entity.data->>'${safeFieldId}'`, 'value')
+            .addSelect('COUNT(*)::int', 'count')
+            .andWhere(`entity.data->>'${safeFieldId}' IS NOT NULL`)
+            .andWhere(`entity.data->>'${safeFieldId}' != ''`)
+            .groupBy('value')
+            .getRawMany();
+        }
+
+        // Добавляем label из options
+        const optionMap = new Map((field.options || []).map((o) => [o.id, o.label]));
+        return {
+          type: 'select',
+          values: raw.map((r) => ({
+            value: r.value,
+            label: optionMap.get(r.value) || r.value,
+            count: Number(r.count),
+          })),
+        };
+      }
+
+      case 'number': {
+        const result = await createBaseQb()
+          .select(`MIN((entity.data->>'${safeFieldId}')::numeric)`, 'min')
+          .addSelect(`MAX((entity.data->>'${safeFieldId}')::numeric)`, 'max')
+          .addSelect('COUNT(*)::int', 'count')
+          .andWhere(`entity.data->>'${safeFieldId}' IS NOT NULL`)
+          .andWhere(`entity.data->>'${safeFieldId}' != ''`)
+          .andWhere(`entity.data->>'${safeFieldId}' ~ '^-?[0-9]+(\\.[0-9]+)?$'`)
+          .getRawOne();
+
+        return {
+          type: 'number',
+          min: result?.min != null ? Number(result.min) : null,
+          max: result?.max != null ? Number(result.max) : null,
+          count: Number(result?.count || 0),
+        };
+      }
+
+      case 'date': {
+        const result = await createBaseQb()
+          .select(`MIN(entity.data->>'${safeFieldId}')`, 'min')
+          .addSelect(`MAX(entity.data->>'${safeFieldId}')`, 'max')
+          .addSelect('COUNT(*)::int', 'count')
+          .andWhere(`entity.data->>'${safeFieldId}' IS NOT NULL`)
+          .andWhere(`entity.data->>'${safeFieldId}' != ''`)
+          .getRawOne();
+
+        return {
+          type: 'date',
+          min: result?.min || null,
+          max: result?.max || null,
+          count: Number(result?.count || 0),
+        };
+      }
+
+      case 'checkbox': {
+        const raw = await createBaseQb()
+          .select(`(entity.data->>'${safeFieldId}')::text`, 'value')
+          .addSelect('COUNT(*)::int', 'count')
+          .groupBy('value')
+          .getRawMany<{ value: string; count: number }>();
+
+        let trueCount = 0;
+        let falseCount = 0;
+        let total = 0;
+        for (const r of raw) {
+          const c = Number(r.count);
+          total += c;
+          if (r.value === 'true') trueCount = c;
+          else falseCount += c;
+        }
+
+        return { type: 'checkbox', trueCount, falseCount, total };
+      }
+
+      case 'user': {
+        const isMulti = field.config?.multiSelect;
+        let raw: { value: string; count: number }[];
+
+        if (isMulti) {
+          raw = await createBaseQb()
+            .select(`jsonb_array_elements_text(entity.data->'${safeFieldId}')`, 'value')
+            .addSelect('COUNT(*)::int', 'count')
+            .andWhere(`entity.data ? '${safeFieldId}'`)
+            .andWhere(`jsonb_typeof(entity.data->'${safeFieldId}') = 'array'`)
+            .groupBy('value')
+            .getRawMany();
+        } else {
+          raw = await createBaseQb()
+            .select(`entity.data->>'${safeFieldId}'`, 'value')
+            .addSelect('COUNT(*)::int', 'count')
+            .andWhere(`entity.data->>'${safeFieldId}' IS NOT NULL`)
+            .andWhere(`entity.data->>'${safeFieldId}' != ''`)
+            .groupBy('value')
+            .getRawMany();
+        }
+
+        return {
+          type: 'user',
+          values: raw.map((r) => ({ value: r.value, count: Number(r.count) })),
+        };
+      }
+
+      case 'text':
+      case 'textarea':
+      case 'url': {
+        // Для текстовых полей — уникальные значения (top 50)
+        const raw = await createBaseQb()
+          .select(`entity.data->>'${safeFieldId}'`, 'value')
+          .addSelect('COUNT(*)::int', 'count')
+          .andWhere(`entity.data->>'${safeFieldId}' IS NOT NULL`)
+          .andWhere(`entity.data->>'${safeFieldId}' != ''`)
+          .groupBy('value')
+          .orderBy('count', 'DESC')
+          .limit(50)
+          .getRawMany<{ value: string; count: number }>();
+
+        return {
+          type: 'text',
+          values: raw.map((r) => r.value),
+          count: raw.reduce((sum, r) => sum + Number(r.count), 0),
+        };
+      }
+
+      case 'client': {
+        // Для client поля — count заполненных
+        const result = await createBaseQb()
+          .select('COUNT(*)::int', 'count')
+          .andWhere(`entity.data->>'${safeFieldId}' IS NOT NULL`)
+          .andWhere(`entity.data->>'${safeFieldId}' != ''`)
+          .andWhere(`entity.data->>'${safeFieldId}' != '{}'`)
+          .getRawOne();
+
+        return { type: 'client', count: Number(result?.count || 0) };
+      }
+
+      default:
+        return { type: field.type, count: 0 };
+    }
   }
 
   async search(

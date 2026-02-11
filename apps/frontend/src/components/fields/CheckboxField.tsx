@@ -58,15 +58,18 @@ function CheckboxForm({ value, onChange }: Parameters<FieldRenderer['Form']>[0])
   );
 }
 
-function CheckboxFilter({ filterValue, onChange }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
-  // Three states: null (all), true (yes), false (no)
+function CheckboxFilter({ filterValue, onChange, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+  const facet = facetData as import('@/types').CheckboxFacet | undefined;
+
+  const options: { value: null | boolean; label: string; count?: number }[] = [
+    { value: null, label: 'Все', count: facet ? facet.total : undefined },
+    { value: true, label: 'Да', count: facet?.trueCount },
+    { value: false, label: 'Нет', count: facet?.falseCount },
+  ];
+
   return (
     <div className="mt-2 space-y-1">
-      {[
-        { value: null, label: 'Все' },
-        { value: true, label: 'Да' },
-        { value: false, label: 'Нет' },
-      ].map((option) => (
+      {options.map((option) => (
         <label
           key={String(option.value)}
           className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
@@ -78,9 +81,12 @@ function CheckboxFilter({ filterValue, onChange }: Parameters<NonNullable<FieldR
             onChange={() => onChange(option.value)}
             className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 focus:ring-primary-500"
           />
-          <span className="text-sm text-gray-700 dark:text-gray-300">
+          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
             {option.label}
           </span>
+          {option.count != null && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{option.count}</span>
+          )}
         </label>
       ))}
     </div>

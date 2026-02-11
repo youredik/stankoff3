@@ -178,9 +178,16 @@ function UrlForm({ value, onChange }: Parameters<FieldRenderer['Form']>[0]) {
   );
 }
 
-function UrlFilter({ field, filterValue, onChange, inputClass }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+function UrlFilter({ field, filterValue, onChange, inputClass, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+  const facet = facetData as import('@/types').TextFacet | undefined;
+
   return (
     <div className="mt-2">
+      {facet && (
+        <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">
+          {facet.count} уник. значений
+        </div>
+      )}
       <input
         type="text"
         value={filterValue || ''}

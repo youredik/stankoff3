@@ -283,9 +283,16 @@ function ClientForm({ field, value, onChange }: Parameters<FieldRenderer['Form']
   );
 }
 
-function ClientFilter({ field, filterValue, onChange, inputClass }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+function ClientFilter({ field, filterValue, onChange, inputClass, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+  const facet = facetData as import('@/types').ClientFacet | undefined;
+
   return (
     <div className="mt-2">
+      {facet && (
+        <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">
+          {facet.count} с клиентом
+        </div>
+      )}
       <input
         type="text"
         value={filterValue || ''}

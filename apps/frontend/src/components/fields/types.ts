@@ -1,4 +1,4 @@
-import type { Field, User } from '@/types';
+import type { Field, User, FieldFacet } from '@/types';
 
 // Props для рендеринга поля в EntityDetailPanel (view/edit mode)
 export interface FieldRendererProps {
@@ -29,6 +29,7 @@ export interface FieldFilterRendererProps {
   inputClass: string;
   allFields?: Field[];
   allFilterValues?: Record<string, any>;
+  facetData?: FieldFacet;
 }
 
 // Интерфейс рендерера поля — каждый тип реализует этот интерфейс

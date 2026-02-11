@@ -20,13 +20,14 @@ import {
   FilterPanel,
   createEmptyFilters,
   isFilterActive,
-  applyFilters,
   type FilterState,
 } from '@/components/kanban/FilterPanel';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { filtersToApi } from '@/lib/utils/filters';
+import { useWorkspaceFilters } from '@/hooks/useWorkspaceFilters';
+import { useFacets } from '@/hooks/useFacets';
 import type { Entity, FieldOption } from '@/types';
 
 interface TableViewProps {
@@ -186,7 +187,7 @@ export function TableView({ workspaceId }: TableViewProps) {
   const router = useRouter();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<FilterState>(createEmptyFilters);
+  const [filters, setFilters] = useWorkspaceFilters(workspaceId);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -215,6 +216,7 @@ export function TableView({ workspaceId }: TableViewProps) {
 
   const isAdmin = user?.role === 'admin' || currentRole === 'admin';
   const canEditEntities = canEdit();
+  const { facets } = useFacets(workspaceId, filters);
 
   // Get status options from workspace
   const statuses = useMemo<FieldOption[]>(() => {
@@ -232,21 +234,6 @@ export function TableView({ workspaceId }: TableViewProps) {
     statuses.forEach((s) => map.set(s.id, s));
     return map;
   }, [statuses]);
-
-  // Apply custom field filters client-side (server handles search/assignee/priority/date)
-  const filteredTableItems = useMemo(() => {
-    const hasCustom = Object.values(filters.customFilters).some((v) => isFilterActive(v));
-    if (!hasCustom) return tableItems;
-    const customOnly: FilterState = {
-      search: '',
-      assigneeIds: [],
-      priorities: [],
-      dateFrom: '',
-      dateTo: '',
-      customFilters: filters.customFilters,
-    };
-    return applyFilters(tableItems, customOnly);
-  }, [tableItems, filters.customFilters]);
 
   // Load data
   useEffect(() => {
@@ -281,7 +268,7 @@ export function TableView({ workspaceId }: TableViewProps) {
     setFilters(newFilters);
     setTablePage(1);
     setSelectedIds(new Set());
-  }, [setTablePage]);
+  }, [setFilters, setTablePage]);
 
   const handleStatusChange = useCallback(async (entityId: string, newStatus: string) => {
     await updateStatus(entityId, newStatus);
@@ -305,12 +292,12 @@ export function TableView({ workspaceId }: TableViewProps) {
   }, []);
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === filteredTableItems.length) {
+    if (selectedIds.size === tableItems.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredTableItems.map((e) => e.id)));
+      setSelectedIds(new Set(tableItems.map((e) => e.id)));
     }
-  }, [selectedIds.size, filteredTableItems]);
+  }, [selectedIds.size, tableItems]);
 
   const activeFilterCount =
     (filters.search ? 1 : 0) +
@@ -394,7 +381,7 @@ export function TableView({ workspaceId }: TableViewProps) {
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      checked={filteredTableItems.length > 0 && selectedIds.size === filteredTableItems.length}
+                      checked={tableItems.length > 0 && selectedIds.size === tableItems.length}
                       onChange={toggleSelectAll}
                       className="rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500"
                     />
@@ -411,7 +398,7 @@ export function TableView({ workspaceId }: TableViewProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {tableLoading && filteredTableItems.length === 0 ? (
+                {tableLoading && tableItems.length === 0 ? (
                   // Skeleton rows
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
@@ -425,14 +412,14 @@ export function TableView({ workspaceId }: TableViewProps) {
                       <td className="px-4 py-3"><div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
                     </tr>
                   ))
-                ) : filteredTableItems.length === 0 ? (
+                ) : tableItems.length === 0 ? (
                   <tr>
                     <td colSpan={TABLE_COLUMNS.length + 1} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                       {activeFilterCount > 0 ? 'Нет заявок, подходящих под фильтры' : 'Нет заявок'}
                     </td>
                   </tr>
                 ) : (
-                  filteredTableItems.map((entity) => {
+                  tableItems.map((entity) => {
                     const statusOption = statusMap.get(entity.status);
                     const priorityInfo = entity.priority ? PRIORITY_LABELS[entity.priority] : null;
 
@@ -575,6 +562,7 @@ export function TableView({ workspaceId }: TableViewProps) {
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClose={() => setShowFilters(false)}
+          facets={facets}
         />
       )}
 

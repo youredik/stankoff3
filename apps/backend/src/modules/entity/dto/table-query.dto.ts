@@ -51,4 +51,8 @@ export class TableQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  customFilters?: string; // JSON-строка: Record<string, any>
 }

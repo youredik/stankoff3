@@ -944,3 +944,64 @@ export interface ChatMessagesPage {
   hasMore: boolean;
   nextCursor: string | null;
 }
+
+// ==================== Faceted Search ====================
+
+export interface FacetValueCount {
+  value: string;
+  count: number;
+}
+
+export interface SelectFacet {
+  type: 'select';
+  values: { value: string; label: string; count: number }[];
+}
+
+export interface NumberFacet {
+  type: 'number';
+  min: number | null;
+  max: number | null;
+  count: number;
+}
+
+export interface DateFacet {
+  type: 'date';
+  min: string | null;
+  max: string | null;
+  count: number;
+}
+
+export interface CheckboxFacet {
+  type: 'checkbox';
+  trueCount: number;
+  falseCount: number;
+  total: number;
+}
+
+export interface TextFacet {
+  type: 'text';
+  values: string[];
+  count: number;
+}
+
+export interface UserFacet {
+  type: 'user';
+  values: { value: string; count: number }[];
+}
+
+export interface ClientFacet {
+  type: 'client';
+  count: number;
+}
+
+export type FieldFacet = SelectFacet | NumberFacet | DateFacet | CheckboxFacet | TextFacet | UserFacet | ClientFacet;
+
+export interface FacetResult {
+  builtIn: {
+    status: FacetValueCount[];
+    priority: FacetValueCount[];
+    assignee: FacetValueCount[];
+    createdAt: { min: string | null; max: string | null };
+  };
+  custom: Record<string, FieldFacet>;
+}

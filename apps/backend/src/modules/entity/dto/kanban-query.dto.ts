@@ -31,6 +31,10 @@ export class KanbanQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  customFilters?: string; // JSON-строка: Record<string, any>
 }
 
 export class ColumnLoadMoreDto {
@@ -71,4 +75,8 @@ export class ColumnLoadMoreDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  customFilters?: string; // JSON-строка: Record<string, any>
 }

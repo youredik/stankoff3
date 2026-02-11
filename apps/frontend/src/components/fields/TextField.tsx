@@ -136,16 +136,32 @@ function TextForm({ field, value, onChange }: Parameters<FieldRenderer['Form']>[
   );
 }
 
-function TextFilter({ field, filterValue, onChange, inputClass }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+function TextFilter({ field, filterValue, onChange, inputClass, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+  const facet = facetData as import('@/types').TextFacet | undefined;
+  const listId = `text-facet-${field.id}`;
+
   return (
     <div className="mt-2">
+      {facet && (
+        <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">
+          {facet.count} уник. значений
+        </div>
+      )}
       <input
         type="text"
         value={filterValue || ''}
         onChange={(e) => onChange(e.target.value)}
         placeholder={`Поиск по "${field.name}"...`}
         className={inputClass}
+        list={facet?.values?.length ? listId : undefined}
       />
+      {facet?.values?.length ? (
+        <datalist id={listId}>
+          {facet.values.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
+      ) : null}
     </div>
   );
 }

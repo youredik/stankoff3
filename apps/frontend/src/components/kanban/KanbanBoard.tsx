@@ -24,7 +24,6 @@ import {
   FilterPanel,
   createEmptyFilters,
   isFilterActive,
-  applyFilters,
   type FilterState,
 } from './FilterPanel';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -32,6 +31,8 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { Entity, FieldOption } from '@/types';
 import { filtersToApi } from '@/lib/utils/filters';
+import { useWorkspaceFilters } from '@/hooks/useWorkspaceFilters';
+import { useFacets } from '@/hooks/useFacets';
 
 interface KanbanBoardProps {
   workspaceId: string;
@@ -61,7 +62,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const [activeCard, setActiveCard] = useState<Entity | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<FilterState>(createEmptyFilters);
+  const [filters, setFilters] = useWorkspaceFilters(workspaceId);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
@@ -80,12 +81,18 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
   const isAdmin = user?.role === 'admin' || currentRole === 'admin';
   const canEditEntities = canEdit();
+  const { facets } = useFacets(workspaceId, filters);
 
   useEffect(() => {
+    const apiFilters = filtersToApi(filters);
+    const hasServerFilters = Object.values(apiFilters).some((v) => v !== undefined);
+    if (hasServerFilters) {
+      setKanbanFilters(apiFilters);
+    }
     fetchKanban(workspaceId);
     fetchUsers();
     fetchWorkspace(workspaceId);
-  }, [workspaceId, fetchKanban, fetchUsers, fetchWorkspace]);
+  }, [workspaceId, fetchKanban, fetchUsers, fetchWorkspace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -104,34 +111,10 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     return DEFAULT_COLUMNS;
   }, [currentWorkspace]);
 
-  // Check if custom (data-field) filters are active
-  const hasCustomFilters = useMemo(() => {
-    return Object.values(filters.customFilters).some((v) => isFilterActive(v));
-  }, [filters.customFilters]);
-
-  // Apply custom field filters client-side (server handles search/assignee/priority/date)
-  const filteredColumns = useMemo(() => {
-    if (!hasCustomFilters) return kanbanColumns;
-    const customOnly: FilterState = {
-      search: '',
-      assigneeIds: [],
-      priorities: [],
-      dateFrom: '',
-      dateTo: '',
-      customFilters: filters.customFilters,
-    };
-    const result: typeof kanbanColumns = {};
-    for (const [key, col] of Object.entries(kanbanColumns)) {
-      const filtered = applyFilters(col.items, customOnly);
-      result[key] = { ...col, items: filtered };
-    }
-    return result;
-  }, [kanbanColumns, hasCustomFilters, filters.customFilters]);
-
   // Count loaded entities across all columns
   const loadedCount = useMemo(() => {
-    return Object.values(filteredColumns).reduce((sum, col) => sum + col.items.length, 0);
-  }, [filteredColumns]);
+    return Object.values(kanbanColumns).reduce((sum, col) => sum + col.items.length, 0);
+  }, [kanbanColumns]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -168,7 +151,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         setKanbanFilters(apiFilters);
       }
     },
-    [setKanbanFilters],
+    [setFilters, setKanbanFilters],
   );
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -205,7 +188,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     setKanbanFilters({});
   };
 
-  if (kanbanLoading && Object.keys(filteredColumns).length === 0) {
+  if (kanbanLoading && Object.keys(kanbanColumns).length === 0) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4">
         <SkeletonColumn />
@@ -304,7 +287,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         >
           <div className="flex overflow-x-auto pb-4">
             {columns.map((column) => {
-              const colData = filteredColumns[column.id] || {
+              const colData = kanbanColumns[column.id] || {
                 items: [],
                 total: 0,
                 hasMore: false,
@@ -347,6 +330,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClose={() => setShowFilters(false)}
+          facets={facets}
         />
       )}
     </div>

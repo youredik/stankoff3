@@ -403,9 +403,10 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 
 **Основные эндпоинты:**
 - `GET/POST /api/entities` — сущности (GET без пагинации — legacy)
-- `GET /api/entities/kanban` — канбан с серверной пагинацией (query: workspaceId, perColumn, search, assigneeId[], priority[], dateFrom, dateTo)
-- `GET /api/entities/table` — табличное представление с пагинацией, сортировкой (query: workspaceId, page, perPage, sortBy, sortOrder, search, assigneeId[], priority[], status[], dateFrom, dateTo)
-- `GET /api/entities/kanban/column` — подгрузка колонки (query: workspaceId, status, offset, limit + фильтры)
+- `GET /api/entities/kanban` — канбан с серверной пагинацией (query: workspaceId, perColumn, search, assigneeId[], priority[], dateFrom, dateTo, customFilters)
+- `GET /api/entities/table` — табличное представление с пагинацией, сортировкой (query: workspaceId, page, perPage, sortBy, sortOrder, search, assigneeId[], priority[], status[], dateFrom, dateTo, customFilters)
+- `GET /api/entities/kanban/column` — подгрузка колонки (query: workspaceId, status, offset, limit + фильтры + customFilters)
+- `GET /api/entities/facets` — фасетные агрегации для фильтров (query: workspaceId, search, assigneeId[], priority[], dateFrom, dateTo, customFilters). Возвращает builtIn (status/priority/assignee/createdAt счётчики) + custom (фасеты по кастомным JSONB полям). customFilters — JSON строка Record<string, any>
 - `PATCH /api/entities/:id/status` — изменение статуса
 - `PATCH /api/entities/:id/assignee` — назначение исполнителя
 - `DELETE /api/entities/cleanup/test-data` — очистка тестовых данных (E2E)
@@ -534,6 +535,17 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `POST /api/ai/indexer/start` — запустить индексацию legacy заявок
 - `POST /api/ai/indexer/reindex/:requestId` — переиндексировать конкретную заявку
 
+**AI Notifications (проактивные уведомления, cron каждые 5 мин):**
+- `GET /api/ai/notifications` — список уведомлений (query: workspaceId, unreadOnly, limit, offset)
+- `GET /api/ai/notifications/unread-count` — количество непрочитанных
+- `PATCH /api/ai/notifications/:id/read` — отметить прочитанным
+- `POST /api/ai/notifications/mark-all-read` — отметить все прочитанными (body: { workspaceId? })
+- `DELETE /api/ai/notifications/:id` — скрыть уведомление
+- `POST /api/ai/notifications/toggle` — включить/выключить анализ (body: { enabled })
+
+**AI Knowledge Graph (контекстное обогащение):**
+- `GET /api/ai/knowledge-graph/:entityId` — граф связей заявки (entity → legacy → эксперты → контрагенты → темы)
+
 **Примечание по AI:**
 RAG использует данные из legacy CRM (QD_requests + QD_answers). Результаты поиска включают ссылки на legacy систему (https://www.stankoff.ru/crm/request/:id). Индексация создаёт embeddings для закрытых заявок с ответами.
 
@@ -601,6 +613,26 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 
 **Frontend API клиент:** `lib/api/legacy.ts` — все методы + `legacyUrls` для генерации URL
 
+**Knowledge Base (база знаний для сотрудников):**
+- `GET /api/knowledge-base/articles` — список статей (query: type, category, workspaceId, search, page, perPage)
+- `GET /api/knowledge-base/articles/:id` — детали статьи
+- `POST /api/knowledge-base/articles` — создать FAQ статью (body: title, content, category?, tags?, workspaceId?, status?)
+- `POST /api/knowledge-base/articles/upload` — загрузить документ (multipart: file, title, category?, tags?, workspaceId?)
+- `PUT /api/knowledge-base/articles/:id` — обновить статью
+- `DELETE /api/knowledge-base/articles/:id` — удалить (автор или ADMIN)
+- `GET /api/knowledge-base/categories` — список категорий (query: workspaceId?)
+- `GET /api/knowledge-base/stats` — статистика (документы, FAQ, чанки)
+
+**Frontend компоненты Knowledge Base (`components/knowledge-base/`):**
+- `KnowledgeBasePage` — главный компонент с табами (Документы / FAQ / Статистика)
+- `KnowledgeBaseList` — список карточек с поиском, фильтром и пагинацией
+- `KnowledgeArticleCard` — карточка статьи (документ или FAQ)
+- `DocumentUploadDialog` — модалка загрузки документа (drag-and-drop)
+- `FaqEditorDialog` — модалка создания FAQ
+- `KnowledgeBaseStatsPanel` — панель статистики
+
+**Frontend API клиент:** `lib/api/knowledge-base.ts`, Store: `store/useKnowledgeBaseStore.ts`
+
 ## WebSocket события
 
 - `entity:created`, `entity:updated` — сущности
@@ -612,6 +644,7 @@ RAG использует данные из legacy CRM (QD_requests + QD_answers)
 - `task:overdue` — уведомление о просроченной задаче
 - `process:incident` — процесс зависнул (worker retries исчерпаны)
 - `ai:classification:ready` — автоклассификация AI завершена (entityId, workspaceId, classification)
+- `ai:notification` — проактивное AI уведомление (кластер заявок, критическая заявка и др.)
 - `auth:refresh` (client → server) — обновление JWT без разрыва WebSocket
 - `presence:update` — список онлайн-пользователей (usePresenceStore)
 - `chat:message` — новое сообщение в чате (conversationId, message)

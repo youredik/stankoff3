@@ -294,43 +294,61 @@ function SelectForm({ field, value, onChange, allData }: Parameters<FieldRendere
   );
 }
 
-function SelectFilter({ field, filterValue, toggleMultiSelect, allFilterValues }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+function SelectFilter({ field, filterValue, toggleMultiSelect, allFilterValues, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
   if (!field.options) return null;
 
   const config = field.config as SelectFieldConfig | undefined;
+  const facet = facetData as import('@/types').SelectFacet | undefined;
+
+  // Счётчики из facetData
+  const countMap = useMemo(() => {
+    if (!facet?.values) return new Map<string, number>();
+    return new Map(facet.values.map((v) => [v.value, v.count]));
+  }, [facet]);
 
   // cascadeFrom: фильтрация опций по значению родительского фильтра
   const visibleOptions = useMemo(() => {
     if (!config?.cascadeFrom || !allFilterValues) return field.options || [];
     const parentFilterValue = allFilterValues[config.cascadeFrom];
-    // Если родительский фильтр не активен — показываем все
     if (!parentFilterValue || (Array.isArray(parentFilterValue) && parentFilterValue.length === 0)) {
       return field.options || [];
     }
-    // Если родительский фильтр = массив (multi-select) — показываем опции для всех выбранных родителей
     const parentIds = Array.isArray(parentFilterValue) ? parentFilterValue : [parentFilterValue];
     return (field.options || []).filter((o) => o.parentId && parentIds.includes(o.parentId));
   }, [field.options, config?.cascadeFrom, allFilterValues]);
 
   return (
     <div className="mt-2 space-y-1">
-      {visibleOptions.map((option) => (
-        <label
-          key={option.id}
-          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          <input
-            type="checkbox"
-            checked={filterValue?.includes(option.id) || false}
-            onChange={() => toggleMultiSelect(option.id)}
-            className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-          />
-          {option.color && (
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: option.color }} />
-          )}
-          <span className="text-sm text-gray-700 dark:text-gray-300">{option.label}</span>
-        </label>
-      ))}
+      {visibleOptions.map((option) => {
+        const count = countMap.get(option.id);
+        const isDisabled = facet && count === undefined;
+
+        return (
+          <label
+            key={option.id}
+            className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+              isDisabled
+                ? 'opacity-40 cursor-default'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={filterValue?.includes(option.id) || false}
+              onChange={() => toggleMultiSelect(option.id)}
+              disabled={!!isDisabled}
+              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+            />
+            {option.color && (
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: option.color }} />
+            )}
+            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">{option.label}</span>
+            {count != null && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+            )}
+          </label>
+        );
+      })}
     </div>
   );
 }

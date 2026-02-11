@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { Entity } from '@/types';
+import type { Entity, FacetResult } from '@/types';
 
 export interface KanbanColumnData {
   status: string;
@@ -19,6 +19,7 @@ export interface EntityFilters {
   priority?: string[];
   dateFrom?: string;
   dateTo?: string;
+  customFilters?: Record<string, any>;
 }
 
 export interface TableResponse {
@@ -37,6 +38,19 @@ export interface TableQueryParams extends EntityFilters {
   status?: string[];
 }
 
+function serializeFilters(filters?: EntityFilters) {
+  if (!filters) return {};
+  const { customFilters, ...rest } = filters;
+  return {
+    ...rest,
+    assigneeId: filters.assigneeId?.join(',') || undefined,
+    priority: filters.priority?.join(',') || undefined,
+    customFilters: customFilters && Object.keys(customFilters).length > 0
+      ? JSON.stringify(customFilters)
+      : undefined,
+  };
+}
+
 export const entitiesApi = {
   getByWorkspace: (workspaceId: string) =>
     apiClient
@@ -49,9 +63,7 @@ export const entitiesApi = {
         params: {
           workspaceId,
           perColumn,
-          ...filters,
-          assigneeId: filters?.assigneeId?.join(',') || undefined,
-          priority: filters?.priority?.join(',') || undefined,
+          ...serializeFilters(filters),
         },
       })
       .then((r) => r.data),
@@ -72,23 +84,36 @@ export const entitiesApi = {
             status,
             offset,
             limit,
-            ...filters,
-            assigneeId: filters?.assigneeId?.join(',') || undefined,
-            priority: filters?.priority?.join(',') || undefined,
+            ...serializeFilters(filters),
           },
         },
       )
       .then((r) => r.data),
 
-  getTable: (workspaceId: string, params?: TableQueryParams) =>
-    apiClient
+  getTable: (workspaceId: string, params?: TableQueryParams) => {
+    const { customFilters, ...rest } = params || {};
+    return apiClient
       .get<TableResponse>('/entities/table', {
         params: {
           workspaceId,
-          ...params,
+          ...rest,
           assigneeId: params?.assigneeId?.join(',') || undefined,
           priority: params?.priority?.join(',') || undefined,
           status: params?.status?.join(',') || undefined,
+          customFilters: customFilters && Object.keys(customFilters).length > 0
+            ? JSON.stringify(customFilters)
+            : undefined,
+        },
+      })
+      .then((r) => r.data);
+  },
+
+  getFacets: (workspaceId: string, filters?: EntityFilters) =>
+    apiClient
+      .get<FacetResult>('/entities/facets', {
+        params: {
+          workspaceId,
+          ...serializeFilters(filters),
         },
       })
       .then((r) => r.data),

@@ -161,26 +161,46 @@ function UserForm({ field, value, users, onChange }: Parameters<FieldRenderer['F
   );
 }
 
-function UserFilter({ field, filterValue, users, toggleMultiSelect }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+function UserFilter({ field, filterValue, users, toggleMultiSelect, facetData }: Parameters<NonNullable<FieldRenderer['Filter']>>[0]) {
+  const facet = facetData as import('@/types').UserFacet | undefined;
+
+  const countMap = useMemo(() => {
+    if (!facet?.values) return new Map<string, number>();
+    return new Map(facet.values.map((v) => [v.value, v.count]));
+  }, [facet]);
+
   return (
     <div className="mt-2 space-y-1">
-      {users.map((user) => (
-        <label
-          key={user.id}
-          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          <input
-            type="checkbox"
-            checked={filterValue?.includes(user.id) || false}
-            onChange={() => toggleMultiSelect(user.id)}
-            className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-          />
-          <UserAvatar firstName={user.firstName} lastName={user.lastName} size="xs" />
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            {user.firstName} {user.lastName}
-          </span>
-        </label>
-      ))}
+      {users.map((user) => {
+        const count = countMap.get(user.id);
+        const isDisabled = facet && count === undefined;
+
+        return (
+          <label
+            key={user.id}
+            className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+              isDisabled
+                ? 'opacity-40 cursor-default'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={filterValue?.includes(user.id) || false}
+              onChange={() => toggleMultiSelect(user.id)}
+              disabled={!!isDisabled}
+              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+            />
+            <UserAvatar firstName={user.firstName} lastName={user.lastName} size="xs" />
+            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+              {user.firstName} {user.lastName}
+            </span>
+            {count != null && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+            )}
+          </label>
+        );
+      })}
     </div>
   );
 }
