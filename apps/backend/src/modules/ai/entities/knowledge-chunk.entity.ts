@@ -27,7 +27,7 @@ export class KnowledgeChunk {
   @Index()
   sourceType: ChunkSourceType;
 
-  @Column({ name: 'source_id', type: 'uuid', nullable: true })
+  @Column({ name: 'source_id', type: 'varchar', length: 255, nullable: true })
   sourceId: string;
 
   @Column({ name: 'workspace_id', type: 'uuid', nullable: true })
