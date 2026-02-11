@@ -21,7 +21,7 @@ export function TimelineAuditItem({ log, statusOptions }: TimelineAuditItemProps
   const Icon = config.icon;
 
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3 items-start">
       <div
         className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${config.color}`}
       >

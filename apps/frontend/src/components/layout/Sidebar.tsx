@@ -2,14 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { UserAvatar } from '@/components/ui/UserAvatar';
 import {
   Plus,
   Users,
   MoreVertical,
   Pencil,
   Trash2,
-  LogOut,
   Copy,
   Archive,
   Download,
@@ -28,7 +26,6 @@ import {
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
-import { useAuthStore } from '@/store/useAuthStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import { useTaskStore } from '@/store/useTaskStore';
@@ -100,7 +97,6 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     useWorkspaceStore();
   const { sections, fetchSections, createSection, deleteSection, updateSection, collapsedSections, toggleSectionCollapsed } =
     useSectionStore();
-  const { user, logout } = useAuthStore();
   const { inboxCount, fetchInboxCount } = useTaskStore();
   const totalChatUnread = useChatStore((s) => {
     const counts = s.unreadCounts;
@@ -128,15 +124,6 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     [workspaces, sections]
   );
 
-  const getFullName = () => {
-    if (!user) return 'Пользователь';
-    return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
-  };
 
   useEffect(() => {
     fetchWorkspaces();
@@ -740,32 +727,6 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
             </div>
           )}
         </nav>
-
-        {/* User section */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <UserAvatar
-              firstName={user?.firstName}
-              lastName={user?.lastName}
-              email={user?.email}
-              size="lg"
-              showOnline={false}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{getFullName()}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              aria-label="Выйти из системы"
-              data-testid="sidebar-logout"
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-              title="Выйти"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
       </aside>
     </>
   );

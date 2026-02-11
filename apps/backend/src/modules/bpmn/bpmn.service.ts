@@ -704,6 +704,49 @@ export class BpmnService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  // ==================== BPMN XML Helpers ====================
+
+  /**
+   * Extract element name from BPMN XML of a process definition
+   */
+  async getElementNameFromDefinition(
+    processDefinitionId: string,
+    elementId: string,
+  ): Promise<string | null> {
+    try {
+      const definition = await this.processDefinitionRepository.findOne({
+        where: { id: processDefinitionId },
+        select: ['bpmnXml'],
+      });
+      if (!definition?.bpmnXml) return null;
+
+      return this.extractElementNameFromXml(definition.bpmnXml, elementId);
+    } catch (error) {
+      this.logger.warn(
+        `Could not extract element name for ${elementId}: ${error.message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Extract element name attribute from BPMN XML by element ID
+   */
+  extractElementNameFromXml(bpmnXml: string, elementId: string): string | null {
+    // Find any XML element with id="elementId" and extract its name attribute
+    const escapedId = elementId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const elementRegex = new RegExp(
+      `<[^>]*\\bid="${escapedId}"[^>]*>`,
+      's',
+    );
+    const elementMatch = bpmnXml.match(elementRegex);
+    if (elementMatch) {
+      const nameMatch = elementMatch[0].match(/\bname="([^"]*)"/);
+      return nameMatch ? nameMatch[1] : null;
+    }
+    return null;
+  }
+
   // ==================== Messages ====================
 
   async sendMessage(

@@ -59,11 +59,16 @@ export class UserTasksWorker {
     const followUpDate = this.parseDate(headers['io.camunda.zeebe:followUpDate'] || variables.followUpDate);
     const taskType = headers['io.camunda.zeebe:taskType'] || variables.taskType || 'custom';
 
+    // Resolve process instance and element name
+    const processInstanceKey = String(job.processInstanceKey);
+    const processInstanceId = await this.getProcessInstanceId(processInstanceKey);
+    const elementName = headers.name || await this.resolveElementName(processInstanceKey, job.elementId) || job.elementId;
+
     const task = await this.tasksService.createFromZeebe({
       jobKey: String(job.key),
-      processInstanceId: await this.getProcessInstanceId(String(job.processInstanceKey)),
+      processInstanceId,
       elementId: job.elementId,
-      elementName: headers.name || job.elementId,
+      elementName,
       workspaceId,
       entityId,
       taskType,
@@ -95,6 +100,21 @@ export class UserTasksWorker {
     // The actual job completion is handled by BpmnWorkersService
     // This method is called to signal completion
     // In a full implementation, we would store the job reference and complete it here
+  }
+
+  /**
+   * Resolve human-readable element name from BPMN XML definition
+   */
+  private async resolveElementName(processInstanceKey: string, elementId: string): Promise<string | null> {
+    try {
+      const instance = await this.bpmnService.findInstanceByKey(processInstanceKey);
+      if (instance?.processDefinitionId) {
+        return this.bpmnService.getElementNameFromDefinition(instance.processDefinitionId, elementId);
+      }
+    } catch (error) {
+      this.logger.warn(`Could not resolve element name for ${elementId}: ${error.message}`);
+    }
+    return null;
   }
 
   /**

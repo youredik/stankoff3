@@ -406,6 +406,84 @@ describe('BpmnService', () => {
     });
   });
 
+  describe('extractElementNameFromXml', () => {
+    const bpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <bpmn:process id="claims-management" name="Управление рекламациями">
+    <bpmn:userTask id="Task_Register" name="Регистрация рекламации">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:userTask id="Task_Review" name="Рассмотреть заявку">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.zeebe:userTask" />
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Service_Notify" name="Отправить уведомление" />
+  </bpmn:process>
+</bpmn:definitions>`;
+
+    it('должен извлечь имя userTask по elementId', () => {
+      const result = service.extractElementNameFromXml(bpmnXml, 'Task_Register');
+      expect(result).toBe('Регистрация рекламации');
+    });
+
+    it('должен извлечь имя другого userTask', () => {
+      const result = service.extractElementNameFromXml(bpmnXml, 'Task_Review');
+      expect(result).toBe('Рассмотреть заявку');
+    });
+
+    it('должен извлечь имя serviceTask', () => {
+      const result = service.extractElementNameFromXml(bpmnXml, 'Service_Notify');
+      expect(result).toBe('Отправить уведомление');
+    });
+
+    it('должен вернуть null если элемент не найден', () => {
+      const result = service.extractElementNameFromXml(bpmnXml, 'NonExistent');
+      expect(result).toBeNull();
+    });
+
+    it('должен вернуть null если элемент без name', () => {
+      const xml = '<bpmn:userTask id="Task_NoName"><bpmn:extensionElements /></bpmn:userTask>';
+      const result = service.extractElementNameFromXml(xml, 'Task_NoName');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getElementNameFromDefinition', () => {
+    it('должен вернуть имя элемента из определения процесса', async () => {
+      const bpmnXml = '<bpmn:userTask id="Task_Register" name="Регистрация рекламации" />';
+      processDefinitionRepo.findOne.mockResolvedValue({
+        bpmnXml,
+      } as ProcessDefinition);
+
+      const result = await service.getElementNameFromDefinition('def-1', 'Task_Register');
+
+      expect(result).toBe('Регистрация рекламации');
+      expect(processDefinitionRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'def-1' },
+        select: ['bpmnXml'],
+      });
+    });
+
+    it('должен вернуть null если определение не найдено', async () => {
+      processDefinitionRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.getElementNameFromDefinition('def-999', 'Task_Register');
+
+      expect(result).toBeNull();
+    });
+
+    it('должен вернуть null при ошибке', async () => {
+      processDefinitionRepo.findOne.mockRejectedValue(new Error('DB error'));
+
+      const result = await service.getElementNameFromDefinition('def-1', 'Task_Register');
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('Zeebe operations (requires connection)', () => {
     it('deployDefinition должен выбросить ошибку если Zeebe не подключен', async () => {
       processDefinitionRepo.findOne.mockResolvedValue(mockDefinition);

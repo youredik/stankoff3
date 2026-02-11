@@ -11,7 +11,7 @@ interface TimelineCommentItemProps {
 
 export function TimelineCommentItem({ comment, allAttachments }: TimelineCommentItemProps) {
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3 items-start">
       <UserAvatar
         firstName={comment.author.firstName}
         lastName={comment.author.lastName}
