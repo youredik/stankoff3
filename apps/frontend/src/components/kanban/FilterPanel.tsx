@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Search, User, Tag, Calendar, ChevronDown, Hash, Type, ToggleLeft, Link2, MapPin, Users } from 'lucide-react';
+import { X, Search, User, Tag, Calendar, Hash, Type, ToggleLeft, Link2, MapPin, Users } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { fieldRegistry } from '@/components/fields';
-import type { Field, FieldType, FieldOption, User as UserType, FacetResult } from '@/types';
+import type { Field, FieldType, FieldOption, FacetResult } from '@/types';
 
 export interface FilterState {
   search: string;
@@ -79,11 +78,6 @@ export function FilterPanel({
 }: FilterPanelProps) {
   const { users } = useEntityStore();
   const { currentWorkspace } = useWorkspaceStore();
-  // «Детали» (ws-details) — всегда развёрнута по умолчанию
-  const [expandedSections, setExpandedSections] = useState<string[]>([
-    'common',
-    'ws-details',
-  ]);
 
   // Collect filterable fields grouped by workspace section
   const workspaceSections = (currentWorkspace?.sections || [])
@@ -98,12 +92,6 @@ export function FilterPanel({
       ),
     }))
     .filter((section) => section.filterableFields.length > 0);
-
-  const toggleSection = (id: string) => {
-    setExpandedSections((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-    );
-  };
 
   const updateFilter = <K extends keyof FilterState>(
     key: K,
@@ -229,268 +217,197 @@ export function FilterPanel({
         <div className="flex-1 overflow-y-auto p-4 space-y-1">
           {/* ====== Секция «Общие» ====== */}
           <div className="mb-3">
-            <button
-              onClick={() => toggleSection('common')}
-              className="flex items-center justify-between w-full text-left cursor-pointer py-1"
-            >
+            <div className="py-1">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Общие
               </span>
-              <ChevronDown
-                className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
-                  expandedSections.includes('common') ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
+            </div>
 
-            {expandedSections.includes('common') && (
-              <div className="mt-2 space-y-4">
-                {/* Search */}
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
-                    <Search className="w-4 h-4" />
-                    <span>Поиск</span>
-                  </div>
-                  <input
-                    type="text"
-                    value={filters.search}
-                    onChange={(e) => updateFilter('search', e.target.value)}
-                    placeholder="Поиск по названию..."
-                    data-testid="filter-search-input"
-                    className={inputClass}
-                  />
+            <div className="mt-2 space-y-4">
+              {/* Search */}
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                  <Search className="w-4 h-4" />
+                  <span>Поиск</span>
                 </div>
+                <input
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) => updateFilter('search', e.target.value)}
+                  placeholder="Поиск по названию..."
+                  data-testid="filter-search-input"
+                  className={inputClass}
+                />
+              </div>
 
-                {/* Assignee */}
-                <div>
-                  <button
-                    onClick={() => toggleSection('assignee')}
-                    className="flex items-center justify-between w-full text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                      <User className="w-4 h-4" />
-                      <span>Исполнитель</span>
-                      {filters.assigneeIds.length > 0 && (
-                        <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
-                          {filters.assigneeIds.length}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronDown
-                      className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
-                        expandedSections.includes('assignee') ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-                  {expandedSections.includes('assignee') && (
-                    <div className="mt-2 space-y-1">
-                      {users.map((user) => {
-                        const count = assigneeCountMap.get(user.id);
-                        const isDisabled = facets && count === undefined;
-                        return (
-                          <label
-                            key={user.id}
-                            className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
-                              isDisabled
-                                ? 'opacity-40 cursor-default'
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={filters.assigneeIds.includes(user.id)}
-                              onChange={() =>
-                                toggleArrayFilter('assigneeIds', user.id)
-                              }
-                              disabled={!!isDisabled}
-                              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-                            />
-                            <UserAvatar
-                              firstName={user.firstName}
-                              lastName={user.lastName}
-                              userId={user.id}
-                              size="sm"
-                            />
-                            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                              {user.firstName} {user.lastName}
-                            </span>
-                            {count != null && (
-                              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
+              {/* Assignee */}
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <User className="w-4 h-4" />
+                  <span>Исполнитель</span>
+                  {filters.assigneeIds.length > 0 && (
+                    <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
+                      {filters.assigneeIds.length}
+                    </span>
                   )}
                 </div>
-
-                {/* Priority */}
-                <div>
-                  <button
-                    onClick={() => toggleSection('priority')}
-                    className="flex items-center justify-between w-full text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                      <Tag className="w-4 h-4" />
-                      <span>Приоритет</span>
-                      {filters.priorities.length > 0 && (
-                        <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
-                          {filters.priorities.length}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronDown
-                      className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
-                        expandedSections.includes('priority') ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-                  {expandedSections.includes('priority') && (
-                    <div className="mt-2 space-y-1">
-                      {PRIORITY_OPTIONS.map((option) => {
-                        const count = priorityCountMap.get(option.id);
-                        const isDisabled = facets && count === undefined;
-                        return (
-                          <label
-                            key={option.id}
-                            className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
-                              isDisabled
-                                ? 'opacity-40 cursor-default'
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={filters.priorities.includes(option.id)}
-                              onChange={() =>
-                                toggleArrayFilter('priorities', option.id)
-                              }
-                              disabled={!!isDisabled}
-                              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-                            />
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: option.color }}
-                            />
-                            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                              {option.label}
-                            </span>
-                            {count != null && (
-                              <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Date */}
-                <div>
-                  <button
-                    onClick={() => toggleSection('date')}
-                    className="flex items-center justify-between w-full text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                      <Calendar className="w-4 h-4" />
-                      <span>Дата создания</span>
-                    </div>
-                    <ChevronDown
-                      className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
-                        expandedSections.includes('date') ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-                  {expandedSections.includes('date') && (
-                    <div className="mt-2 space-y-2">
-                      <div>
-                        <label className="text-xs text-gray-500 dark:text-gray-400">
-                          От
-                        </label>
+                <div className="mt-2 space-y-1">
+                  {users.map((user) => {
+                    const count = assigneeCountMap.get(user.id);
+                    const isDisabled = facets && count === undefined;
+                    return (
+                      <label
+                        key={user.id}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+                          isDisabled
+                            ? 'opacity-40 cursor-default'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
                         <input
-                          type="date"
-                          value={filters.dateFrom}
-                          onChange={(e) =>
-                            updateFilter('dateFrom', e.target.value)
+                          type="checkbox"
+                          checked={filters.assigneeIds.includes(user.id)}
+                          onChange={() =>
+                            toggleArrayFilter('assigneeIds', user.id)
                           }
-                          className={inputClass}
+                          disabled={!!isDisabled}
+                          className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                         />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 dark:text-gray-400">
-                          До
-                        </label>
-                        <input
-                          type="date"
-                          value={filters.dateTo}
-                          onChange={(e) =>
-                            updateFilter('dateTo', e.target.value)
-                          }
-                          className={inputClass}
+                        <UserAvatar
+                          firstName={user.firstName}
+                          lastName={user.lastName}
+                          userId={user.id}
+                          size="sm"
                         />
-                      </div>
-                    </div>
-                  )}
+                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                          {user.firstName} {user.lastName}
+                        </span>
+                        {count != null && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+                        )}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
-            )}
+
+              {/* Priority */}
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <Tag className="w-4 h-4" />
+                  <span>Приоритет</span>
+                  {filters.priorities.length > 0 && (
+                    <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
+                      {filters.priorities.length}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 space-y-1">
+                  {PRIORITY_OPTIONS.map((option) => {
+                    const count = priorityCountMap.get(option.id);
+                    const isDisabled = facets && count === undefined;
+                    return (
+                      <label
+                        key={option.id}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
+                          isDisabled
+                            ? 'opacity-40 cursor-default'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filters.priorities.includes(option.id)}
+                          onChange={() =>
+                            toggleArrayFilter('priorities', option.id)
+                          }
+                          disabled={!!isDisabled}
+                          className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
+                        />
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: option.color }}
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                          {option.label}
+                        </span>
+                        {count != null && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{count}</span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Date */}
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <Calendar className="w-4 h-4" />
+                  <span>Дата создания</span>
+                </div>
+                <div className="mt-2 space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">
+                      От
+                    </label>
+                    <input
+                      type="date"
+                      value={filters.dateFrom}
+                      onChange={(e) =>
+                        updateFilter('dateFrom', e.target.value)
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">
+                      До
+                    </label>
+                    <input
+                      type="date"
+                      value={filters.dateTo}
+                      onChange={(e) =>
+                        updateFilter('dateTo', e.target.value)
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ====== Секции из workspace ====== */}
           {workspaceSections.map((section) => (
             <div key={section.id} className="mb-3" data-testid={`filter-section-${section.id}`}>
-              <button
-                onClick={() => toggleSection(`ws-${section.id}`)}
-                className="flex items-center justify-between w-full text-left cursor-pointer py-1"
-              >
+              <div className="py-1">
                 <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {section.name}
                 </span>
-                <ChevronDown
-                  className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
-                    expandedSections.includes(`ws-${section.id}`)
-                      ? 'rotate-180'
-                      : ''
-                  }`}
-                />
-              </button>
+              </div>
 
-              {expandedSections.includes(`ws-${section.id}`) && (
-                <div className="mt-2 space-y-4">
-                  {section.filterableFields.map((field) => {
-                    const Icon = getFieldIcon(field.type);
-                    const activeCount = fieldFilterCount(field.id);
+              <div className="mt-2 space-y-4">
+                {section.filterableFields.map((field) => {
+                  const Icon = getFieldIcon(field.type);
+                  const activeCount = fieldFilterCount(field.id);
 
-                    return (
-                      <div key={field.id} data-testid={`filter-field-${field.id}`}>
-                        <button
-                          onClick={() => toggleSection(`field-${field.id}`)}
-                          className="flex items-center justify-between w-full text-left cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-                            <Icon className="w-4 h-4" />
-                            <span>{field.name}</span>
-                            {activeCount > 0 && (
-                              <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
-                                {activeCount}
-                              </span>
-                            )}
-                          </div>
-                          <ChevronDown
-                            className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${
-                              expandedSections.includes(`field-${field.id}`)
-                                ? 'rotate-180'
-                                : ''
-                            }`}
-                          />
-                        </button>
-                        {expandedSections.includes(`field-${field.id}`) &&
-                          renderFieldFilter(field)}
+                  return (
+                    <div key={field.id} data-testid={`filter-field-${field.id}`}>
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                        <Icon className="w-4 h-4" />
+                        <span>{field.name}</span>
+                        {activeCount > 0 && (
+                          <span className="text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded">
+                            {activeCount}
+                          </span>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      {renderFieldFilter(field)}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>

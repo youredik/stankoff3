@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import type { NumberFieldConfig } from '@/types';
 import type { FieldRenderer } from './types';
 
@@ -109,12 +110,38 @@ function NumberFilter({ field, filterValue, onChange, inputClass, facetData }: P
   const facet = facetData as import('@/types').NumberFacet | undefined;
   const dataMin = facet?.min;
   const dataMax = facet?.max;
+  const hasRange = facet != null && dataMin != null && dataMax != null && dataMin !== dataMax;
+
+  const sliderMin = dataMin ?? 0;
+  const sliderMax = dataMax ?? 100;
+  const step = (sliderMax - sliderMin) / 100 || 1;
+
+  const currentMin = range.min ?? sliderMin;
+  const currentMax = range.max ?? sliderMax;
+
+  // Percentage positions for the highlighted track segment
+  const minPercent = hasRange ? ((currentMin - sliderMin) / (sliderMax - sliderMin)) * 100 : 0;
+  const maxPercent = hasRange ? ((currentMax - sliderMin) / (sliderMax - sliderMin)) * 100 : 100;
+
+  const onMinSlider = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(e.target.value);
+    // Prevent min from exceeding max
+    const clamped = Math.min(val, (range.max ?? sliderMax) - step);
+    onChange({ ...range, min: clamped <= sliderMin ? undefined : clamped });
+  }, [range, sliderMin, sliderMax, step, onChange]);
+
+  const onMaxSlider = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(e.target.value);
+    // Prevent max from going below min
+    const clamped = Math.max(val, (range.min ?? sliderMin) + step);
+    onChange({ ...range, max: clamped >= sliderMax ? undefined : clamped });
+  }, [range, sliderMin, sliderMax, step, onChange]);
 
   return (
     <div className="mt-2 space-y-2">
-      {facet && dataMin != null && dataMax != null && dataMin !== dataMax && (
+      {hasRange && (
         <div className="text-xs text-gray-400 dark:text-gray-500">
-          Диапазон: {dataMin} — {dataMax} ({facet.count})
+          Диапазон: {dataMin} — {dataMax} ({facet!.count})
         </div>
       )}
       <div className="flex gap-2">
@@ -149,16 +176,37 @@ function NumberFilter({ field, filterValue, onChange, inputClass, facetData }: P
           />
         </div>
       </div>
-      {facet && dataMin != null && dataMax != null && dataMin !== dataMax && (
-        <input
-          type="range"
-          min={dataMin}
-          max={dataMax}
-          step={(dataMax - dataMin) / 100 || 1}
-          value={range.max ?? dataMax}
-          onChange={(e) => onChange({ ...range, max: Number(e.target.value) })}
-          className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
-        />
+      {/* Dual-range slider */}
+      {hasRange && (
+        <div className="relative h-6 flex items-center">
+          {/* Track background */}
+          <div className="absolute left-0 right-0 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full" />
+          {/* Highlighted range segment */}
+          <div
+            className="absolute h-1.5 bg-primary-500 rounded-full"
+            style={{ left: `${minPercent}%`, right: `${100 - maxPercent}%` }}
+          />
+          {/* Min thumb */}
+          <input
+            type="range"
+            min={sliderMin}
+            max={sliderMax}
+            step={step}
+            value={currentMin}
+            onChange={onMinSlider}
+            className="absolute w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative [&::-webkit-slider-thumb]:z-20 [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary-500 [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:relative [&::-moz-range-thumb]:z-20"
+          />
+          {/* Max thumb */}
+          <input
+            type="range"
+            min={sliderMin}
+            max={sliderMax}
+            step={step}
+            value={currentMax}
+            onChange={onMaxSlider}
+            className="absolute w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative [&::-webkit-slider-thumb]:z-30 [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary-500 [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:relative [&::-moz-range-thumb]:z-30"
+          />
+        </div>
       )}
     </div>
   );
