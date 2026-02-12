@@ -207,7 +207,7 @@ describe('ClassifierService', () => {
       expect(result.entityId).toBe(entityId);
     });
 
-    it('должен обновить существующую классификацию', async () => {
+    it('должен обновить существующую старую классификацию', async () => {
       providerRegistry.complete.mockResolvedValue(mockClassificationResult);
 
       const existingClassification = {
@@ -217,6 +217,7 @@ describe('ClassifierService', () => {
         priority: 'low',
         skills: [],
         confidence: 0.5,
+        createdAt: new Date(Date.now() - 60 * 60 * 1000), // 1 час назад — старая
       } as unknown as AiClassification;
 
       classificationRepo.findOne.mockResolvedValue(existingClassification);
@@ -225,8 +226,53 @@ describe('ClassifierService', () => {
       const result = await service.classifyAndSave(entityId, dto);
 
       expect(classificationRepo.create).not.toHaveBeenCalled();
+      expect(providerRegistry.complete).toHaveBeenCalled();
       expect(result.category).toBe('technical_support');
       expect(result.priority).toBe('high');
+    });
+
+    it('должен вернуть свежую классификацию без LLM-вызова', async () => {
+      const freshClassification = {
+        id: 'class-123',
+        entityId,
+        category: 'consultation',
+        priority: 'medium',
+        skills: ['general'],
+        confidence: 0.85,
+        reasoning: 'Консультация по оборудованию',
+        provider: 'openai',
+        model: 'gpt-4o',
+        createdAt: new Date(Date.now() - 5 * 60 * 1000), // 5 минут назад — свежая
+      } as unknown as AiClassification;
+
+      classificationRepo.findOne.mockResolvedValue(freshClassification);
+
+      const result = await service.classifyAndSave(entityId, dto);
+
+      // LLM НЕ должен быть вызван
+      expect(providerRegistry.complete).not.toHaveBeenCalled();
+      expect(result).toBe(freshClassification);
+    });
+
+    it('должен классифицировать заново если старше 30 минут', async () => {
+      providerRegistry.complete.mockResolvedValue(mockClassificationResult);
+
+      const oldClassification = {
+        id: 'class-123',
+        entityId,
+        category: 'other',
+        priority: 'low',
+        skills: [],
+        confidence: 0.5,
+        createdAt: new Date(Date.now() - 31 * 60 * 1000), // 31 минута — устаревшая
+      } as unknown as AiClassification;
+
+      classificationRepo.findOne.mockResolvedValue(oldClassification);
+      classificationRepo.save.mockImplementation((c) => Promise.resolve(c as AiClassification));
+
+      await service.classifyAndSave(entityId, dto);
+
+      expect(providerRegistry.complete).toHaveBeenCalled();
     });
   });
 

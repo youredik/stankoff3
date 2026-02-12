@@ -164,6 +164,24 @@ describe('KnowledgeGraphService', () => {
       expect(cpNodes[0].label).toBe('ООО МеталлСтрой');
     });
 
+    it('должен возвращать из кэша при повторном вызове', async () => {
+      const result1 = await service.buildGraph('entity-1');
+      const result2 = await service.buildGraph('entity-1');
+
+      expect(result1).toEqual(result2);
+      // searchSimilar вызван только один раз — второй раз из кэша
+      expect(knowledgeBaseService.searchSimilar).toHaveBeenCalledTimes(1);
+    });
+
+    it('должен перезапросить данные после invalidateCache', async () => {
+      await service.buildGraph('entity-1');
+      service.invalidateCache('entity-1');
+      await service.buildGraph('entity-1');
+
+      // searchSimilar вызван дважды — кэш был сброшен
+      expect(knowledgeBaseService.searchSimilar).toHaveBeenCalledTimes(2);
+    });
+
     it('должен graceful degrade если AI недоступен', async () => {
       knowledgeBaseService.isAvailable.mockReturnValue(false);
 

@@ -15,7 +15,7 @@ interface AiSummaryBannerProps {
  * Показывается когда комментариев >= 5
  */
 export function AiSummaryBanner({ entityId, commentCount }: AiSummaryBannerProps) {
-  const summary = useAiStore((s) => s.summaryCache.get(entityId) ?? null);
+  const summary = useAiStore((s) => s.summaryCache.get(entityId)?.data ?? null);
   const loading = useAiStore((s) => s.summaryLoading.get(entityId) ?? false);
   const fetchSummary = useAiStore((s) => s.fetchSummary);
 
@@ -23,7 +23,7 @@ export function AiSummaryBanner({ entityId, commentCount }: AiSummaryBannerProps
 
   useEffect(() => {
     if (commentCount >= 5) {
-      fetchSummary(entityId);
+      fetchSummary(entityId, commentCount);
     }
   }, [entityId, commentCount, fetchSummary]);
 

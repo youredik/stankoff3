@@ -31,6 +31,14 @@ export interface KnowledgeGraphResponse {
 export class KnowledgeGraphService {
   private readonly logger = new Logger(KnowledgeGraphService.name);
 
+  // In-memory кэш для результатов buildGraph (TTL 5 мин)
+  private readonly cache = new Map<
+    string,
+    { data: KnowledgeGraphResponse; expiresAt: number }
+  >();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000;
+  private readonly CACHE_MAX_SIZE = 200;
+
   constructor(
     @InjectRepository(WorkspaceEntity)
     private readonly entityRepository: Repository<WorkspaceEntity>,
@@ -44,6 +52,12 @@ export class KnowledgeGraphService {
    * Build a knowledge graph centered on an entity
    */
   async buildGraph(entityId: string): Promise<KnowledgeGraphResponse> {
+    // Проверяем кэш
+    const cached = this.cache.get(entityId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const entity = await this.entityRepository.findOne({
       where: { id: entityId },
       relations: ['assignee', 'workspace'],
@@ -96,7 +110,37 @@ export class KnowledgeGraphService {
     // Similar cases from RAG
     await this.addSimilarCases(entity, nodes, edges, nodeIds, centerNodeId);
 
-    return { nodes, edges, centerNodeId };
+    const result = { nodes, edges, centerNodeId };
+
+    // Сохраняем в кэш
+    this.cache.set(entityId, {
+      data: result,
+      expiresAt: Date.now() + this.CACHE_TTL_MS,
+    });
+    if (this.cache.size > this.CACHE_MAX_SIZE) {
+      this.cleanupCache();
+    }
+
+    return result;
+  }
+
+  /**
+   * Сброс кэша для entity (при обновлении)
+   */
+  invalidateCache(entityId: string): void {
+    this.cache.delete(entityId);
+  }
+
+  /**
+   * Удаление истёкших записей кэша
+   */
+  private cleanupCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache) {
+      if (entry.expiresAt < now) {
+        this.cache.delete(key);
+      }
+    }
   }
 
   private async addSimilarCases(

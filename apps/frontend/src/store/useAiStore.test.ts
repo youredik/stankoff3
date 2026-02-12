@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAiStore } from './useAiStore';
-import type { AiAssistantResponse, AiClassification, GeneratedResponse, ConversationSummary } from '@/types/ai';
+import type { AiAssistantResponse, AiClassification, GeneratedResponse, ConversationSummary, KnowledgeGraphResponse } from '@/types/ai';
 
 // Mock AI API
 vi.mock('@/lib/api/ai', () => ({
@@ -11,6 +11,7 @@ vi.mock('@/lib/api/ai', () => ({
     applyClassification: vi.fn(),
     suggestResponse: vi.fn(),
     getSummary: vi.fn(),
+    getKnowledgeGraph: vi.fn(),
   },
 }));
 
@@ -71,6 +72,8 @@ describe('useAiStore', () => {
       streamingDraft: '',
       summaryCache: new Map(),
       summaryLoading: new Map(),
+      knowledgeGraphCache: new Map(),
+      knowledgeGraphLoading: new Map(),
     });
     vi.clearAllMocks();
   });
@@ -87,6 +90,8 @@ describe('useAiStore', () => {
       expect(state.streamingDraft).toBe('');
       expect(state.summaryCache.size).toBe(0);
       expect(state.summaryLoading.size).toBe(0);
+      expect(state.knowledgeGraphCache.size).toBe(0);
+      expect(state.knowledgeGraphLoading.size).toBe(0);
     });
   });
 
@@ -152,8 +157,20 @@ describe('useAiStore', () => {
       expect(result).toEqual(mockClassification);
 
       const state = useAiStore.getState();
-      expect(state.classificationCache.get('entity-1')).toEqual(mockClassification);
+      expect(state.classificationCache.get('entity-1')?.data).toEqual(mockClassification);
       expect(state.classificationLoading.get('entity-1')).toBe(false);
+    });
+
+    it('должен вернуть данные из кэша если TTL не истёк', async () => {
+      vi.mocked(aiApi.getClassification).mockResolvedValue(mockClassification);
+
+      await useAiStore.getState().fetchClassification('entity-1');
+      expect(aiApi.getClassification).toHaveBeenCalledTimes(1);
+
+      // Второй вызов — из кэша
+      const result = await useAiStore.getState().fetchClassification('entity-1');
+      expect(aiApi.getClassification).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(mockClassification);
     });
 
     it('должен вернуть null при ошибке API', async () => {
@@ -183,7 +200,7 @@ describe('useAiStore', () => {
         workspaceId: 'workspace-1',
       });
       expect(result).toEqual(mockClassification);
-      expect(useAiStore.getState().classificationCache.get('entity-1')).toEqual(mockClassification);
+      expect(useAiStore.getState().classificationCache.get('entity-1')?.data).toEqual(mockClassification);
     });
 
     it('должен вернуть null при ошибке', async () => {
@@ -205,7 +222,7 @@ describe('useAiStore', () => {
 
       expect(aiApi.applyClassification).toHaveBeenCalledWith('entity-1');
       expect(result).toEqual(appliedClassification);
-      expect(useAiStore.getState().classificationCache.get('entity-1')?.applied).toBe(true);
+      expect(useAiStore.getState().classificationCache.get('entity-1')?.data?.applied).toBe(true);
     });
 
     it('должен вернуть null при ошибке', async () => {
@@ -274,7 +291,7 @@ describe('useAiStore', () => {
 
       expect(aiApi.getSummary).toHaveBeenCalledWith('entity-1');
       expect(result).toEqual(mockSummary);
-      expect(useAiStore.getState().summaryCache.get('entity-1')).toEqual(mockSummary);
+      expect(useAiStore.getState().summaryCache.get('entity-1')?.data).toEqual(mockSummary);
       expect(useAiStore.getState().summaryLoading.get('entity-1')).toBe(false);
     });
 
@@ -328,6 +345,46 @@ describe('useAiStore', () => {
       expect(state.streamingDraft).toBe('');
       expect(state.summaryCache.size).toBe(0);
       expect(state.summaryLoading.size).toBe(0);
+      expect(state.knowledgeGraphCache.size).toBe(0);
+      expect(state.knowledgeGraphLoading.size).toBe(0);
+    });
+  });
+
+  describe('fetchKnowledgeGraph', () => {
+    const mockGraph: KnowledgeGraphResponse = {
+      nodes: [{ id: 'entity:1', type: 'entity', label: 'Тест' }],
+      edges: [],
+      centerNodeId: 'entity:1',
+    };
+
+    it('должен загрузить граф из API и закэшировать', async () => {
+      vi.mocked(aiApi.getKnowledgeGraph).mockResolvedValue(mockGraph);
+
+      const result = await useAiStore.getState().fetchKnowledgeGraph('entity-1');
+
+      expect(aiApi.getKnowledgeGraph).toHaveBeenCalledWith('entity-1');
+      expect(result).toEqual(mockGraph);
+      expect(useAiStore.getState().knowledgeGraphCache.get('entity-1')?.data).toEqual(mockGraph);
+    });
+
+    it('должен вернуть данные из кэша если TTL не истёк', async () => {
+      vi.mocked(aiApi.getKnowledgeGraph).mockResolvedValue(mockGraph);
+
+      await useAiStore.getState().fetchKnowledgeGraph('entity-1');
+      expect(aiApi.getKnowledgeGraph).toHaveBeenCalledTimes(1);
+
+      const result = await useAiStore.getState().fetchKnowledgeGraph('entity-1');
+      expect(aiApi.getKnowledgeGraph).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(mockGraph);
+    });
+
+    it('должен перезагрузить при forceRefresh', async () => {
+      vi.mocked(aiApi.getKnowledgeGraph).mockResolvedValue(mockGraph);
+
+      await useAiStore.getState().fetchKnowledgeGraph('entity-1');
+      await useAiStore.getState().fetchKnowledgeGraph('entity-1', true);
+
+      expect(aiApi.getKnowledgeGraph).toHaveBeenCalledTimes(2);
     });
   });
 });

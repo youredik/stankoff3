@@ -6,6 +6,7 @@ import { LegacyUrlService } from '../../legacy/services/legacy-url.service';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
 import { WorkspaceEntity } from '../../entity/entity.entity';
 import { Comment } from '../../entity/comment.entity';
+import { AiUsageLog } from '../entities/ai-usage-log.entity';
 import {
   AiAssistantResponse,
   SimilarCase,
@@ -43,11 +44,19 @@ export class AiAssistantService {
     { summary: string; expiresAt: number }
   >();
 
+  // Кэш sentiment (TTL 5 мин, key: entityId:commentId)
+  private readonly sentimentCache = new Map<
+    string,
+    { data: { label: string; emoji: string; score: number } | null; expiresAt: number }
+  >();
+
   constructor(
     @InjectRepository(WorkspaceEntity)
     private readonly entityRepository: Repository<WorkspaceEntity>,
     @InjectRepository(Comment)
     private readonly commentRepository: Repository<Comment>,
+    @InjectRepository(AiUsageLog)
+    private readonly usageLogRepo: Repository<AiUsageLog>,
     private readonly knowledgeBaseService: KnowledgeBaseService,
     private readonly legacyUrlService: LegacyUrlService,
     private readonly providerRegistry: AiProviderRegistry,
@@ -173,6 +182,13 @@ export class AiAssistantService {
    */
   invalidateCache(entityId: string): void {
     this.cache.delete(entityId);
+    this.summaryCache.delete(entityId);
+    // Чистим sentiment-записи для этого entity
+    for (const key of this.sentimentCache.keys()) {
+      if (key.startsWith(`${entityId}:`)) {
+        this.sentimentCache.delete(key);
+      }
+    }
   }
 
   /**
@@ -555,10 +571,23 @@ ${context}
 Сформируй черновик ответа:`;
 
     // Генерируем ответ
+    const startTime = Date.now();
     const result = await this.providerRegistry.complete({
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
       maxTokens: 1000,
+    });
+    const latencyMs = Date.now() - startTime;
+
+    await this.logUsage({
+      provider: result.provider,
+      model: result.model,
+      operation: 'generate',
+      entityId,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      latencyMs,
+      success: true,
     });
 
     return {
@@ -729,7 +758,7 @@ ${conversation}`,
       return null;
     }
 
-    // Получаем последний комментарий
+    // Получаем последний комментарий (нужен для cache key)
     const lastComment = await this.commentRepository.findOne({
       where: { entityId },
       order: { createdAt: 'DESC' },
@@ -738,6 +767,15 @@ ${conversation}`,
     if (!lastComment || lastComment.content.length < 10) {
       return null;
     }
+
+    // Проверяем кэш по entityId:commentId
+    const cacheKey = `${entityId}:${lastComment.id}`;
+    const cached = this.sentimentCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    const startTime = Date.now();
 
     try {
       const result = await this.providerRegistry.complete({
@@ -753,6 +791,19 @@ ${conversation}`,
         jsonMode: true,
       });
 
+      const latencyMs = Date.now() - startTime;
+
+      await this.logUsage({
+        provider: result.provider,
+        model: result.model,
+        operation: 'classify',
+        entityId,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        latencyMs,
+        success: true,
+      });
+
       const parsed = JSON.parse(extractJson(result.content));
       const emojiMap: Record<string, string> = {
         satisfied: '😊',
@@ -762,14 +813,72 @@ ${conversation}`,
         urgent: '🚨',
       };
 
-      return {
+      const sentiment = {
         label: parsed.label || 'neutral',
         emoji: emojiMap[parsed.label] || '😐',
         score: parsed.score || 0.5,
       };
+
+      // Сохраняем в кэш
+      this.sentimentCache.set(cacheKey, {
+        data: sentiment,
+        expiresAt: Date.now() + this.CACHE_TTL_MS,
+      });
+      if (this.sentimentCache.size > this.CACHE_MAX_SIZE) {
+        const now = Date.now();
+        for (const [key, entry] of this.sentimentCache) {
+          if (entry.expiresAt < now) this.sentimentCache.delete(key);
+        }
+      }
+
+      return sentiment;
     } catch (error) {
+      const latencyMs = Date.now() - startTime;
+      await this.logUsage({
+        provider: 'unknown',
+        model: 'unknown',
+        operation: 'classify',
+        entityId,
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs,
+        success: false,
+        error: error.message,
+      });
       this.logger.warn(`Ошибка анализа настроения: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * Логирует использование AI
+   */
+  private async logUsage(data: {
+    provider: string;
+    model: string;
+    operation: string;
+    entityId?: string;
+    inputTokens: number;
+    outputTokens: number;
+    latencyMs: number;
+    success: boolean;
+    error?: string;
+  }): Promise<void> {
+    try {
+      const log = this.usageLogRepo.create({
+        provider: data.provider as AiUsageLog['provider'],
+        model: data.model,
+        operation: data.operation as AiUsageLog['operation'],
+        entityId: data.entityId,
+        inputTokens: data.inputTokens,
+        outputTokens: data.outputTokens,
+        latencyMs: data.latencyMs,
+        success: data.success,
+        error: data.error,
+      });
+      await this.usageLogRepo.save(log);
+    } catch (e) {
+      this.logger.error(`Ошибка записи лога AI: ${e}`);
     }
   }
 }

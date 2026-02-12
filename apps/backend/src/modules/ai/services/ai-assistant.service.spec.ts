@@ -7,6 +7,7 @@ import { LegacyUrlService } from '../../legacy/services/legacy-url.service';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
 import { WorkspaceEntity } from '../../entity/entity.entity';
 import { Comment } from '../../entity/comment.entity';
+import { AiUsageLog } from '../entities/ai-usage-log.entity';
 
 describe('AiAssistantService', () => {
   let service: AiAssistantService;
@@ -14,6 +15,7 @@ describe('AiAssistantService', () => {
   let knowledgeBaseService: jest.Mocked<KnowledgeBaseService>;
   let legacyUrlService: jest.Mocked<LegacyUrlService>;
   let providerRegistry: jest.Mocked<AiProviderRegistry>;
+  let usageLogRepo: jest.Mocked<Repository<AiUsageLog>>;
 
   const mockEntity = {
     id: 'entity-1',
@@ -101,6 +103,13 @@ describe('AiAssistantService', () => {
             complete: jest.fn(),
           },
         },
+        {
+          provide: getRepositoryToken(AiUsageLog),
+          useValue: {
+            create: jest.fn().mockReturnValue({}),
+            save: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -109,6 +118,7 @@ describe('AiAssistantService', () => {
     knowledgeBaseService = module.get(KnowledgeBaseService);
     legacyUrlService = module.get(LegacyUrlService);
     providerRegistry = module.get(AiProviderRegistry);
+    usageLogRepo = module.get(getRepositoryToken(AiUsageLog));
 
     // Сбрасываем кэш между тестами
     service.invalidateCache('entity-1');
@@ -324,6 +334,93 @@ describe('AiAssistantService', () => {
 
       expect(result).toBeNull();
     });
+
+    it('должен кэшировать результат sentiment для того же комментария', async () => {
+      const commentRepo = service['commentRepository'] as jest.Mocked<Repository<Comment>>;
+      commentRepo.findOne.mockResolvedValue({
+        id: 'comment-1',
+        entityId: 'entity-1',
+        content: 'Спасибо за быстрый ответ!',
+        createdAt: new Date(),
+      } as unknown as Comment);
+
+      providerRegistry.complete.mockResolvedValue({
+        content: '{"label":"satisfied","score":0.9}',
+        inputTokens: 50,
+        outputTokens: 20,
+        model: 'gpt-4o',
+        provider: 'openai',
+      });
+
+      await service.analyzeSentiment('entity-1');
+      await service.analyzeSentiment('entity-1');
+
+      // LLM вызван только один раз — второй раз из кэша
+      expect(providerRegistry.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('должен пересчитать sentiment при новом комментарии', async () => {
+      const commentRepo = service['commentRepository'] as jest.Mocked<Repository<Comment>>;
+
+      // Первый вызов — comment-1
+      commentRepo.findOne.mockResolvedValueOnce({
+        id: 'comment-1',
+        entityId: 'entity-1',
+        content: 'Спасибо за быстрый ответ!',
+        createdAt: new Date(),
+      } as unknown as Comment);
+
+      providerRegistry.complete.mockResolvedValue({
+        content: '{"label":"satisfied","score":0.9}',
+        inputTokens: 50,
+        outputTokens: 20,
+        model: 'gpt-4o',
+        provider: 'openai',
+      });
+
+      await service.analyzeSentiment('entity-1');
+
+      // Второй вызов — comment-2 (новый комментарий)
+      commentRepo.findOne.mockResolvedValueOnce({
+        id: 'comment-2',
+        entityId: 'entity-1',
+        content: 'Проблема снова повторилась!',
+        createdAt: new Date(),
+      } as unknown as Comment);
+
+      await service.analyzeSentiment('entity-1');
+
+      // LLM вызван дважды — разные commentId
+      expect(providerRegistry.complete).toHaveBeenCalledTimes(2);
+    });
+
+    it('должен логировать usage при анализе sentiment', async () => {
+      const commentRepo = service['commentRepository'] as jest.Mocked<Repository<Comment>>;
+      commentRepo.findOne.mockResolvedValue({
+        id: 'comment-1',
+        entityId: 'entity-1',
+        content: 'Проблема не решена уже неделю!',
+        createdAt: new Date(),
+      } as unknown as Comment);
+
+      providerRegistry.complete.mockResolvedValue({
+        content: '{"label":"frustrated","score":0.85}',
+        inputTokens: 50,
+        outputTokens: 20,
+        model: 'gpt-4o',
+        provider: 'openai',
+      });
+
+      await service.analyzeSentiment('entity-1');
+
+      expect(usageLogRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'classify',
+          success: true,
+        }),
+      );
+      expect(usageLogRepo.save).toHaveBeenCalled();
+    });
   });
 
   describe('generateResponseSuggestion', () => {
@@ -368,6 +465,29 @@ describe('AiAssistantService', () => {
       await expect(service.generateResponseSuggestion('entity-1')).rejects.toThrow(
         'Не найдено похожих случаев',
       );
+    });
+
+    it('должен логировать usage при генерации ответа', async () => {
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      knowledgeBaseService.searchSimilar.mockResolvedValue(mockSearchResults);
+      providerRegistry.complete.mockResolvedValue({
+        content: 'Рекомендуем проверить подшипник...',
+        inputTokens: 500,
+        outputTokens: 200,
+        model: 'gpt-4o',
+        provider: 'openai',
+      });
+
+      await service.generateResponseSuggestion('entity-1');
+
+      expect(usageLogRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'generate',
+          entityId: 'entity-1',
+          success: true,
+        }),
+      );
+      expect(usageLogRepo.save).toHaveBeenCalled();
     });
   });
 });

@@ -67,7 +67,7 @@ export function AiClassificationPanel({
   onApply,
   readOnly = false,
 }: AiClassificationPanelProps) {
-  const classification = useAiStore((s) => s.classificationCache.get(entityId) ?? null);
+  const classification = useAiStore((s) => s.classificationCache.get(entityId)?.data ?? null);
   const isLoading = useAiStore((s) => s.classificationLoading.get(entityId) ?? false);
   const { fetchClassification, classifyEntity, applyClassification } = useAiStore();
 

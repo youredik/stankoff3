@@ -6,12 +6,30 @@ import type {
   AiClassification,
   ConversationSummary,
   GeneratedResponse,
+  KnowledgeGraphResponse,
 } from '@/types/ai';
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 минут — зеркалит backend кэш
+const CLASSIFICATION_CACHE_TTL = 10 * 60 * 1000; // 10 минут — классификация меняется редко
 
 interface AssistanceCacheEntry {
   data: AiAssistantResponse;
+  loadedAt: number;
+}
+
+interface ClassificationCacheEntry {
+  data: AiClassification | null;
+  loadedAt: number;
+}
+
+interface SummaryCacheEntry {
+  data: ConversationSummary;
+  loadedAt: number;
+  commentCount: number;
+}
+
+interface KnowledgeGraphCacheEntry {
+  data: KnowledgeGraphResponse;
   loadedAt: number;
 }
 
@@ -20,8 +38,8 @@ interface AiState {
   assistanceCache: Map<string, AssistanceCacheEntry>;
   assistanceLoading: Map<string, boolean>;
 
-  // Кэш классификации по entityId
-  classificationCache: Map<string, AiClassification | null>;
+  // Кэш классификации по entityId (с TTL)
+  classificationCache: Map<string, ClassificationCacheEntry>;
   classificationLoading: Map<string, boolean>;
 
   // Сгенерированный ответ (эфемерный, не кэшируется)
@@ -29,9 +47,13 @@ interface AiState {
   isGenerating: boolean;
   streamingDraft: string;
 
-  // Кэш summary по entityId
-  summaryCache: Map<string, ConversationSummary>;
+  // Кэш summary по entityId (с TTL + commentCount)
+  summaryCache: Map<string, SummaryCacheEntry>;
   summaryLoading: Map<string, boolean>;
+
+  // Кэш графа знаний по entityId (с TTL)
+  knowledgeGraphCache: Map<string, KnowledgeGraphCacheEntry>;
+  knowledgeGraphLoading: Map<string, boolean>;
 
   // Actions
   fetchAssistance: (entityId: string, forceRefresh?: boolean) => Promise<AiAssistantResponse | null>;
@@ -45,9 +67,11 @@ interface AiState {
   applyClassification: (entityId: string) => Promise<AiClassification | null>;
   generateResponse: (entityId: string, additionalContext?: string) => Promise<GeneratedResponse | null>;
   generateResponseStream: (entityId: string, additionalContext?: string) => Promise<GeneratedResponse | null>;
-  fetchSummary: (entityId: string) => Promise<ConversationSummary | null>;
+  fetchSummary: (entityId: string, commentCount?: number) => Promise<ConversationSummary | null>;
+  fetchKnowledgeGraph: (entityId: string, forceRefresh?: boolean) => Promise<KnowledgeGraphResponse | null>;
   onClassificationReady: (entityId: string) => void;
   invalidateAssistance: (entityId: string) => void;
+  invalidateKnowledgeGraph: (entityId: string) => void;
   clearAll: () => void;
 }
 
@@ -61,6 +85,8 @@ export const useAiStore = create<AiState>((set, get) => ({
   streamingDraft: '',
   summaryCache: new Map(),
   summaryLoading: new Map(),
+  knowledgeGraphCache: new Map(),
+  knowledgeGraphLoading: new Map(),
 
   fetchAssistance: async (entityId, forceRefresh = false) => {
     if (!entityId) return null;
@@ -108,6 +134,17 @@ export const useAiStore = create<AiState>((set, get) => ({
   fetchClassification: async (entityId) => {
     if (!entityId) return null;
 
+    // Проверяем кэш с TTL
+    const cached = get().classificationCache.get(entityId);
+    if (cached && Date.now() - cached.loadedAt < CLASSIFICATION_CACHE_TTL) {
+      return cached.data;
+    }
+
+    // Уже загружается — не дублируем
+    if (get().classificationLoading.get(entityId)) {
+      return cached?.data ?? null;
+    }
+
     set((state) => {
       const loading = new Map(state.classificationLoading);
       loading.set(entityId, true);
@@ -119,7 +156,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       set((state) => {
         const cache = new Map(state.classificationCache);
         const loading = new Map(state.classificationLoading);
-        cache.set(entityId, data);
+        cache.set(entityId, { data, loadedAt: Date.now() });
         loading.set(entityId, false);
         return { classificationCache: cache, classificationLoading: loading };
       });
@@ -150,7 +187,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       set((state) => {
         const cache = new Map(state.classificationCache);
         const loading = new Map(state.classificationLoading);
-        cache.set(entityId, result);
+        cache.set(entityId, { data: result, loadedAt: Date.now() });
         loading.set(entityId, false);
         return { classificationCache: cache, classificationLoading: loading };
       });
@@ -170,7 +207,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       const applied = await aiApi.applyClassification(entityId);
       set((state) => {
         const cache = new Map(state.classificationCache);
-        cache.set(entityId, applied);
+        cache.set(entityId, { data: applied, loadedAt: Date.now() });
         return { classificationCache: cache };
       });
       return applied;
@@ -256,9 +293,23 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
   },
 
-  fetchSummary: async (entityId) => {
+  fetchSummary: async (entityId, commentCount?) => {
     if (!entityId) return null;
-    if (get().summaryLoading.get(entityId)) return get().summaryCache.get(entityId) ?? null;
+
+    // Проверяем кэш: валиден если TTL не истёк И commentCount совпадает
+    const cached = get().summaryCache.get(entityId);
+    if (cached) {
+      const isFresh = Date.now() - cached.loadedAt < CACHE_TTL;
+      const commentCountMatches = commentCount === undefined || cached.commentCount === commentCount;
+      if (isFresh && commentCountMatches) {
+        return cached.data;
+      }
+    }
+
+    // Уже загружается — не дублируем
+    if (get().summaryLoading.get(entityId)) {
+      return cached?.data ?? null;
+    }
 
     set((state) => {
       const loading = new Map(state.summaryLoading);
@@ -271,7 +322,11 @@ export const useAiStore = create<AiState>((set, get) => ({
       set((state) => {
         const cache = new Map(state.summaryCache);
         const loading = new Map(state.summaryLoading);
-        cache.set(entityId, data);
+        cache.set(entityId, {
+          data,
+          loadedAt: Date.now(),
+          commentCount: commentCount ?? data.commentCount,
+        });
         loading.set(entityId, false);
         return { summaryCache: cache, summaryLoading: loading };
       });
@@ -286,8 +341,56 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
   },
 
+  fetchKnowledgeGraph: async (entityId, forceRefresh = false) => {
+    if (!entityId) return null;
+
+    // Проверяем кэш
+    if (!forceRefresh) {
+      const cached = get().knowledgeGraphCache.get(entityId);
+      if (cached && Date.now() - cached.loadedAt < CACHE_TTL) {
+        return cached.data;
+      }
+    }
+
+    // Уже загружается — не дублируем
+    if (get().knowledgeGraphLoading.get(entityId)) {
+      const cached = get().knowledgeGraphCache.get(entityId);
+      return cached?.data ?? null;
+    }
+
+    set((state) => {
+      const loading = new Map(state.knowledgeGraphLoading);
+      loading.set(entityId, true);
+      return { knowledgeGraphLoading: loading };
+    });
+
+    try {
+      const data = await aiApi.getKnowledgeGraph(entityId);
+      set((state) => {
+        const cache = new Map(state.knowledgeGraphCache);
+        const loading = new Map(state.knowledgeGraphLoading);
+        cache.set(entityId, { data, loadedAt: Date.now() });
+        loading.set(entityId, false);
+        return { knowledgeGraphCache: cache, knowledgeGraphLoading: loading };
+      });
+      return data;
+    } catch {
+      set((state) => {
+        const loading = new Map(state.knowledgeGraphLoading);
+        loading.set(entityId, false);
+        return { knowledgeGraphLoading: loading };
+      });
+      return null;
+    }
+  },
+
   onClassificationReady: (entityId) => {
-    // Перезагрузить классификацию из API
+    // Инвалидируем кэш чтобы fetchClassification не вернул старые данные
+    set((state) => {
+      const cache = new Map(state.classificationCache);
+      cache.delete(entityId);
+      return { classificationCache: cache };
+    });
     get().fetchClassification(entityId);
   },
 
@@ -296,6 +399,14 @@ export const useAiStore = create<AiState>((set, get) => ({
       const cache = new Map(state.assistanceCache);
       cache.delete(entityId);
       return { assistanceCache: cache };
+    });
+  },
+
+  invalidateKnowledgeGraph: (entityId) => {
+    set((state) => {
+      const cache = new Map(state.knowledgeGraphCache);
+      cache.delete(entityId);
+      return { knowledgeGraphCache: cache };
     });
   },
 
@@ -310,6 +421,8 @@ export const useAiStore = create<AiState>((set, get) => ({
       streamingDraft: '',
       summaryCache: new Map(),
       summaryLoading: new Map(),
+      knowledgeGraphCache: new Map(),
+      knowledgeGraphLoading: new Map(),
     });
   },
 }));

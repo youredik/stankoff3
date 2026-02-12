@@ -8,7 +8,7 @@ import {
   Maximize2,
   X,
 } from 'lucide-react';
-import { aiApi } from '@/lib/api/ai';
+import { useAiStore } from '@/store/useAiStore';
 import type { GraphNode, GraphEdge, KnowledgeGraphResponse } from '@/types/ai';
 
 interface KnowledgeGraphProps {
@@ -30,22 +30,20 @@ interface LayoutNode extends GraphNode {
 }
 
 export function KnowledgeGraph({ entityId }: KnowledgeGraphProps) {
-  const [data, setData] = useState<KnowledgeGraphResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const data = useAiStore((s) => s.knowledgeGraphCache.get(entityId)?.data ?? null);
+  const loading = useAiStore((s) => s.knowledgeGraphLoading.get(entityId) ?? false);
+  const fetchKnowledgeGraph = useAiStore((s) => s.fetchKnowledgeGraph);
+
   const [expanded, setExpanded] = useState(false);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   const fetchGraph = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await aiApi.getKnowledgeGraph(entityId);
-      setData(result);
-    } catch {
-      // graceful degradation
-    } finally {
-      setLoading(false);
-    }
-  }, [entityId]);
+    await fetchKnowledgeGraph(entityId);
+  }, [entityId, fetchKnowledgeGraph]);
+
+  const refreshGraph = useCallback(async () => {
+    await fetchKnowledgeGraph(entityId, true);
+  }, [entityId, fetchKnowledgeGraph]);
 
   useEffect(() => {
     fetchGraph();
@@ -102,7 +100,7 @@ export function KnowledgeGraph({ entityId }: KnowledgeGraphProps) {
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={fetchGraph}
+            onClick={refreshGraph}
             className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
             title="Обновить"
           >
@@ -138,7 +136,7 @@ export function KnowledgeGraph({ entityId }: KnowledgeGraphProps) {
           hoveredNode={hoveredNode}
           onHoverNode={setHoveredNode}
           onClose={() => setExpanded(false)}
-          onRefresh={fetchGraph}
+          onRefresh={refreshGraph}
           legend={legend}
         />,
         document.body,

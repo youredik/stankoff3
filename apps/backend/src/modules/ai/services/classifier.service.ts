@@ -117,18 +117,34 @@ export class ClassifierService {
 
   /**
    * Классифицирует entity и сохраняет результат
+   * Если свежая классификация уже есть (< 30 мин) — возвращает её без LLM-вызова
    */
   async classifyAndSave(
     entityId: string,
     dto: ClassifyRequestDto,
     userId?: string,
   ): Promise<AiClassification> {
+    // Проверяем, есть ли свежая классификация
+    const existing = await this.classificationRepo.findOne({
+      where: { entityId },
+    });
+
+    if (existing) {
+      const ageMs = Date.now() - new Date(existing.createdAt).getTime();
+      const REUSE_TTL_MS = 30 * 60 * 1000; // 30 минут
+
+      if (ageMs < REUSE_TTL_MS) {
+        this.logger.debug(
+          `Используем существующую классификацию для ${entityId} (возраст: ${Math.round(ageMs / 1000)}с)`,
+        );
+        return existing;
+      }
+    }
+
     const result = await this.classify(dto, userId);
 
     // Upsert классификации
-    let classification = await this.classificationRepo.findOne({
-      where: { entityId },
-    });
+    let classification = existing;
 
     if (classification) {
       classification.category = result.category as AiClassification['category'];
