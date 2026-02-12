@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { LegacyService } from '../../legacy/services/legacy.service';
 import { LegacyRequest, LegacyAnswer } from '../../legacy/entities';
@@ -28,6 +29,22 @@ export interface IndexingStats {
 }
 
 /**
+ * Сохранённое состояние индексации (в БД)
+ */
+interface IndexerState {
+  id: string;
+  last_processed_offset: number;
+  total_requests: number;
+  processed_requests: number;
+  skipped_requests: number;
+  total_chunks: number;
+  failed_requests: number;
+  is_completed: boolean;
+  started_at: Date | null;
+  updated_at: Date;
+}
+
+/**
  * Опции индексации
  */
 export interface IndexingOptions {
@@ -35,6 +52,8 @@ export interface IndexingOptions {
   maxRequests?: number;
   modifiedAfter?: Date;
   onProgress?: (stats: IndexingStats) => void;
+  /** Начать сначала, игнорируя сохранённый прогресс */
+  resetProgress?: boolean;
 }
 
 /**
@@ -43,6 +62,9 @@ export interface IndexingOptions {
  * Индексирует данные из Legacy CRM в векторную базу знаний для RAG.
  * Обрабатывает заявки (QD_requests) и ответы (QD_answers),
  * разбивает на чанки и создаёт embeddings.
+ *
+ * Поддерживает persistent progress — при рестарте контейнера
+ * продолжает индексацию с сохранённого offset.
  */
 @Injectable()
 export class RagIndexerService {
@@ -56,12 +78,17 @@ export class RagIndexerService {
   // Rate limiting для Yandex Cloud Embeddings API (лимит 10 req/sec)
   private readonly EMBED_DELAY_MS = 150; // задержка между embed вызовами
 
+  // Persistent progress: сохраняем offset каждые N batch'ей
+  private readonly SAVE_STATE_EVERY_BATCHES = 10;
+  private readonly INDEXER_STATE_ID = 'rag_legacy';
+
   // Статус индексации
   private indexingStats: IndexingStats | null = null;
 
   constructor(
     private readonly knowledgeBase: KnowledgeBaseService,
     private readonly legacyService: LegacyService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -79,6 +106,60 @@ export class RagIndexerService {
   }
 
   /**
+   * Загрузить сохранённое состояние индексации из БД
+   */
+  async loadState(): Promise<IndexerState | null> {
+    try {
+      const rows = await this.dataSource.query<IndexerState[]>(
+        `SELECT * FROM indexer_state WHERE id = $1`,
+        [this.INDEXER_STATE_ID],
+      );
+      return rows.length > 0 ? rows[0] : null;
+    } catch {
+      // Таблица может не существовать (до миграции)
+      return null;
+    }
+  }
+
+  /**
+   * Сохранить текущее состояние индексации в БД
+   */
+  private async saveState(offset: number, isCompleted: boolean = false): Promise<void> {
+    if (!this.indexingStats) return;
+
+    try {
+      await this.dataSource.query(
+        `INSERT INTO indexer_state (id, last_processed_offset, total_requests, processed_requests,
+          skipped_requests, total_chunks, failed_requests, is_completed, started_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+         ON CONFLICT (id) DO UPDATE SET
+          last_processed_offset = $2,
+          total_requests = $3,
+          processed_requests = $4,
+          skipped_requests = $5,
+          total_chunks = $6,
+          failed_requests = $7,
+          is_completed = $8,
+          started_at = $9,
+          updated_at = NOW()`,
+        [
+          this.INDEXER_STATE_ID,
+          offset,
+          this.indexingStats.totalRequests,
+          this.indexingStats.processedRequests,
+          this.indexingStats.skippedRequests,
+          this.indexingStats.totalChunks,
+          this.indexingStats.failedRequests,
+          isCompleted,
+          this.indexingStats.startedAt,
+        ],
+      );
+    } catch (error) {
+      this.logger.warn(`Ошибка сохранения состояния индексации: ${error.message}`);
+    }
+  }
+
+  /**
    * Запустить полную индексацию legacy данных
    */
   async indexAll(options: IndexingOptions = {}): Promise<IndexingStats> {
@@ -87,6 +168,7 @@ export class RagIndexerService {
       maxRequests,
       modifiedAfter,
       onProgress,
+      resetProgress = false,
     } = options;
 
     if (!this.isAvailable()) {
@@ -101,20 +183,45 @@ export class RagIndexerService {
     const totalCount = await this.legacyService.getIndexableRequestsCount();
     const requestsToProcess = maxRequests ? Math.min(totalCount, maxRequests) : totalCount;
 
+    // Загружаем сохранённый прогресс
+    let startOffset = 0;
+    let resumedStats: Partial<IndexingStats> = {};
+
+    if (!resetProgress) {
+      const savedState = await this.loadState();
+      if (savedState && !savedState.is_completed && savedState.total_requests > 0) {
+        startOffset = savedState.last_processed_offset;
+        resumedStats = {
+          processedRequests: savedState.processed_requests,
+          skippedRequests: savedState.skipped_requests,
+          totalChunks: savedState.total_chunks,
+          failedRequests: savedState.failed_requests,
+        };
+        this.logger.log(
+          `Возобновление индексации с offset ${startOffset} ` +
+          `(обработано: ${savedState.processed_requests}, пропущено: ${savedState.skipped_requests})`
+        );
+      }
+    }
+
     this.indexingStats = {
       totalRequests: requestsToProcess,
-      processedRequests: 0,
-      skippedRequests: 0,
-      totalChunks: 0,
-      failedRequests: 0,
+      processedRequests: resumedStats.processedRequests || 0,
+      skippedRequests: resumedStats.skippedRequests || 0,
+      totalChunks: resumedStats.totalChunks || 0,
+      failedRequests: resumedStats.failedRequests || 0,
       startedAt: new Date(),
       isRunning: true,
     };
 
-    this.logger.log(`Начало индексации: ${requestsToProcess} заявок`);
+    this.logger.log(
+      `Начало индексации: ${requestsToProcess} заявок` +
+      (startOffset > 0 ? ` (продолжение с offset ${startOffset})` : '')
+    );
 
     try {
-      let offset = 0;
+      let offset = startOffset;
+      let batchesSinceLastSave = 0;
 
       while (offset < requestsToProcess) {
         const limit = Math.min(batchSize, requestsToProcess - offset);
@@ -167,6 +274,13 @@ export class RagIndexerService {
         // processedRequests считает и пропущенные (для корректного progress %)
         this.indexingStats.processedRequests += skippedCount;
         offset += requests.length;
+        batchesSinceLastSave++;
+
+        // Сохраняем прогресс каждые N batch'ей
+        if (batchesSinceLastSave >= this.SAVE_STATE_EVERY_BATCHES) {
+          await this.saveState(offset);
+          batchesSinceLastSave = 0;
+        }
 
         // Логируем прогресс каждые 100 заявок
         if (this.indexingStats.processedRequests % 100 === 0) {
@@ -181,6 +295,11 @@ export class RagIndexerService {
     } finally {
       this.indexingStats.isRunning = false;
       this.indexingStats.finishedAt = new Date();
+      // Сохраняем финальное состояние
+      await this.saveState(
+        this.indexingStats.processedRequests,
+        this.indexingStats.processedRequests >= this.indexingStats.totalRequests,
+      );
     }
 
     this.logger.log(

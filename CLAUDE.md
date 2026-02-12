@@ -336,7 +336,7 @@ deploy:
 ### Автоматические бэкапы PostgreSQL
 
 - Сервис `backup` в `docker-compose.preprod.yml` (image: `ghcr.io/youredik/stankoff3/backup:preprod`)
-- Cron: каждый час (`0 * * * *`) → `pg_dump` → gzip → S3 (Yandex Object Storage)
+- Cron: 2 раза в сутки (`0 3,15 * * *`, 03:00 и 15:00 MSK) → `pg_dump` → gzip → S3 (Yandex Object Storage)
 - Retention: 7 дней (локально и S3)
 - **Telegram нотификации**: алерт при ошибке, отчёт при успехе
 - Env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`

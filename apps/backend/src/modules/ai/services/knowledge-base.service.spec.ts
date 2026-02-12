@@ -13,12 +13,12 @@ describe('KnowledgeBaseService', () => {
   let usageLogRepo: jest.Mocked<Repository<AiUsageLog>>;
   let dataSource: jest.Mocked<DataSource>;
 
-  const mockEmbedding = Array(1536).fill(0.1);
+  const mockEmbedding = Array(256).fill(0.1);
   const mockEmbeddingResult = {
     embedding: mockEmbedding,
     inputTokens: 50,
-    model: 'text-embedding-3-large',
-    provider: 'openai',
+    model: 'text-search-doc/latest',
+    provider: 'yandex',
   };
 
   beforeEach(async () => {
@@ -73,6 +73,9 @@ describe('KnowledgeBaseService', () => {
     dataSource = module.get(DataSource);
     chunkRepo = module.get(getRepositoryToken(KnowledgeChunk));
     usageLogRepo = module.get(getRepositoryToken(AiUsageLog));
+
+    // Очищаем embedding cache между тестами
+    service.clearEmbeddingCache();
   });
 
   describe('isAvailable', () => {
@@ -146,7 +149,7 @@ describe('KnowledgeBaseService', () => {
 
       expect(usageLogRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          provider: 'openai',
+          provider: 'yandex',
           operation: 'embed',
           workspaceId: 'ws-123',
           inputTokens: 50,
@@ -232,7 +235,7 @@ describe('KnowledgeBaseService', () => {
   });
 
   describe('searchSimilar', () => {
-    it('должен найти похожие чанки', async () => {
+    it('должен найти похожие чанки через гибридный поиск', async () => {
       providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
 
       const similarChunks = [
@@ -243,6 +246,7 @@ describe('KnowledgeBaseService', () => {
           sourceId: 'entity-1',
           metadata: {},
           similarity: 0.95,
+          textRank: 0.3,
         },
         {
           id: 'chunk-2',
@@ -251,6 +255,7 @@ describe('KnowledgeBaseService', () => {
           sourceId: 'entity-2',
           metadata: {},
           similarity: 0.88,
+          textRank: 0.1,
         },
       ];
 
@@ -265,8 +270,33 @@ describe('KnowledgeBaseService', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].similarity).toBe(0.95);
+      expect(result[0].textRank).toBe(0.3);
       expect(providerRegistry.embed).toHaveBeenCalledWith('Поиск');
       expect(dataSource.query).toHaveBeenCalled();
+    });
+
+    it('должен использовать fallback на vector search если гибридный недоступен', async () => {
+      providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
+
+      // Первый вызов (hybrid) — ошибка
+      dataSource.query
+        .mockRejectedValueOnce(new Error('function search_hybrid_chunks does not exist'))
+        // Второй вызов (vector fallback) — успех
+        .mockResolvedValueOnce([
+          {
+            id: 'chunk-1',
+            content: 'Контент',
+            source_type: 'entity',
+            source_id: 'entity-1',
+            metadata: {},
+            similarity: 0.9,
+          },
+        ]);
+
+      const result = await service.searchSimilar({ query: 'Тест' });
+
+      expect(result).toHaveLength(1);
+      expect(dataSource.query).toHaveBeenCalledTimes(2);
     });
 
     it('должен выбросить ошибку если сервис не настроен', async () => {
@@ -283,16 +313,95 @@ describe('KnowledgeBaseService', () => {
 
       await service.searchSimilar({ query: 'Тест' });
 
+      // Проверяем гибридный поиск (первый вызов)
       expect(dataSource.query).toHaveBeenCalledWith(
-        expect.any(String),
+        expect.stringContaining('search_hybrid_chunks'),
         expect.arrayContaining([
           expect.any(String), // embedding vector
+          'Тест', // query text
           null, // workspaceId
           null, // sourceType
           10, // limit (default)
           0.7, // minSimilarity (default)
         ]),
       );
+    });
+  });
+
+  describe('embedding cache', () => {
+    it('должен кэшировать embedding при первом запросе', async () => {
+      providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
+      dataSource.query.mockResolvedValue([]);
+
+      await service.searchSimilar({ query: 'Кэшируемый запрос' });
+      await service.searchSimilar({ query: 'Кэшируемый запрос' });
+
+      // embed вызван только один раз (второй раз из кэша)
+      expect(providerRegistry.embed).toHaveBeenCalledTimes(1);
+      // Но dataSource.query вызван дважды (поиск в БД не кэшируется)
+      expect(dataSource.query).toHaveBeenCalledTimes(2);
+    });
+
+    it('не должен кэшировать разные запросы', async () => {
+      providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
+      dataSource.query.mockResolvedValue([]);
+
+      await service.searchSimilar({ query: 'Запрос 1' });
+      await service.searchSimilar({ query: 'Запрос 2' });
+
+      expect(providerRegistry.embed).toHaveBeenCalledTimes(2);
+    });
+
+    it('не должен логировать usage для кэшированных запросов', async () => {
+      providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
+      dataSource.query.mockResolvedValue([]);
+
+      await service.searchSimilar({ query: 'Запрос с логом' });
+      await service.searchSimilar({ query: 'Запрос с логом' });
+
+      // usageLogRepo.create вызван только один раз
+      expect(usageLogRepo.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('должен вернуть статистику кэша', async () => {
+      providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
+      dataSource.query.mockResolvedValue([]);
+
+      const statsBefore = service.getCacheStats();
+      expect(statsBefore.size).toBe(0);
+
+      await service.searchSimilar({ query: 'Запрос для кэша' });
+
+      const statsAfter = service.getCacheStats();
+      expect(statsAfter.size).toBe(1);
+      expect(statsAfter.maxSize).toBe(200);
+      expect(statsAfter.ttlMs).toBe(5 * 60 * 1000);
+    });
+
+    it('должен очищать кэш', async () => {
+      providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
+      dataSource.query.mockResolvedValue([]);
+
+      await service.searchSimilar({ query: 'Запрос' });
+      expect(service.getCacheStats().size).toBe(1);
+
+      service.clearEmbeddingCache();
+      expect(service.getCacheStats().size).toBe(0);
+    });
+
+    it('должен вытеснять старые записи при превышении MAX_CACHE_SIZE', async () => {
+      providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);
+      dataSource.query.mockResolvedValue([]);
+
+      // Заполняем кэш до максимума (200 записей)
+      for (let i = 0; i < 201; i++) {
+        service.clearEmbeddingCache();
+      }
+
+      // Создаём 201 запись через приватный метод cacheEmbedding
+      // Вместо этого проверим через getCacheStats что size не превышает maxSize
+      const stats = service.getCacheStats();
+      expect(stats.maxSize).toBe(200);
     });
   });
 

@@ -2606,7 +2606,7 @@ S3 команды:
 **Автоматические бэкапы (preprod и production):**
 
 Сервис `backup` в docker-compose.preprod.yml (и docker-compose.prod.yml):
-- Запускает бэкапы **раз в час** (cron: `0 * * * *`)
+- Запускает бэкапы **2 раза в сутки** (cron: `0 3,15 * * *`, 03:00 и 15:00 MSK)
 - Автоматически загружает в S3 (Yandex Object Storage)
 - Удаляет старые бэкапы (>7 дней по умолчанию)
 - **Telegram нотификации** — алерт при ошибке, отчёт при успехе
@@ -3008,6 +3008,8 @@ docker compose -f docker-compose.ollama.yml exec ollama ollama pull qwen2.5:14b
 - **Yandex Cloud Embeddings** - text-search-doc/latest (256 измерений, нативный русский)
 - **Cosine similarity** - метрика схожести
 - **HNSW индекс** - для быстрого приближённого поиска
+- **Hybrid search** — комбинация vector similarity + PostgreSQL full-text search (tsvector/ts_rank)
+- **Embedding cache** — in-memory кэш (Map, TTL 5 мин, макс. 200 записей) для повторных запросов
 
 **Схема таблицы knowledge_chunks:**
 ```sql
@@ -3015,6 +3017,7 @@ CREATE TABLE knowledge_chunks (
   id UUID PRIMARY KEY,
   content TEXT NOT NULL,
   embedding VECTOR(256),
+  search_vector TSVECTOR,   -- для гибридного поиска (автообновление триггером)
   source_type VARCHAR(50),  -- 'legacy_request', 'entity', 'document', 'faq'
   source_id VARCHAR(255),   -- VARCHAR для поддержки legacy числовых ID
   metadata JSONB,
@@ -3024,11 +3027,36 @@ CREATE TABLE knowledge_chunks (
 -- HNSW индекс для быстрого приближённого поиска
 CREATE INDEX ON knowledge_chunks USING hnsw (embedding vector_cosine_ops)
   WITH (m = 16, ef_construction = 64);
+
+-- GIN индекс для полнотекстового поиска
+CREATE INDEX ON knowledge_chunks USING GIN (search_vector);
 ```
+
+**Гибридный поиск (`search_hybrid_chunks`):**
+- Комбинирует cosine similarity (vector) и ts_rank_cd (full-text) для лучшего ранжирования
+- Формула: `similarity + 0.2 * LEAST(ts_rank * 5, 1.0)` — вектор основной, текст добавляет boost
+- Условие: `vector_sim >= min_similarity OR search_vector @@ ts_query` — находит и семантически похожие, и текстово совпадающие результаты
+- Fallback на `search_similar_chunks` (чистый vector) если гибридная функция недоступна
+
+**Embedding cache:**
+- Кэширует embedding-вектор для идентичных текстовых запросов (TTL 5 мин)
+- Экономит вызовы к Yandex Cloud Embeddings API (rate limit 10 req/sec)
+- FIFO eviction при превышении лимита (200 записей)
 
 ### RAG Indexer
 
 Индексирует данные из Legacy CRM (заявки QD_requests и ответы QD_answers).
+
+**Persistent progress (таблица `indexer_state`):**
+- Сохраняет `last_processed_offset` каждые 10 batch'ей + при завершении
+- При рестарте контейнера продолжает с сохранённого offset (а не с 0)
+- Комбинируется со skip-оптимизацией (`getIndexedSourceIds`) для обработки частично обработанных batch'ей
+- Опция `resetProgress: true` для принудительного запуска сначала
+
+**Оптимизации индексации:**
+- **Skip already-indexed** — перед каждым batch проверяет `knowledge_chunks` одним SQL-запросом
+- **Rate limiting** — 150ms между embed вызовами (Yandex Cloud: 10 req/sec)
+- **Persistent progress** — не теряет прогресс при рестарте
 
 **Параметры чанкинга:**
 - Размер чанка: ~512 токенов (~2000 символов)

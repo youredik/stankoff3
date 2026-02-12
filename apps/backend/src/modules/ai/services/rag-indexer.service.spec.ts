@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
 import { RagIndexerService } from './rag-indexer.service';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { LegacyService } from '../../legacy/services/legacy.service';
@@ -8,6 +9,7 @@ describe('RagIndexerService', () => {
   let service: RagIndexerService;
   let knowledgeBase: jest.Mocked<KnowledgeBaseService>;
   let legacyService: jest.Mocked<LegacyService>;
+  let dataSource: jest.Mocked<DataSource>;
 
   const mockRequest = {
     id: 1,
@@ -110,6 +112,10 @@ describe('RagIndexerService', () => {
       ]),
     };
 
+    const mockDataSource = {
+      query: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RagIndexerService,
@@ -121,12 +127,17 @@ describe('RagIndexerService', () => {
           provide: LegacyService,
           useValue: mockLegacyService,
         },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
       ],
     }).compile();
 
     service = module.get<RagIndexerService>(RagIndexerService);
     knowledgeBase = module.get(KnowledgeBaseService);
     legacyService = module.get(LegacyService);
+    dataSource = module.get(DataSource);
   });
 
   describe('isAvailable', () => {
@@ -148,6 +159,43 @@ describe('RagIndexerService', () => {
   describe('getStatus', () => {
     it('должен возвращать null если индексация не запущена', () => {
       expect(service.getStatus()).toBeNull();
+    });
+  });
+
+  describe('loadState', () => {
+    it('должен вернуть null если нет сохранённого состояния', async () => {
+      dataSource.query.mockResolvedValue([]);
+      const state = await service.loadState();
+      expect(state).toBeNull();
+    });
+
+    it('должен вернуть сохранённое состояние', async () => {
+      const savedState = {
+        id: 'rag_legacy',
+        last_processed_offset: 5000,
+        total_requests: 282000,
+        processed_requests: 5000,
+        skipped_requests: 0,
+        total_chunks: 7500,
+        failed_requests: 10,
+        is_completed: false,
+        started_at: new Date(),
+        updated_at: new Date(),
+      };
+      dataSource.query.mockResolvedValue([savedState]);
+
+      const state = await service.loadState();
+
+      expect(state).toEqual(savedState);
+      expect(state!.last_processed_offset).toBe(5000);
+    });
+
+    it('должен вернуть null при ошибке (таблица не существует)', async () => {
+      dataSource.query.mockRejectedValue(new Error('relation "indexer_state" does not exist'));
+
+      const state = await service.loadState();
+
+      expect(state).toBeNull();
     });
   });
 
@@ -339,6 +387,137 @@ describe('RagIndexerService', () => {
 
       // После завершения можно запустить снова
       expect(stats.isRunning).toBe(false);
+    });
+
+    it('должен возобновить индексацию с сохранённого offset', async () => {
+      // Имитируем 12 заявок, из которых 10 уже обработаны (осталось 2)
+      legacyService.getIndexableRequestsCount.mockResolvedValue(12);
+      const savedState = {
+        id: 'rag_legacy',
+        last_processed_offset: 10,
+        total_requests: 12,
+        processed_requests: 10,
+        skipped_requests: 3,
+        total_chunks: 15,
+        failed_requests: 1,
+        is_completed: false,
+        started_at: new Date(),
+        updated_at: new Date(),
+      };
+      // loadState вызывает dataSource.query для SELECT
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (typeof sql === 'string' && sql.includes('SELECT')) {
+          return [savedState];
+        }
+        return []; // INSERT/UPDATE
+      });
+
+      // Имитируем единственный batch с offset 10 (заявки 11-12)
+      let callCount = 0;
+      legacyService.getRequestsForIndexing.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            items: [
+              { ...mockRequest, id: 11 } as unknown as LegacyRequest,
+              { ...mockRequest, id: 12 } as unknown as LegacyRequest,
+            ],
+            total: 12,
+          };
+        }
+        return { items: [], total: 12 };
+      });
+
+      const batchMap = new Map();
+      batchMap.set(11, { request: { ...mockRequest, id: 11, subject: 'Заявка 11 '.repeat(20) }, answers: [] });
+      batchMap.set(12, { request: { ...mockRequest, id: 12, subject: 'Заявка 12 '.repeat(20) }, answers: [] });
+      legacyService.getRequestsWithAnswersBatch.mockResolvedValue(batchMap);
+
+      const stats = await service.indexAll({ batchSize: 10, maxRequests: 12 });
+
+      // Должен начать с offset 10, обработать 2 заявки, плюс 10 из сохранённого состояния
+      expect(stats.processedRequests).toBe(12); // 10 resumedStats + 2 новых
+      expect(stats.skippedRequests).toBe(3); // из сохранённого состояния
+      expect(stats.totalChunks).toBeGreaterThanOrEqual(15); // 15 из resumedStats + новые
+
+      // Проверяем что getRequestsForIndexing вызван с offset 10
+      expect(legacyService.getRequestsForIndexing).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 10 }),
+      );
+    });
+
+    it('должен начать сначала при resetProgress=true', async () => {
+      // Есть сохранённое состояние, но мы его игнорируем
+      const savedState = {
+        id: 'rag_legacy',
+        last_processed_offset: 50000,
+        total_requests: 282000,
+        processed_requests: 50000,
+        skipped_requests: 0,
+        total_chunks: 75000,
+        failed_requests: 0,
+        is_completed: false,
+        started_at: new Date(),
+        updated_at: new Date(),
+      };
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (typeof sql === 'string' && sql.includes('SELECT')) {
+          return [savedState];
+        }
+        return [];
+      });
+
+      const stats = await service.indexAll({
+        batchSize: 10,
+        resetProgress: true,
+      });
+
+      // Должен начать с offset 0
+      expect(legacyService.getRequestsForIndexing).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 0 }),
+      );
+      expect(stats.processedRequests).toBe(2); // Все 2 заявки (не 50002)
+    });
+
+    it('должен сохранять прогресс в БД', async () => {
+      const stats = await service.indexAll({ batchSize: 10 });
+
+      // saveState вызывается хотя бы для финального сохранения
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO indexer_state'),
+        expect.arrayContaining(['rag_legacy']),
+      );
+
+      expect(stats.isRunning).toBe(false);
+    });
+
+    it('не должен возобновлять если индексация завершена (is_completed)', async () => {
+      const completedState = {
+        id: 'rag_legacy',
+        last_processed_offset: 282000,
+        total_requests: 282000,
+        processed_requests: 282000,
+        skipped_requests: 0,
+        total_chunks: 400000,
+        failed_requests: 100,
+        is_completed: true,
+        started_at: new Date(),
+        updated_at: new Date(),
+      };
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (typeof sql === 'string' && sql.includes('SELECT')) {
+          return [completedState];
+        }
+        return [];
+      });
+
+      const stats = await service.indexAll({ batchSize: 10 });
+
+      // Должен начать с 0, а не с 282000
+      expect(legacyService.getRequestsForIndexing).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 0 }),
+      );
+      expect(stats.processedRequests).toBe(2);
     });
   });
 

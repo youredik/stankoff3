@@ -12,11 +12,28 @@ interface SimilarChunk {
   sourceId: string;
   metadata: Record<string, unknown>;
   similarity: number;
+  textRank?: number;
+}
+
+/**
+ * Кэшированный embedding для повторных запросов
+ */
+interface CachedEmbedding {
+  embedding: number[];
+  provider: string;
+  model: string;
+  inputTokens: number;
+  cachedAt: number;
 }
 
 @Injectable()
 export class KnowledgeBaseService {
   private readonly logger = new Logger(KnowledgeBaseService.name);
+
+  // Embedding cache: in-memory с TTL
+  private readonly embeddingCache = new Map<string, CachedEmbedding>();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
+  private readonly MAX_CACHE_SIZE = 200; // макс. количество записей
 
   constructor(
     private readonly providerRegistry: AiProviderRegistry,
@@ -115,6 +132,7 @@ export class KnowledgeBaseService {
 
   /**
    * Ищет похожие чанки по тексту
+   * Использует гибридный поиск (vector + full-text) когда доступен
    */
   async searchSimilar(params: {
     query: string;
@@ -132,25 +150,74 @@ export class KnowledgeBaseService {
     const limit = params.limit || 10;
     const minSimilarity = params.minSimilarity || 0.7;
 
-    // Генерируем embedding для запроса через реестр провайдеров
-    const embeddingResult = await this.providerRegistry.embed(params.query);
+    // Проверяем embedding cache
+    const cached = this.getCachedEmbedding(params.query);
+    let embedding: number[];
+    let provider: string;
+    let model: string;
+    let inputTokens: number;
 
-    // Логируем использование
-    await this.logUsage({
-      provider: embeddingResult.provider as AiUsageLog['provider'],
-      model: embeddingResult.model,
-      operation: 'search',
-      userId: params.userId,
-      workspaceId: params.workspaceId,
-      inputTokens: embeddingResult.inputTokens,
-      outputTokens: 0,
-      latencyMs: Date.now() - startTime,
-      success: true,
-    });
+    if (cached) {
+      embedding = cached.embedding;
+      provider = cached.provider;
+      model = cached.model;
+      inputTokens = cached.inputTokens;
+      this.logger.debug(`Embedding cache hit для запроса (${params.query.slice(0, 50)}...)`);
+    } else {
+      // Генерируем embedding через реестр провайдеров
+      const embeddingResult = await this.providerRegistry.embed(params.query);
+      embedding = embeddingResult.embedding;
+      provider = embeddingResult.provider;
+      model = embeddingResult.model;
+      inputTokens = embeddingResult.inputTokens;
 
-    // Используем функцию поиска из БД
-    const embeddingVector = `[${embeddingResult.embedding.join(',')}]`;
+      // Кэшируем результат
+      this.cacheEmbedding(params.query, {
+        embedding,
+        provider,
+        model,
+        inputTokens,
+        cachedAt: Date.now(),
+      });
 
+      // Логируем использование (только для некэшированных)
+      await this.logUsage({
+        provider: provider as AiUsageLog['provider'],
+        model,
+        operation: 'search',
+        userId: params.userId,
+        workspaceId: params.workspaceId,
+        inputTokens,
+        outputTokens: 0,
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+    }
+
+    // Формируем vector строку для SQL
+    const embeddingVector = `[${embedding.join(',')}]`;
+
+    // Пробуем гибридный поиск
+    try {
+      const results = await this.dataSource.query<SimilarChunk[]>(
+        `SELECT id, content, "sourceType", "sourceId", metadata, similarity, "textRank"
+         FROM search_hybrid_chunks($1::vector, $2, $3, $4, $5, $6)`,
+        [
+          embeddingVector,
+          params.query,
+          params.workspaceId || null,
+          params.sourceType || null,
+          limit,
+          minSimilarity,
+        ],
+      );
+      return results;
+    } catch {
+      // Fallback на обычный vector search (если гибридная функция не существует)
+      this.logger.debug('Hybrid search недоступен, используем vector search');
+    }
+
+    // Fallback: обычный vector search
     const results = await this.dataSource.query<SimilarChunk[]>(
       `SELECT * FROM search_similar_chunks($1::vector, $2, $3, $4, $5)`,
       [
@@ -197,6 +264,54 @@ export class KnowledgeBaseService {
     }
 
     return { totalChunks, bySourceType };
+  }
+
+  /**
+   * Получает статистику embedding cache
+   */
+  getCacheStats(): { size: number; maxSize: number; ttlMs: number } {
+    return {
+      size: this.embeddingCache.size,
+      maxSize: this.MAX_CACHE_SIZE,
+      ttlMs: this.CACHE_TTL_MS,
+    };
+  }
+
+  /**
+   * Очищает embedding cache
+   */
+  clearEmbeddingCache(): void {
+    this.embeddingCache.clear();
+  }
+
+  /**
+   * Получает кэшированный embedding (с проверкой TTL)
+   */
+  private getCachedEmbedding(query: string): CachedEmbedding | null {
+    const cached = this.embeddingCache.get(query);
+    if (!cached) return null;
+
+    if (Date.now() - cached.cachedAt > this.CACHE_TTL_MS) {
+      this.embeddingCache.delete(query);
+      return null;
+    }
+
+    return cached;
+  }
+
+  /**
+   * Сохраняет embedding в кэш (с eviction по размеру)
+   */
+  private cacheEmbedding(query: string, entry: CachedEmbedding): void {
+    // Eviction: если кэш полон, удаляем самую старую запись
+    if (this.embeddingCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = this.embeddingCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.embeddingCache.delete(oldestKey);
+      }
+    }
+
+    this.embeddingCache.set(query, entry);
   }
 
   /**
