@@ -9,6 +9,7 @@ import {
   CLASSIFICATION_USER_PROMPT,
 } from '../prompts/classification.prompt';
 import { ClassifyRequestDto, ClassifyResponseDto } from '../dto/ai.dto';
+import { extractJson } from '../utils/extract-json';
 
 interface ClassificationResult {
   category: string;
@@ -189,7 +190,7 @@ export class ClassifierService {
    */
   private parseClassificationResponse(content: string): ClassificationResult {
     try {
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(extractJson(content));
 
       return {
         category: parsed.category || 'other',

@@ -258,6 +258,74 @@ describe('AiAssistantService', () => {
     });
   });
 
+  describe('analyzeSentiment', () => {
+    it('должен парсить JSON обёрнутый в markdown (YandexGPT)', async () => {
+      const commentRepo = service['commentRepository'] as jest.Mocked<Repository<Comment>>;
+      commentRepo.findOne.mockResolvedValue({
+        id: 'comment-1',
+        entityId: 'entity-1',
+        content: 'Уже третий день станок стоит, мы теряем деньги! Когда будет решение?',
+        createdAt: new Date(),
+      } as unknown as Comment);
+
+      providerRegistry.complete.mockResolvedValue({
+        content: '```json\n{"label":"frustrated","score":0.9}\n```',
+        inputTokens: 50,
+        outputTokens: 20,
+        model: 'yandexgpt-lite',
+        provider: 'yandex',
+      });
+
+      const result = await service.analyzeSentiment('entity-1');
+
+      expect(result).not.toBeNull();
+      expect(result!.label).toBe('frustrated');
+      expect(result!.emoji).toBe('😤');
+      expect(result!.score).toBe(0.9);
+    });
+
+    it('должен парсить обычный JSON без обёртки', async () => {
+      const commentRepo = service['commentRepository'] as jest.Mocked<Repository<Comment>>;
+      commentRepo.findOne.mockResolvedValue({
+        id: 'comment-1',
+        entityId: 'entity-1',
+        content: 'Спасибо, проблема решена, всё работает отлично!',
+        createdAt: new Date(),
+      } as unknown as Comment);
+
+      providerRegistry.complete.mockResolvedValue({
+        content: '{"label":"satisfied","score":0.95}',
+        inputTokens: 50,
+        outputTokens: 20,
+        model: 'gpt-4o',
+        provider: 'openai',
+      });
+
+      const result = await service.analyzeSentiment('entity-1');
+
+      expect(result).not.toBeNull();
+      expect(result!.label).toBe('satisfied');
+      expect(result!.emoji).toBe('😊');
+    });
+
+    it('должен вернуть null если нет комментариев', async () => {
+      const commentRepo = service['commentRepository'] as jest.Mocked<Repository<Comment>>;
+      commentRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.analyzeSentiment('entity-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('должен вернуть null если AI недоступен', async () => {
+      providerRegistry.isCompletionAvailable.mockReturnValue(false);
+
+      const result = await service.analyzeSentiment('entity-1');
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('generateResponseSuggestion', () => {
     it('должен генерировать черновик ответа', async () => {
       entityRepo.findOne.mockResolvedValue(mockEntity);

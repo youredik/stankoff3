@@ -14,6 +14,7 @@ import {
   GeneratedResponseDto,
   StreamingEvent,
 } from '../dto/ai.dto';
+import { extractJson } from '../utils/extract-json';
 
 /**
  * AI Assistant Service
@@ -752,7 +753,7 @@ ${conversation}`,
         jsonMode: true,
       });
 
-      const parsed = JSON.parse(result.content);
+      const parsed = JSON.parse(extractJson(result.content));
       const emojiMap: Record<string, string> = {
         satisfied: '😊',
         neutral: '😐',

@@ -121,6 +121,28 @@ describe('ClassifierService', () => {
       await expect(service.classify(dto)).rejects.toThrow('AI сервис не настроен');
     });
 
+    it('должен обработать JSON обёрнутый в markdown (YandexGPT)', async () => {
+      const markdownWrapped = '```json\n' + JSON.stringify({
+        category: 'reclamation',
+        priority: 'critical',
+        skills: ['mechanical'],
+        confidence: 0.95,
+        reasoning: 'Брак оборудования',
+      }) + '\n```';
+
+      providerRegistry.complete.mockResolvedValue({
+        ...mockClassificationResult,
+        content: markdownWrapped,
+      });
+
+      const result = await service.classify(dto);
+
+      expect(result.category).toBe('reclamation');
+      expect(result.priority).toBe('critical');
+      expect(result.skills).toEqual(['mechanical']);
+      expect(result.confidence).toBe(0.95);
+    });
+
     it('должен обработать некорректный JSON ответ', async () => {
       providerRegistry.complete.mockResolvedValue({
         ...mockClassificationResult,
