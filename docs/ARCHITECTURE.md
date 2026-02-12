@@ -42,7 +42,7 @@
 | **health** | Health check endpoints |
 | **invitation** | Приглашение сотрудников по email |
 | **knowledge-base** | База знаний (FAQ, документы) |
-| **legacy** | Legacy CRM (MariaDB), миграция, синхронизация |
+| **legacy** | Legacy CRM (MariaDB), миграция, синхронизация, системные справочники (контрагенты, контакты, товары) |
 | **onboarding** | Onboarding сотрудников |
 | **rbac** | Роли и permissions (permission-based, 8 системных ролей) |
 | **s3** | Yandex Object Storage (S3-compatible) |
@@ -51,7 +51,7 @@
 | **sla** | Service Level Agreement |
 | **user** | Пользователи, профили |
 | **websocket** | WebSocket, events gateway |
-| **workspace** | Рабочие места |
+| **workspace** | Рабочие места (включая системные: контрагенты, контакты, товары) |
 
 ## Frontend компоненты (22 категории)
 
@@ -121,10 +121,11 @@
 ## Seed данные
 
 - 87 реальных сотрудников из legacy CRM
-- 8 секций, 15 workspaces (Продажи, Сервис, Маркетинг, Склад, Финансы, Юридический, Управление, IT)
+- 9 секций, 18 workspaces (Продажи, Сервис, Маркетинг, Склад, Финансы, Юридический, Управление, IT, Справочники)
+- 3 системных workspace: Контрагенты (CO), Контакты (CT), Товары (PR) — синхронизация из legacy cron каждые 30 мин
 - 10 BPMN definitions → deploy в Zeebe
 - IT workspace: 25 задач разработки с диалогами
-- Оркестратор: cleanup → users → rbac → keycloak → structure → entities → it-department → bpmn → sla-dmn
+- Оркестратор: cleanup → users → rbac → keycloak → structure → entities → it-department → user-groups → system-workspaces → bpmn → sla-dmn → knowledge-base
 
 ## AI
 

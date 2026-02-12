@@ -240,6 +240,15 @@
 - `POST /api/legacy/sync/disable` — выключить
 - `POST /api/legacy/sync/run-now` — вручную
 
+**System Sync (системные справочники, cron каждые 30 мин):**
+- `GET /api/legacy/system-sync/status` — статус всех sync (counterparties, contacts, products)
+- `GET /api/legacy/system-sync/:type/preview` — оценка объёма (totalLegacy, alreadySynced, remaining)
+- `GET /api/legacy/system-sync/:type/progress` — прогресс текущей синхронизации
+- `POST /api/legacy/system-sync/:type/start` — запустить sync (async, 202 Accepted)
+- `POST /api/legacy/system-sync/cron/enable` — включить cron-синхронизацию
+- `POST /api/legacy/system-sync/cron/disable` — выключить cron-синхронизацию
+  - `:type` = `counterparties` | `contacts` | `products`
+
 ## Knowledge Base
 
 - `GET /api/knowledge-base/articles` — список (query: type, category, workspaceId, search, page, perPage)
