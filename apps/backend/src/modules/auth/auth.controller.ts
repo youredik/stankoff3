@@ -19,14 +19,20 @@ import { User } from '../user/user.entity';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 const ID_TOKEN_COOKIE = 'keycloak_id_token';
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 дней
+const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 дней
 
 @Controller('auth')
 export class AuthController {
+  private readonly isSecure: boolean;
+
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
-  ) {}
+  ) {
+    // secure cookie: true для любого HTTPS (preprod и production), false для localhost dev
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '';
+    this.isSecure = frontendUrl.startsWith('https://');
+  }
 
   @Public()
   @Post('refresh')
@@ -47,7 +53,7 @@ export class AuthController {
     // Обновляем refresh token в cookie
     res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: this.isSecure,
       sameSite: 'lax',
       maxAge: COOKIE_MAX_AGE,
       path: '/api',
@@ -69,7 +75,7 @@ export class AuthController {
     // Очищаем refresh token cookie
     res.clearCookie(REFRESH_TOKEN_COOKIE, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: this.isSecure,
       sameSite: 'lax',
       path: '/api',
     });
@@ -77,7 +83,7 @@ export class AuthController {
     // Очищаем id_token cookie
     res.clearCookie(ID_TOKEN_COOKIE, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: this.isSecure,
       sameSite: 'lax',
       path: '/api',
     });
@@ -143,7 +149,7 @@ export class AuthController {
       // Устанавливаем refresh token в HttpOnly cookie
       res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: this.isSecure,
         sameSite: 'lax', // lax для cross-origin redirect
         maxAge: COOKIE_MAX_AGE,
         path: '/api',
@@ -154,7 +160,7 @@ export class AuthController {
       if (idToken) {
         res.cookie(ID_TOKEN_COOKIE, idToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: this.isSecure,
           sameSite: 'lax',
           maxAge: COOKIE_MAX_AGE,
           path: '/api',
@@ -162,8 +168,8 @@ export class AuthController {
       }
 
       // Редирект на frontend с access token в query параметре
-      // Frontend сохранит токен в памяти и очистит URL
-      return res.redirect(`${frontendUrl}/dashboard?access_token=${accessToken}`);
+      // Frontend (AuthProvider на /workspace) сохранит токен в памяти и очистит URL
+      return res.redirect(`${frontendUrl}/workspace?access_token=${accessToken}`);
     } catch (error) {
       console.error('Keycloak callback error:', error);
       console.error('Error stack:', (error as Error).stack);

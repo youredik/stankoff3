@@ -19,6 +19,43 @@ const roleLabels: Record<string, string> = {
   employee: 'Сотрудник',
 };
 
+// Защита от бесконечного цикла редиректов на SSO
+const SSO_REDIRECT_KEY = 'sso_redirect_count';
+const SSO_REDIRECT_MAX = 3;
+const SSO_REDIRECT_WINDOW_MS = 30_000; // 30 секунд
+
+function checkAndIncrementSsoRedirect(): boolean {
+  try {
+    const stored = sessionStorage.getItem(SSO_REDIRECT_KEY);
+    const now = Date.now();
+
+    if (stored) {
+      const { count, timestamp } = JSON.parse(stored);
+      if (now - timestamp < SSO_REDIRECT_WINDOW_MS) {
+        if (count >= SSO_REDIRECT_MAX) {
+          return false; // Слишком много редиректов — блокируем
+        }
+        sessionStorage.setItem(SSO_REDIRECT_KEY, JSON.stringify({ count: count + 1, timestamp }));
+        return true;
+      }
+    }
+
+    // Новое окно или старый таймстамп — начинаем счётчик заново
+    sessionStorage.setItem(SSO_REDIRECT_KEY, JSON.stringify({ count: 1, timestamp: now }));
+    return true;
+  } catch {
+    return true; // sessionStorage недоступен — пропускаем проверку
+  }
+}
+
+function resetSsoRedirectCounter() {
+  try {
+    sessionStorage.removeItem(SSO_REDIRECT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,6 +64,7 @@ function LoginPageContent() {
   const [devUsers, setDevUsers] = useState<DevUser[] | null>(null);
   const [devLoading, setDevLoading] = useState(true);
   const [devLoginLoading, setDevLoginLoading] = useState<string | null>(null);
+  const [redirectLoopDetected, setRedirectLoopDetected] = useState(false);
 
   // Устанавливаем interceptors при монтировании
   useEffect(() => {
@@ -35,6 +73,40 @@ function LoginPageContent() {
       () => useAuthStore.getState().refreshTokens(),
     );
   }, []);
+
+  // Fallback: если login page получил access_token (например, через ошибочный redirect),
+  // обрабатываем его здесь — так же как AuthProvider
+  const accessTokenParam = searchParams.get('access_token');
+
+  useEffect(() => {
+    if (!accessTokenParam) return;
+
+    // Очищаем URL от токена
+    const url = new URL(window.location.href);
+    url.searchParams.delete('access_token');
+    window.history.replaceState({}, '', url.toString());
+
+    // Сохраняем токен и загружаем профиль
+    useAuthStore.setState({ accessToken: accessTokenParam, isLoading: true });
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${accessTokenParam}` },
+          credentials: 'include',
+        });
+        if (!response.ok) throw new Error('Failed to fetch profile');
+        const user = await response.json();
+        useAuthStore.setState({ user, isAuthenticated: true, isLoading: false });
+        resetSsoRedirectCounter();
+        router.push('/workspace');
+      } catch {
+        useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
+      }
+    };
+
+    fetchProfile();
+  }, [accessTokenParam, router]);
 
   // Проверяем dev mode при загрузке
   useEffect(() => {
@@ -51,6 +123,9 @@ function LoginPageContent() {
 
   // Обработка ошибок и редиректа
   useEffect(() => {
+    // Если пришёл access_token — обрабатывается выше, не делаем ничего
+    if (accessTokenParam) return;
+
     // Если dev users загружаются — ждём
     if (devLoading) return;
 
@@ -63,31 +138,41 @@ function LoginPageContent() {
 
     if (ssoError === 'sso_failed') {
       useAuthStore.setState({ error: 'Ошибка SSO авторизации. Попробуйте снова.' });
+      resetSsoRedirectCounter();
       return;
     }
 
-    // Если уже авторизован - на dashboard
+    // Если уже авторизован — на workspace
     if (isAuthenticated && !isLoading) {
+      resetSsoRedirectCounter();
       router.push('/workspace');
       return;
     }
 
-    // Если не авторизован, не загружается и нет ошибки и не после logout - автоматический редирект на SSO
+    // Если не авторизован, не загружается и нет ошибки и не после logout — автоматический редирект на SSO
     if (!isAuthenticated && !isLoading && !ssoError && !logoutSuccess) {
+      // Защита от бесконечного цикла
+      if (!checkAndIncrementSsoRedirect()) {
+        setRedirectLoopDetected(true);
+        return;
+      }
       setIsRedirecting(true);
       window.location.href = authApi.getKeycloakLoginUrl();
     }
-  }, [searchParams, isAuthenticated, isLoading, router, devLoading, devUsers]);
+  }, [searchParams, isAuthenticated, isLoading, router, devLoading, devUsers, accessTokenParam]);
 
   // Redirect if already authenticated (regardless of dev mode)
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
+      resetSsoRedirectCounter();
       router.push('/workspace');
     }
   }, [isAuthenticated, isLoading, router]);
 
   const handleLogin = () => {
     clearError();
+    resetSsoRedirectCounter();
+    setRedirectLoopDetected(false);
     setIsRedirecting(true);
     window.location.href = authApi.getKeycloakLoginUrl();
   };
@@ -98,7 +183,6 @@ function LoginPageContent() {
     try {
       const { accessToken } = await authApi.devLogin(email);
       useAuthStore.getState().setAccessToken(accessToken);
-      // checkAuth загрузит профиль через /auth/me и обновит store
       await useAuthStore.getState().checkAuth();
       router.push('/workspace');
     } catch {
@@ -106,6 +190,39 @@ function LoginPageContent() {
       setDevLoginLoading(null);
     }
   };
+
+  // Обнаружен цикл редиректов — показываем страницу с кнопкой ручного входа
+  if (redirectLoopDetected) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500 rounded mb-4">
+                <span className="text-3xl">🏭</span>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Stankoff Portal</h1>
+            </div>
+
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded mb-6">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Не удалось автоматически авторизоваться. Возможно, сессия SSO истекла.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogin}
+              className="w-full py-3 px-4 bg-primary-500 hover:bg-primary-400 text-white font-semibold rounded transition-colors flex items-center justify-center gap-2"
+            >
+              <Shield className="w-5 h-5" />
+              Войти через SSO
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Показываем loading при редиректе
   if (isRedirecting) {
