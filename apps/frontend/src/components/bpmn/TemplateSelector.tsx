@@ -28,6 +28,14 @@ export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   // Load templates and categories
   useEffect(() => {
     const loadTemplates = async () => {

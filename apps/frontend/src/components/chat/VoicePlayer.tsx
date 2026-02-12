@@ -77,6 +77,7 @@ export function VoicePlayer({ voiceKey, duration, waveform }: VoicePlayerProps) 
       {/* Play/Pause button */}
       <button
         onClick={togglePlay}
+        aria-label={playing ? 'Пауза' : 'Воспроизвести'}
         className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white flex-shrink-0 hover:bg-primary-600 transition-colors"
       >
         {playing ? (

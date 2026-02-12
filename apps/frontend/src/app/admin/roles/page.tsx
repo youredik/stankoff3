@@ -7,20 +7,22 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Breadcrumbs, createHomeBreadcrumb } from '@/components/ui/Breadcrumbs';
 import { RoleList } from '@/components/admin/RoleList';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import { useCan } from '@/hooks/useCan';
 
 function AdminRolesContent() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const permissionsLoaded = usePermissionStore((s) => s.loaded);
   const canManageRoles = useCan('global:role:manage');
 
   useEffect(() => {
-    if (user && !canManageRoles) {
+    if (user && permissionsLoaded && !canManageRoles) {
       router.replace('/workspace');
     }
-  }, [user, canManageRoles, router]);
+  }, [user, permissionsLoaded, canManageRoles, router]);
 
-  if (!canManageRoles) {
+  if (!permissionsLoaded || !canManageRoles) {
     return null;
   }
 

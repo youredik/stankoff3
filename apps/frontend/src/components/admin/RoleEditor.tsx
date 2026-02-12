@@ -31,6 +31,14 @@ export function RoleEditor({ role, onSave, onClose }: RoleEditorProps) {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     rbacApi.getPermissionRegistry().then(setAllPermissions).catch(console.error);
   }, []);
 

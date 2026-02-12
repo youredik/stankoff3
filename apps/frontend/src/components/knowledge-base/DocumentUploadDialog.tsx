@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, Upload, FileText } from 'lucide-react';
 import { useKnowledgeBaseStore } from '@/store/useKnowledgeBaseStore';
 
@@ -10,6 +10,14 @@ interface Props {
 
 export function DocumentUploadDialog({ onClose }: Props) {
   const { uploadDocument, isCreating, categories } = useKnowledgeBaseStore();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');

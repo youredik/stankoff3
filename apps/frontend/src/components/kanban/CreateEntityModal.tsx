@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
@@ -131,6 +131,15 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
 
   const isDirty = !!title || !!assigneeId || Object.keys(formData).length > 0;
   useBeforeUnload(isDirty);
+
+  // Close on Escape (a11y requirement for modal dialogs)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const titleError = (titleTouched || submitAttempted) && !title.trim() ? 'Название обязательно' : null;
 

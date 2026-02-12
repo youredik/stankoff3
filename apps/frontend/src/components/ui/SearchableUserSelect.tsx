@@ -113,6 +113,7 @@ export default function SearchableUserSelect({
                 <button
                   type="button"
                   onClick={() => setSearch('')}
+                  aria-label="Очистить поиск"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-3.5 h-3.5" />

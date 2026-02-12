@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { X, Search, User, Tag, Calendar, Hash, Type, ToggleLeft, Link2, MapPin, Users, ChevronDown } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -78,6 +78,14 @@ export function FilterPanel({
   onClose,
   facets,
 }: FilterPanelProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const { users } = useEntityStore();
   const { currentWorkspace } = useWorkspaceStore();
 

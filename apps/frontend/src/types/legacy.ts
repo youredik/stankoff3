@@ -48,6 +48,7 @@ export interface LegacyProductSearchResult {
 export interface LegacyCategory {
   id: number;
   name: string;
+  uri: string | null;
   parentId: number | null;
 }
 

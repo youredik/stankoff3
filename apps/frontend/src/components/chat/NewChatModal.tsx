@@ -29,6 +29,14 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     apiClient.get<UserItem[]>('/users').then((r) => setUsers(r.data));
   }, []);
 

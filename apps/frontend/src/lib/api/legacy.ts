@@ -173,13 +173,17 @@ const LEGACY_BASE_URL = 'https://www.stankoff.ru';
 
 /**
  * Генераторы URL для Legacy CRM
+ * URL-паттерны взяты из .htaccess и router.php legacy проекта
  */
 export const legacyUrls = {
-  customer: (id: number) => `${LEGACY_BASE_URL}/crm/customer/${id}`,
-  counterparty: (id: number) => `${LEGACY_BASE_URL}/crm/counterparty/${id}`,
-  deal: (id: number) => `${LEGACY_BASE_URL}/crm/deal/${id}`,
-  product: (id: number) => `${LEGACY_BASE_URL}/catalog/product/${id}`,
-  category: (id: number) => `${LEGACY_BASE_URL}/catalog/category/${id}`,
-  request: (id: number) => `${LEGACY_BASE_URL}/crm/request/${id}`,
-  manager: (id: number) => `${LEGACY_BASE_URL}/crm/manager/${id}`,
+  customer: (id: number) => `${LEGACY_BASE_URL}/client/view/${id}`,
+  counterparty: (id: number) => `${LEGACY_BASE_URL}/commerce/counterparty/view/${id}`,
+  deal: (id: number) => `${LEGACY_BASE_URL}/deal/view/${id}`,
+  product: (uri: string | null, id?: number) =>
+    uri ? `${LEGACY_BASE_URL}/blog/product/${uri}` : `${LEGACY_BASE_URL}/blog`,
+  category: (uri: string | null, id?: number) =>
+    uri ? `${LEGACY_BASE_URL}/blog/${uri}` : `${LEGACY_BASE_URL}/blog`,
+  request: (hash: string | null, id?: number) =>
+    hash ? `${LEGACY_BASE_URL}/request/view/${hash}` : `${LEGACY_BASE_URL}/request/list`,
+  manager: (id: number) => `${LEGACY_BASE_URL}/admin/settings/employees/${id}`,
 };

@@ -4,7 +4,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link2, Plus, X, ExternalLink, Loader2 } from 'lucide-react';
 import { entitiesApi } from '@/lib/api/entities';
 import { workspacesApi } from '@/lib/api/workspaces';
+import { useEntityNavigation } from '@/hooks/useEntityNavigation';
+import { useEntityStore } from '@/store/useEntityStore';
 import type { Entity, Workspace } from '@/types';
+import { RelatedEntityCard, EntityCardSkeleton, type FullEntityData } from './RelatedEntityCard';
 
 interface LinkedEntitiesProps {
   entityId: string;
@@ -13,85 +16,90 @@ interface LinkedEntitiesProps {
   readOnly?: boolean;
 }
 
-interface LinkedEntityInfo {
-  id: string;
-  customId: string;
-  title: string;
-  status: string;
-  workspaceName: string;
-  workspaceIcon: string;
-}
-
 export function LinkedEntities({
   entityId,
   linkedEntityIds,
   onUpdate,
   readOnly = false,
 }: LinkedEntitiesProps) {
-  const [linkedEntities, setLinkedEntities] = useState<LinkedEntityInfo[]>([]);
+  const [fullEntities, setFullEntities] = useState<FullEntityData[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [allEntities, setAllEntities] = useState<Entity[]>([]);
+  const [preloadedEntities, setPreloadedEntities] = useState<Entity[]>([]);
+  const [searchResults, setSearchResults] = useState<Entity[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loadingModal, setLoadingModal] = useState(false);
+  const [searching, setSearching] = useState(false);
 
-  // Стабильный ключ для сравнения массива (вместо reference equality)
+  const { openEntity } = useEntityNavigation();
+  const users = useEntityStore((s) => s.users);
+
+  // Стабильный ключ для сравнения массива
   const linkedIdsKey = useMemo(() => linkedEntityIds.join(','), [linkedEntityIds]);
 
-  // Fetch linked entity details via search API (not loading all entities)
+  // Загрузка полных данных связанных сущностей + их workspace
   useEffect(() => {
     if (linkedEntityIds.length === 0) {
-      setLinkedEntities([]);
+      setFullEntities([]);
       return;
     }
 
     let cancelled = false;
+    const wsCache = new Map<string, Workspace>();
 
     const fetchLinkedEntities = async () => {
       setLoading(true);
       try {
-        // Search each customId individually (they're short, fast queries)
-        const results = await Promise.all(
-          linkedEntityIds.map(async (customId) => {
+        const results = await Promise.allSettled(
+          linkedEntityIds.map(async (customId): Promise<FullEntityData | null> => {
+            let entity: Entity | null = null;
+
+            // 1. Найти entity через search по customId
             try {
               const searchResults = await entitiesApi.search(customId, 5);
-              const match = searchResults.find((r) => r.customId === customId);
+              const match = searchResults.find(
+                (r) => r.customId === customId || r.id === customId,
+              );
               if (match) {
-                return {
-                  id: match.id,
-                  customId: match.customId,
-                  title: match.title,
-                  status: match.status,
-                  workspaceName: match.workspaceName || '',
-                  workspaceIcon: match.workspaceIcon || '',
-                } as LinkedEntityInfo;
+                entity = await entitiesApi.getById(match.id);
               }
-            } catch {
-              // ignore individual search failure
+            } catch { /* silent */ }
+
+            // 2. Fallback: getById напрямую (если UUID)
+            if (!entity) {
+              try {
+                entity = await entitiesApi.getById(customId);
+              } catch { /* silent */ }
             }
-            return {
-              id: customId,
-              customId,
-              title: 'Не найдено',
-              status: '',
-              workspaceName: '',
-              workspaceIcon: '',
-            } as LinkedEntityInfo;
+
+            if (!entity) return null;
+
+            // 3. Загрузить workspace (с кэшем)
+            let workspace = wsCache.get(entity.workspaceId);
+            if (!workspace) {
+              try {
+                workspace = await workspacesApi.getById(entity.workspaceId);
+                wsCache.set(entity.workspaceId, workspace);
+              } catch { /* silent */ }
+            }
+
+            if (!workspace) return null;
+
+            return { entity, workspace };
           }),
         );
 
         if (!cancelled) {
-          setLinkedEntities(results);
-          // Fetch workspaces for the add modal
-          try {
-            const ws = await workspacesApi.getAll();
-            if (!cancelled) setWorkspaces(ws);
-          } catch { /* silent */ }
+          setFullEntities(
+            results
+              .filter((r): r is PromiseFulfilledResult<FullEntityData | null> => r.status === 'fulfilled')
+              .map((r) => r.value)
+              .filter((v): v is FullEntityData => v !== null),
+          );
         }
-      } catch {
-        // silent
-      }
+      } catch { /* silent */ }
       if (!cancelled) setLoading(false);
     };
 
@@ -100,49 +108,77 @@ export function LinkedEntities({
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedIdsKey]);
 
-  // Fetch workspaces for add modal and search entities by query
+  // Fetch workspaces + preload recent entities when modal opens
   useEffect(() => {
     if (!showAddModal) return;
-
     let cancelled = false;
 
-    const fetchWorkspacesForModal = async () => {
+    const init = async () => {
+      setLoadingModal(true);
       try {
         const workspacesData = await workspacesApi.getAll();
         if (cancelled) return;
         setWorkspaces(workspacesData);
-        if (workspacesData.length > 0) {
-          setSelectedWorkspaceId((prev) => prev || workspacesData[0].id);
+
+        const wsId = selectedWorkspaceId || (workspacesData.length > 0 ? workspacesData[0].id : '');
+        if (!selectedWorkspaceId && wsId) setSelectedWorkspaceId(wsId);
+
+        // Предзагрузка последних заявок
+        if (wsId) {
+          const result = await entitiesApi.getTable(wsId, {
+            perPage: 15,
+            sortBy: 'createdAt',
+            sortOrder: 'DESC',
+          });
+          if (!cancelled) setPreloadedEntities(result.items);
         }
-      } catch {
-        // silent
-      }
+      } catch { /* silent */ }
+      if (!cancelled) setLoadingModal(false);
     };
 
-    fetchWorkspacesForModal();
-
-    return () => {
-      cancelled = true;
-    };
+    init();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddModal]);
 
-  // Search entities when searchQuery changes in modal
+  // Preload entities when workspace changes
   useEffect(() => {
-    if (!showAddModal || !searchQuery || searchQuery.length < 2) {
-      setAllEntities([]);
+    if (!showAddModal || !selectedWorkspaceId) return;
+    let cancelled = false;
+
+    const preload = async () => {
+      setLoadingModal(true);
+      try {
+        const result = await entitiesApi.getTable(selectedWorkspaceId, {
+          perPage: 15,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC',
+        });
+        if (!cancelled) setPreloadedEntities(result.items);
+      } catch { /* silent */ }
+      if (!cancelled) setLoadingModal(false);
+    };
+
+    preload();
+    return () => { cancelled = true; };
+  }, [showAddModal, selectedWorkspaceId]);
+
+  // Search entities with debounce
+  useEffect(() => {
+    if (!showAddModal || searchQuery.length < 1) {
+      setSearchResults([]);
       return;
     }
-
     let cancelled = false;
+    setSearching(true);
     const timer = setTimeout(async () => {
       try {
         const results = await entitiesApi.search(searchQuery, 20);
         if (!cancelled) {
-          // Convert SearchResult to Entity-like objects for the modal list
-          setAllEntities(
+          setSearchResults(
             results.map((r) => ({
               id: r.id,
               customId: r.customId,
@@ -157,47 +193,75 @@ export function LinkedEntities({
             })) as Entity[],
           );
         }
-      } catch {
-        // silent
-      }
+      } catch { /* silent */ }
+      if (!cancelled) setSearching(false);
     }, 300);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [showAddModal, searchQuery]);
 
-  const handleRemoveLink = (customId: string) => {
-    const updated = linkedEntityIds.filter((id) => id !== customId);
-    onUpdate(updated);
+  // Получить customId текущей заявки из store
+  const currentCustomId = useEntityStore((s) => s.selectedEntity?.customId);
+
+  const handleRemoveLink = async (targetCustomId: string) => {
+    // 1. Убираем связь у текущей заявки
+    onUpdate(linkedEntityIds.filter((id) => id !== targetCustomId));
+
+    // 2. Обратная связь: убираем текущую заявку из linkedEntityIds целевой
+    if (currentCustomId) {
+      try {
+        const targetData = fullEntities.find((d) => d.entity.customId === targetCustomId);
+        if (targetData) {
+          const targetLinked = targetData.entity.linkedEntityIds || [];
+          if (targetLinked.includes(currentCustomId)) {
+            await entitiesApi.update(targetData.entity.id, {
+              linkedEntityIds: targetLinked.filter((id) => id !== currentCustomId),
+            } as Partial<Entity>);
+          }
+        }
+      } catch {
+        // Обратная связь — best effort
+      }
+    }
   };
 
-  const handleAddLink = (customId: string) => {
-    if (!linkedEntityIds.includes(customId)) {
-      onUpdate([...linkedEntityIds, customId]);
+  const handleAddLink = async (targetCustomId: string) => {
+    // 1. Добавляем связь у текущей заявки
+    if (!linkedEntityIds.includes(targetCustomId)) {
+      onUpdate([...linkedEntityIds, targetCustomId]);
     }
+
+    // 2. Обратная связь: добавляем текущую заявку в linkedEntityIds целевой
+    if (currentCustomId) {
+      try {
+        // Находим целевую заявку (из результатов поиска в модалке)
+        const targetSearchEntity = sourceEntities.find((e) => e.customId === targetCustomId);
+        if (targetSearchEntity) {
+          // Загружаем полные данные целевой заявки
+          const targetFull = await entitiesApi.getById(targetSearchEntity.id);
+          const targetLinked = targetFull.linkedEntityIds || [];
+          if (!targetLinked.includes(currentCustomId)) {
+            await entitiesApi.update(targetFull.id, {
+              linkedEntityIds: [...targetLinked, currentCustomId],
+            } as Partial<Entity>);
+          }
+        }
+      } catch {
+        // Обратная связь — best effort
+      }
+    }
+
     setShowAddModal(false);
     setSearchQuery('');
   };
 
+  // Источник: поиск или предзагрузка
+  const sourceEntities = searchQuery.length >= 1 ? searchResults : preloadedEntities;
+
   // Filter entities for add modal
-  const filteredEntities = allEntities.filter((e) => {
-    // Don't show current entity
+  const filteredEntities = sourceEntities.filter((e) => {
     if (e.id === entityId) return false;
-    // Don't show already linked
     if (linkedEntityIds.includes(e.customId)) return false;
-    // Filter by workspace
-    if (selectedWorkspaceId && e.workspaceId !== selectedWorkspaceId)
-      return false;
-    // Filter by search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        e.customId.toLowerCase().includes(query) ||
-        e.title.toLowerCase().includes(query)
-      );
-    }
+    if (searchQuery.length >= 1 && selectedWorkspaceId && e.workspaceId !== selectedWorkspaceId) return false;
     return true;
   });
 
@@ -219,42 +283,26 @@ export function LinkedEntities({
         )}
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-2">
-          <Loader2 className="w-4 h-4 text-gray-400 dark:text-gray-500 animate-spin" />
-        </div>
-      )}
+      {/* Загрузка */}
+      {loading && linkedEntityIds.map((id) => <EntityCardSkeleton key={id} />)}
 
-      {!loading && linkedEntities.length === 0 && (
+      {/* Пусто */}
+      {!loading && fullEntities.length === 0 && linkedEntityIds.length === 0 && (
         <p className="text-xs text-gray-400 dark:text-gray-500 italic">Нет связей</p>
       )}
 
-      {!loading && linkedEntities.length > 0 && (
-        <div className="space-y-1">
-          {linkedEntities.map((entity) => (
-            <div
-              key={entity.id}
-              className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg group"
-            >
-              <span className="text-sm">{entity.workspaceIcon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
-                    {entity.customId}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-700 dark:text-gray-300 truncate">{entity.title}</p>
-              </div>
-              {!readOnly && (
-                <button
-                  onClick={() => handleRemoveLink(entity.customId)}
-                  className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Удалить связь"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+      {/* Карточки связанных сущностей */}
+      {!loading && fullEntities.length > 0 && (
+        <div className="space-y-2">
+          {fullEntities.map((data) => (
+            <RelatedEntityCard
+              key={data.entity.id}
+              data={data}
+              users={users}
+              canEdit={!readOnly}
+              onRemove={() => handleRemoveLink(data.entity.customId)}
+              onNavigate={() => openEntity(data.entity.id)}
+            />
           ))}
         </div>
       )}
@@ -279,7 +327,6 @@ export function LinkedEntities({
               </div>
 
               <div className="p-4 space-y-3">
-                {/* Workspace selector */}
                 <select
                   value={selectedWorkspaceId}
                   onChange={(e) => setSelectedWorkspaceId(e.target.value)}
@@ -293,7 +340,6 @@ export function LinkedEntities({
                   ))}
                 </select>
 
-                {/* Search */}
                 <input
                   type="text"
                   value={searchQuery}
@@ -302,17 +348,34 @@ export function LinkedEntities({
                   className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
 
-                {/* Entity list */}
+                {/* Подсказка */}
+                {!searchQuery && !loadingModal && filteredEntities.length > 0 && (
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                    Последние заявки · начните вводить для поиска
+                  </p>
+                )}
+
                 <div className="max-h-64 overflow-y-auto space-y-1">
-                  {filteredEntities.length === 0 && (
+                  {/* Загрузка */}
+                  {(loadingModal || searching) && (
+                    <div className="flex items-center justify-center gap-2 py-4">
+                      <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+                      <span className="text-sm text-gray-400">
+                        {searching ? 'Поиск...' : 'Загрузка...'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Пусто */}
+                  {!loadingModal && !searching && filteredEntities.length === 0 && (
                     <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
-                      Нет доступных сущностей
+                      {searchQuery ? 'Ничего не найдено' : 'Нет доступных заявок'}
                     </p>
                   )}
-                  {filteredEntities.slice(0, 20).map((entity) => {
-                    const workspace = workspaces.find(
-                      (w) => w.id === entity.workspaceId
-                    );
+
+                  {/* Список */}
+                  {!loadingModal && !searching && filteredEntities.slice(0, 20).map((entity) => {
+                    const workspace = workspaces.find((w) => w.id === entity.workspaceId);
                     return (
                       <button
                         key={entity.id}

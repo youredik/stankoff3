@@ -43,6 +43,14 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     if (user) {
       setFormData({
         email: user.email,

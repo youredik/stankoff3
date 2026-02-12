@@ -298,7 +298,7 @@ export function ChatInput({
               {(replyTo.content || '').replace(/<[^>]*>/g, '').substring(0, 60)}
             </p>
           </div>
-          <button data-testid="chat-cancel-reply-btn" onClick={onCancelReply} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
+          <button data-testid="chat-cancel-reply-btn" onClick={onCancelReply} aria-label="Отменить ответ" className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -320,6 +320,7 @@ export function ChatInput({
               )}
               <button
                 onClick={() => removeFile(i)}
+                aria-label="Удалить файл"
                 className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
@@ -367,7 +368,7 @@ export function ChatInput({
           </div>
 
           {content.trim() || pendingFiles.length > 0 ? (
-            <button data-testid="chat-send-btn" onClick={handleSend} disabled={uploading} className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white transition-colors flex-shrink-0 mb-0.5">
+            <button data-testid="chat-send-btn" onClick={handleSend} disabled={uploading} aria-label="Отправить сообщение" className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white transition-colors flex-shrink-0 mb-0.5">
               <Send className="w-5 h-5" />
             </button>
           ) : (

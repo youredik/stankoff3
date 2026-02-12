@@ -201,7 +201,7 @@ export function LegacyProductPicker({
             )}
             {showLegacyLink && (
               <a
-                href={legacyUrls.product(selectedProduct.id)}
+                href={legacyUrls.product(selectedProduct.uri, selectedProduct.id)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-1 text-gray-400 hover:text-teal-600 dark:hover:text-teal-400"

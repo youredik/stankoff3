@@ -296,6 +296,7 @@ export function TaskInbox({
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
+          aria-label="Обновить список задач"
           className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -340,6 +341,7 @@ export function TaskInbox({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as UserTaskStatus | '')}
+              aria-label="Фильтр по статусу"
               className="appearance-none pl-3 pr-8 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
             >
               {statusFilters.map((filter) => (
@@ -356,6 +358,7 @@ export function TaskInbox({
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
+              aria-label="Сортировка задач"
               className="appearance-none pl-3 pr-8 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
             >
               {sortOptions.map((opt) => (

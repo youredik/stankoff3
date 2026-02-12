@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, Upload, FileJson, FileSpreadsheet, AlertCircle, CheckCircle } from 'lucide-react';
 import { useEntityStore } from '@/store/useEntityStore';
 import { entitiesApi } from '@/lib/api/entities';
@@ -19,6 +19,15 @@ interface ImportResult {
 
 export function ImportModal({ workspaceId, onClose }: ImportModalProps) {
   const { fetchEntities } = useEntityStore();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const [format, setFormat] = useState<ImportFormat>('csv');
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);

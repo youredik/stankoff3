@@ -158,6 +158,7 @@ export function MediaLightbox({
               e.stopPropagation();
               goToPrev();
             }}
+            aria-label="Предыдущее изображение"
             className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -167,6 +168,7 @@ export function MediaLightbox({
               e.stopPropagation();
               goToNext();
             }}
+            aria-label="Следующее изображение"
             className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
           >
             <ChevronRight className="w-6 h-6" />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader2, Search } from 'lucide-react';
 import type { EntityLink, EntityLinkType, Entity } from '@/types';
 import { entityLinksApi } from '@/lib/api/entity-links';
@@ -34,6 +34,14 @@ export function AddLinkModal({
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleSearch = async () => {
     if (searchQuery.length < 2) return;

@@ -33,6 +33,7 @@ export interface Field {
   relatedWorkspaceId?: string;  // Для relation типа
   config?: FieldConfig;   // Type-specific настройки
   rules?: FieldRule[];    // Правила видимости/вычислений
+  system?: boolean;       // Системное поле (нельзя удалить, можно настраивать label/description)
 }
 
 // ==================== Field Config (type-specific) ====================
@@ -170,6 +171,8 @@ export interface WorkspaceSection {
 // Устаревший alias - используйте WorkspaceSection
 export type Section = WorkspaceSection;
 
+export type SystemWorkspaceType = 'counterparties' | 'contacts' | 'products';
+
 export interface Workspace {
   id: string;
   name: string;
@@ -178,6 +181,8 @@ export interface Workspace {
   lastEntityNumber: number; // Последний использованный номер
   isArchived?: boolean; // Архивирован ли workspace
   isInternal?: boolean; // Внутренний workspace (не отображается в UI)
+  isSystem?: boolean; // Системный workspace (справочник)
+  systemType?: SystemWorkspaceType | null; // Тип системного workspace
   sectionId?: string | null; // ID раздела (MenuSection)
   section?: MenuSection | null; // Раздел, к которому принадлежит workspace
   showInMenu: boolean; // Показывать в боковом меню

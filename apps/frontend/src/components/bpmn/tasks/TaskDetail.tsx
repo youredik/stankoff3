@@ -69,6 +69,14 @@ export function TaskDetail({
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'completed';
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     if (activeTab === 'comments') {
       loadComments();
     }

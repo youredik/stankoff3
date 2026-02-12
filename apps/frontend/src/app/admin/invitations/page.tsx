@@ -7,20 +7,22 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Breadcrumbs, createHomeBreadcrumb } from '@/components/ui/Breadcrumbs';
 import { InvitationList } from '@/components/admin/InvitationList';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePermissionStore } from '@/store/usePermissionStore';
 import { useCan } from '@/hooks/useCan';
 
 function AdminInvitationsContent() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const permissionsLoaded = usePermissionStore((s) => s.loaded);
   const canManageUsers = useCan('global:user:manage');
 
   useEffect(() => {
-    if (user && !canManageUsers) {
+    if (user && permissionsLoaded && !canManageUsers) {
       router.replace('/workspace');
     }
-  }, [user, canManageUsers, router]);
+  }, [user, permissionsLoaded, canManageUsers, router]);
 
-  if (!canManageUsers) {
+  if (!permissionsLoaded || !canManageUsers) {
     return null;
   }
 

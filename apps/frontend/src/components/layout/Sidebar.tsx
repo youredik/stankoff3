@@ -274,6 +274,9 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className={`font-medium truncate text-sm ${workspace.isArchived ? 'text-gray-500' : ''}`}>{workspace.name}</span>
+              {workspace.isSystem && (
+                <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex-shrink-0">СИС</span>
+              )}
               {workspace.isArchived && (
                 <Archive className="w-3 h-3 text-gray-500 flex-shrink-0" />
               )}
@@ -300,7 +303,7 @@ export function Sidebar() {
             </button>
 
             {menuOpen === workspace.id && (
-                <div data-dropdown-menu role="menu" className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-48">
+                <div data-dropdown-menu role="menu" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-48">
                   <button
                     onClick={() => handleEditWorkspace(workspace.id)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
@@ -318,29 +321,33 @@ export function Sidebar() {
                     <GitBranch className="w-4 h-4 text-gray-400" />
                     <span>Бизнес-процессы</span>
                   </button>
-                  <button
-                    onClick={() => handleDuplicateWorkspace(workspace)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-                  >
-                    <Copy className="w-4 h-4 text-gray-400" />
-                    <span>Дублировать</span>
-                  </button>
-                  <button
-                    onClick={() => handleArchiveWorkspace(workspace)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-                  >
-                    {workspace.isArchived ? (
-                      <>
-                        <ArchiveRestore className="w-4 h-4 text-gray-400" />
-                        <span>Разархивировать</span>
-                      </>
-                    ) : (
-                      <>
-                        <Archive className="w-4 h-4 text-gray-400" />
-                        <span>Архивировать</span>
-                      </>
-                    )}
-                  </button>
+                  {!workspace.isSystem && (
+                    <button
+                      onClick={() => handleDuplicateWorkspace(workspace)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    >
+                      <Copy className="w-4 h-4 text-gray-400" />
+                      <span>Дублировать</span>
+                    </button>
+                  )}
+                  {!workspace.isSystem && (
+                    <button
+                      onClick={() => handleArchiveWorkspace(workspace)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    >
+                      {workspace.isArchived ? (
+                        <>
+                          <ArchiveRestore className="w-4 h-4 text-gray-400" />
+                          <span>Разархивировать</span>
+                        </>
+                      ) : (
+                        <>
+                          <Archive className="w-4 h-4 text-gray-400" />
+                          <span>Архивировать</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                   <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                   <button
                     onClick={() => handleExportJson(workspace.id)}
@@ -363,14 +370,18 @@ export function Sidebar() {
                     <Upload className="w-4 h-4 text-gray-400" />
                     <span>Импорт</span>
                   </button>
-                  <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-                  <button
-                    onClick={() => handleDeleteWorkspace(workspace.id)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Удалить</span>
-                  </button>
+                  {!workspace.isSystem && (
+                    <>
+                      <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+                      <button
+                        onClick={() => handleDeleteWorkspace(workspace.id)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Удалить</span>
+                      </button>
+                    </>
+                  )}
                 </div>
             )}
           </div>
@@ -443,13 +454,14 @@ export function Sidebar() {
                   e.stopPropagation();
                   setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id);
                 }}
+                aria-label="Меню раздела"
                 className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <MoreVertical className="w-3.5 h-3.5" />
               </button>
 
               {sectionMenuOpen === section.id && (
-                  <div data-dropdown-menu className="absolute right-0 top-full mt-1 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-44">
+                  <div data-dropdown-menu onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute right-0 top-full mt-1 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-44">
                     <button
                       onClick={() => {
                         setSectionMenuOpen(null);
@@ -574,6 +586,7 @@ export function Sidebar() {
               <button
                 onClick={() => setCreatingSectionName('')}
                 className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                aria-label="Создать раздел"
                 title="Создать раздел"
               >
                 <FolderPlus className="w-5 h-5" />
@@ -605,6 +618,7 @@ export function Sidebar() {
               </button>
               <button
                 onClick={() => setCreatingSectionName(null)}
+                aria-label="Отмена"
                 className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
               >
                 <X className="w-5 h-5" />

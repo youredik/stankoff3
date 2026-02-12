@@ -103,7 +103,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {showAddMembers ? 'Добавить участников' : 'Настройки чата'}
           </h3>
-          <button onClick={showAddMembers ? () => setShowAddMembers(false) : onClose} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
+          <button onClick={showAddMembers ? () => setShowAddMembers(false) : onClose} aria-label="Закрыть меню" className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
             <X className="w-4 h-4" />
           </button>
         </div>

@@ -183,6 +183,7 @@ export function ToastContainer() {
             </div>
             <button
               onClick={() => handleDismissUi(t.id)}
+              aria-label="Закрыть уведомление"
               className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4" />
@@ -222,6 +223,7 @@ export function ToastContainer() {
             </div>
             <button
               onClick={() => handleDismiss(toast.id)}
+              aria-label="Закрыть уведомление"
               className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4" />

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { X, Keyboard } from 'lucide-react';
 import { GLOBAL_SHORTCUTS } from '@/hooks/useKeyboardShortcuts';
 
@@ -8,6 +9,14 @@ interface KeyboardShortcutsHelpProps {
 }
 
 export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
@@ -27,6 +36,7 @@ export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps) {
             </div>
             <button
               onClick={onClose}
+              aria-label="Закрыть справку"
               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
             >
               <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
