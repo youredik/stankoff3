@@ -656,6 +656,119 @@ describe('RagIndexerService', () => {
     });
   });
 
+  describe('autoResumeIndexing (onModuleInit)', () => {
+    beforeEach(() => {
+      // Убираем задержку для тестов
+      (service as unknown as { AUTO_RESUME_DELAY_MS: number }).AUTO_RESUME_DELAY_MS = 0;
+    });
+
+    it('должен автоматически возобновить незавершённую индексацию', async () => {
+      const savedState = {
+        id: 'rag_legacy',
+        last_processed_offset: 1,
+        total_requests: 2,
+        processed_requests: 1,
+        skipped_requests: 0,
+        total_chunks: 2,
+        failed_requests: 0,
+        is_completed: false,
+        started_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      // loadState → savedState, saveState → ok
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (typeof sql === 'string' && sql.includes('SELECT')) {
+          return [savedState];
+        }
+        return [];
+      });
+
+      legacyService.getIndexableRequestsCount.mockResolvedValue(2);
+
+      // Имитируем единственный batch (offset 1, одна заявка)
+      let callCount = 0;
+      legacyService.getRequestsForIndexing.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            items: [{ ...mockRequest, id: 2, subject: 'Заявка 2 '.repeat(20) } as unknown as LegacyRequest],
+            total: 2,
+          };
+        }
+        return { items: [], total: 2 };
+      });
+
+      const batchMap = new Map();
+      batchMap.set(2, { request: { ...mockRequest, id: 2, subject: 'Заявка 2 '.repeat(20) }, answers: [] });
+      legacyService.getRequestsWithAnswersBatch.mockResolvedValue(batchMap);
+
+      // Вызываем onModuleInit
+      await service.onModuleInit();
+
+      // Даём time для выполнения async операции
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Проверяем что индексация была запущена с offset 1
+      expect(legacyService.getRequestsForIndexing).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 1 }),
+      );
+    });
+
+    it('не должен запускать индексацию если состояние is_completed', async () => {
+      const completedState = {
+        id: 'rag_legacy',
+        last_processed_offset: 1000,
+        total_requests: 1000,
+        processed_requests: 1000,
+        skipped_requests: 0,
+        total_chunks: 1500,
+        failed_requests: 0,
+        is_completed: true,
+        started_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (typeof sql === 'string' && sql.includes('SELECT')) {
+          return [completedState];
+        }
+        return [];
+      });
+
+      await service.onModuleInit();
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // indexAll НЕ должен быть вызван (нет вызова getIndexableRequestsCount)
+      expect(legacyService.getIndexableRequestsCount).not.toHaveBeenCalled();
+    });
+
+    it('не должен запускать индексацию если нет сохранённого состояния', async () => {
+      dataSource.query.mockResolvedValue([]);
+
+      await service.onModuleInit();
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(legacyService.getIndexableRequestsCount).not.toHaveBeenCalled();
+    });
+
+    it('не должен запускать индексацию если сервисы недоступны', async () => {
+      knowledgeBase.isAvailable.mockReturnValue(false);
+
+      await service.onModuleInit();
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(legacyService.getIndexableRequestsCount).not.toHaveBeenCalled();
+    });
+
+    it('должен перехватить ошибку и не упасть', async () => {
+      dataSource.query.mockRejectedValue(new Error('DB connection failed'));
+
+      // Не должен выбросить ошибку
+      await expect(service.onModuleInit()).resolves.not.toThrow();
+    });
+  });
+
   describe('analytics extraction', () => {
     it('должен включить аналитику в metadata', async () => {
       await service.indexRequest(mockRequest, mockAnswers);

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { LegacyService } from '../../legacy/services/legacy.service';
@@ -67,7 +67,7 @@ export interface IndexingOptions {
  * продолжает индексацию с сохранённого offset.
  */
 @Injectable()
-export class RagIndexerService {
+export class RagIndexerService implements OnModuleInit {
   private readonly logger = new Logger(RagIndexerService.name);
 
   // Параметры чанкинга
@@ -82,6 +82,9 @@ export class RagIndexerService {
   private readonly SAVE_STATE_EVERY_BATCHES = 10;
   private readonly INDEXER_STATE_ID = 'rag_legacy';
 
+  // Auto-resume: задержка перед автозапуском (даём сервисам прогреться)
+  private readonly AUTO_RESUME_DELAY_MS = 30_000; // 30 секунд
+
   // Статус индексации
   private indexingStats: IndexingStats | null = null;
 
@@ -90,6 +93,54 @@ export class RagIndexerService {
     private readonly legacyService: LegacyService,
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * При старте приложения проверяем незавершённую индексацию
+   * и автоматически возобновляем её через 30 секунд
+   */
+  async onModuleInit(): Promise<void> {
+    // Запускаем проверку в фоне (не блокируем старт приложения)
+    this.autoResumeIndexing().catch(err => {
+      this.logger.warn(`Auto-resume индексации пропущен: ${err.message}`);
+    });
+  }
+
+  private async autoResumeIndexing(): Promise<void> {
+    // Ждём, пока все сервисы запустятся
+    await this.delay(this.AUTO_RESUME_DELAY_MS);
+
+    // Проверяем доступность сервисов
+    if (!this.isAvailable()) {
+      this.logger.debug('Auto-resume: AI или Legacy сервис недоступен, пропускаем');
+      return;
+    }
+
+    // Проверяем есть ли незавершённая индексация
+    const savedState = await this.loadState();
+
+    if (!savedState) {
+      this.logger.debug('Auto-resume: нет сохранённого состояния индексации');
+      return;
+    }
+
+    if (savedState.is_completed) {
+      this.logger.debug('Auto-resume: индексация уже завершена');
+      return;
+    }
+
+    this.logger.log(
+      `Auto-resume: найдена незавершённая индексация ` +
+      `(offset: ${savedState.last_processed_offset}, ` +
+      `обработано: ${savedState.processed_requests}/${savedState.total_requests}). ` +
+      `Возобновляем...`
+    );
+
+    try {
+      await this.indexAll();
+    } catch (error) {
+      this.logger.error(`Auto-resume: ошибка возобновления индексации: ${error.message}`);
+    }
+  }
 
   /**
    * Проверка доступности сервисов для индексации
