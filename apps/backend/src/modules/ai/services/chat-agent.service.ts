@@ -132,11 +132,16 @@ export class ChatAgentService {
             query: cleanContent,
             sourceType: 'legacy_request',
             limit: 5,
-            minSimilarity: 0.5,
+            minSimilarity: 0.7,
           });
 
+          // Confidence gating: не подмешиваем нерелевантный контекст в промпт
           if (searchResults.length > 0) {
-            ragContext = this.formatRagContext(searchResults);
+            const avgSim = searchResults.reduce((s, r) => s + r.similarity, 0) / searchResults.length;
+            const maxSim = Math.max(...searchResults.map(r => r.similarity));
+            if (avgSim >= 0.65 && maxSim >= 0.7) {
+              ragContext = this.formatRagContext(searchResults);
+            }
           }
         } catch (e) {
           this.logger.warn(`RAG search failed: ${e instanceof Error ? e.message : e}`);

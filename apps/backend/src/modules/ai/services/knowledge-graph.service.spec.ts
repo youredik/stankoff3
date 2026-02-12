@@ -199,5 +199,43 @@ describe('KnowledgeGraphService', () => {
       // Не должен бросить ошибку, только center + assignee
       expect(result.nodes.length).toBe(2);
     });
+
+    it('не должен добавлять нерелевантные узлы при низком similarity', async () => {
+      knowledgeBaseService.searchSimilar.mockResolvedValue([
+        {
+          id: 'chunk-low-1',
+          content: 'Заточной станок S50-CBN...',
+          sourceType: 'legacy_request',
+          sourceId: 'req-low-1',
+          metadata: { requestId: 123647, subject: 'Заточной станок S50-CBN' },
+          similarity: 0.62,
+        },
+        {
+          id: 'chunk-low-2',
+          content: 'Поставка оборудования...',
+          sourceType: 'legacy_request',
+          sourceId: 'req-low-2',
+          metadata: { requestId: 219182, subject: 'Поставка оборудования' },
+          similarity: 0.59,
+        },
+      ]);
+
+      const result = await service.buildGraph('entity-1');
+
+      // Только center node + assigned expert, без мусорных legacy узлов
+      expect(result.nodes.length).toBe(2);
+      const legacyNodes = result.nodes.filter((n) => n.type === 'legacy_request');
+      expect(legacyNodes.length).toBe(0);
+    });
+
+    it('должен использовать minSimilarity = 0.7', async () => {
+      await service.buildGraph('entity-1');
+
+      expect(knowledgeBaseService.searchSimilar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minSimilarity: 0.7,
+        }),
+      );
+    });
   });
 });

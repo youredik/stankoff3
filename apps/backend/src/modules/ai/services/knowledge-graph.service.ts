@@ -38,6 +38,8 @@ export class KnowledgeGraphService {
   >();
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
   private readonly CACHE_MAX_SIZE = 200;
+  private readonly MIN_SIMILARITY = 0.7;
+  private readonly CONFIDENCE_THRESHOLD = 0.65;
 
   constructor(
     @InjectRepository(WorkspaceEntity)
@@ -164,8 +166,14 @@ export class KnowledgeGraphService {
         query,
         sourceType: 'legacy_request',
         limit: 6,
-        minSimilarity: 0.5,
+        minSimilarity: this.MIN_SIMILARITY,
       });
+
+      // Confidence gating: если результаты нерелевантны — не добавляем мусорные узлы
+      if (results.length === 0) return;
+      const avgSimilarity = results.reduce((sum, r) => sum + r.similarity, 0) / results.length;
+      const maxSimilarity = Math.max(...results.map(r => r.similarity));
+      if (avgSimilarity < this.CONFIDENCE_THRESHOLD || maxSimilarity < this.MIN_SIMILARITY) return;
 
       const expertMap = new Map<string, { cases: number; nodeId: string }>();
       const counterpartyMap = new Map<string, string>();
