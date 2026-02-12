@@ -64,6 +64,7 @@ stankoff-portal/
 4. **Performance:**
    - Server Components по умолчанию, `'use client'` только когда нужны хуки/браузерные API
    - Ленивая загрузка тяжёлых компонентов (`dynamic(() => import(...), { ssr: false })`)
+   - **Никогда не реэкспортируй тяжёлые компоненты (bpmn-js, dmn-js, form-js) из barrel-файлов (`index.ts`)** — это ломает HMR/HotReload. Импортировать только через `dynamic(() => import('./Component'), { ssr: false })`  по прямому пути
    - Виртуализация длинных списков
    - Debounce для поиска и фильтрации (300ms)
    - Серверная пагинация вместо загрузки всех данных

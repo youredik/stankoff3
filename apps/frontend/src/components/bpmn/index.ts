@@ -1,6 +1,5 @@
-export { BpmnModeler } from './BpmnModeler';
-export { BpmnViewer } from './BpmnViewer';
-export { BpmnHeatMap } from './BpmnHeatMap';
+// BpmnModeler, BpmnViewer, BpmnHeatMap — импортировать ТОЛЬКО через dynamic()
+// import('./BpmnModeler'), import('./BpmnViewer'), import('./BpmnHeatMap')
 export { ProcessEditor } from './ProcessEditor';
 export { ProcessList } from './ProcessList';
 export { ProcessInstanceList } from './ProcessInstanceList';

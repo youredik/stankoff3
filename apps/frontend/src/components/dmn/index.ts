@@ -1,4 +1,5 @@
 export { DecisionTableEditor } from './DecisionTableEditor';
 export { DecisionTableViewer } from './DecisionTableViewer';
 export { DmnSettings } from './DmnSettings';
-export { DmnModeler } from './DmnModeler';
+// DmnModeler — импортировать ТОЛЬКО через dynamic()
+// import('./DmnModeler')
