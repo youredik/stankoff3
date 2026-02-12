@@ -47,7 +47,8 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Copy standalone build
-COPY --from=builder /app/.next/standalone ./
+# Next.js 16 with turbopack.root nests standalone output under WORKDIR path
+COPY --from=builder /app/.next/standalone/app ./
 COPY --from=builder /app/.next/static ./.next/static
 # Copy public folder if exists (may be empty)
 COPY --from=builder /app/public* ./public/
