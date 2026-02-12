@@ -282,7 +282,10 @@ export class AiAssistantService {
         resolution,
         similarity: Math.round(result.similarity * 100) / 100,
         resolutionTimeHours,
-        legacyUrl: this.legacyUrlService.getRequestUrl(requestId),
+        legacyUrl: this.legacyUrlService.getRequestUrl(
+          metadata.requestHash as string | undefined,
+          requestId,
+        ),
         specialists: specialistNames?.slice(0, 3),
       });
     }

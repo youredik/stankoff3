@@ -80,7 +80,9 @@ describe('KnowledgeGraphService', () => {
         {
           provide: LegacyUrlService,
           useValue: {
-            getRequestUrl: jest.fn().mockImplementation((id: number) => `https://legacy.example.com/crm/request/${id}`),
+            getRequestUrl: jest.fn().mockImplementation((hash?: string | null, id?: number) =>
+              hash ? `https://legacy.example.com/request/view/${hash}` : `https://legacy.example.com/request/list`,
+            ),
           },
         },
       ],

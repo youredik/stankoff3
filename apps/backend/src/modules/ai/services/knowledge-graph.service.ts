@@ -196,7 +196,10 @@ export class KnowledgeGraphService {
             metadata: {
               requestId,
               similarity: Math.round(result.similarity * 100) / 100,
-              legacyUrl: this.legacyUrlService.getRequestUrl(requestId),
+              legacyUrl: this.legacyUrlService.getRequestUrl(
+                metadata.requestHash as string | undefined,
+                requestId,
+              ),
               resolutionTimeHours: metadata.resolutionTimeHours,
             },
           });

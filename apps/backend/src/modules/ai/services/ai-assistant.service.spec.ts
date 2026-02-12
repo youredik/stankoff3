@@ -33,6 +33,7 @@ describe('AiAssistantService', () => {
       sourceId: 'req-1',
       metadata: {
         requestId: 45231,
+        requestHash: 'hash45231abcdefghijklmnopqrs',
         subject: 'Замена подшипника серводвигателя Fanuc',
         managerName: 'Иванов Иван',
         managerId: 12,
@@ -54,6 +55,7 @@ describe('AiAssistantService', () => {
       sourceId: 'req-2',
       metadata: {
         requestId: 38102,
+        requestHash: 'hash38102abcdefghijklmnopqrs',
         subject: 'Диагностика серводвигателя после перегрева',
         managerName: 'Иванов Иван',
         managerId: 12,
@@ -93,7 +95,9 @@ describe('AiAssistantService', () => {
         {
           provide: LegacyUrlService,
           useValue: {
-            getRequestUrl: jest.fn((id: number) => `https://legacy.example.com/crm/request/${id}`),
+            getRequestUrl: jest.fn((hash?: string | null, id?: number) =>
+              hash ? `https://legacy.example.com/request/view/${hash}` : `https://legacy.example.com/request/list`,
+            ),
           },
         },
         {
@@ -169,7 +173,7 @@ describe('AiAssistantService', () => {
       expect(result.similarCases).toHaveLength(2);
       expect(result.similarCases[0].requestId).toBe(45231);
       expect(result.similarCases[0].similarity).toBe(0.92);
-      expect(result.similarCases[0].legacyUrl).toContain('45231');
+      expect(result.similarCases[0].legacyUrl).toContain('/request/view/hash45231');
 
       expect(result.suggestedExperts.length).toBeGreaterThan(0);
       expect(result.suggestedExperts[0].name).toBe('Иванов Иван');

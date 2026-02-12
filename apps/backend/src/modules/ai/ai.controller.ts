@@ -227,11 +227,12 @@ export class AiController {
       // Добавляем legacy ссылки к результатам
       const results: SearchResultItem[] = rawResults.map(item => ({
         ...item,
-        legacyUrl: item.sourceType === 'legacy_request' && item.metadata?.legacyUrl
-          ? String(item.metadata.legacyUrl)
-          : item.sourceType === 'legacy_request'
-            ? this.legacyUrlService.getRequestUrl(parseInt(item.sourceId, 10))
-            : undefined,
+        legacyUrl: item.sourceType === 'legacy_request'
+          ? this.legacyUrlService.getRequestUrl(
+              item.metadata?.requestHash as string | undefined,
+              parseInt(item.sourceId, 10),
+            )
+          : undefined,
       }));
 
       // Создаём контекст со ссылками для AI
