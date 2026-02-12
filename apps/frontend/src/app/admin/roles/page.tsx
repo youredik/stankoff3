@@ -2,9 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Header } from '@/components/layout/Header';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { ToastContainer } from '@/components/ui/ToastContainer';
+import { AppShell } from '@/components/layout/AppShell';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { RoleList } from '@/components/admin/RoleList';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -17,31 +15,18 @@ function AdminRolesContent() {
 
   useEffect(() => {
     if (user && !canManageRoles) {
-      router.replace('/dashboard');
+      router.replace('/workspace');
     }
   }, [user, canManageRoles, router]);
-
-  const handleWorkspaceChange = (id: string) => {
-    router.push('/dashboard');
-  };
 
   if (!canManageRoles) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <ToastContainer />
-      <Header />
-
-      <div className="flex">
-        <Sidebar selectedWorkspace="" onWorkspaceChange={handleWorkspaceChange} />
-
-        <main className="flex-1 p-6">
-          <RoleList />
-        </main>
-      </div>
-    </div>
+    <AppShell mainClassName="p-6">
+      <RoleList />
+    </AppShell>
   );
 }
 

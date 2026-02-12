@@ -13,8 +13,8 @@ import {
   AlertOctagon,
   Sparkles,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { useEntityStore } from '@/store/useEntityStore';
 import type { AppNotification, NotificationType } from '@/store/useNotificationStore';
 
 const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
@@ -42,8 +42,8 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
 };
 
 export function ToastContainer() {
+  const router = useRouter();
   const { notifications } = useNotificationStore();
-  const { selectEntity } = useEntityStore();
   const [toasts, setToasts] = useState<AppNotification[]>([]);
   const shownIdsRef = useRef<Set<string>>(new Set());
   const timersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -91,9 +91,9 @@ export function ToastContainer() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const handleClick = async (toast: AppNotification) => {
-    if (toast.entityId) {
-      await selectEntity(toast.entityId);
+  const handleClick = (toast: AppNotification) => {
+    if (toast.entityId && toast.workspaceId) {
+      router.push(`/workspace/${toast.workspaceId}?entity=${toast.entityId}`);
     }
     handleDismiss(toast.id);
   };

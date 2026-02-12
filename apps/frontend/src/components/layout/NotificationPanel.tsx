@@ -16,8 +16,8 @@ import {
   AlertOctagon,
   Sparkles,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useNotificationStore, NotificationType } from '@/store/useNotificationStore';
-import { useEntityStore } from '@/store/useEntityStore';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 
 interface NotificationPanelProps {
@@ -49,16 +49,17 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
 };
 
 export function NotificationPanel({ onClose }: NotificationPanelProps) {
+  const router = useRouter();
   const { notifications, markAllRead, markRead, browserNotificationsEnabled, setBrowserNotificationsEnabled } = useNotificationStore();
-  const { selectEntity } = useEntityStore();
   const { permission, isSupported, requestPermission } = useBrowserNotifications();
   const [showSettings, setShowSettings] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const handleNotificationClick = async (notificationId: string, entityId?: string) => {
+  const handleNotificationClick = (notificationId: string, entityId?: string, workspaceId?: string) => {
     markRead(notificationId);
-    if (entityId) {
-      await selectEntity(entityId);
+    if (entityId && workspaceId) {
+      router.push(`/workspace/${workspaceId}?entity=${entityId}`);
+      onClose();
     }
   };
 
@@ -172,7 +173,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
             <div
               key={notif.id}
               data-testid="notification-item"
-              onClick={() => handleNotificationClick(notif.id, notif.entityId)}
+              onClick={() => handleNotificationClick(notif.id, notif.entityId, notif.workspaceId)}
               className={`p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer flex items-start gap-3 transition-colors ${
                 notif.urgent && !notif.read
                   ? 'bg-red-50 dark:bg-red-900/30 border-l-4 border-l-red-500'

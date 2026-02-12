@@ -129,3 +129,17 @@ export const usePermissionStore = create<PermissionState & PermissionActions>()(
     reset: () => set(initialState),
   }),
 );
+
+/**
+ * Hook для получения `can` с корректной подпиской на изменения permissions.
+ *
+ * ВАЖНО: `usePermissionStore((s) => s.can)` возвращает стабильную ссылку
+ * на функцию, которая никогда не меняется → компонент НЕ перерисовывается
+ * когда permissions загружаются. Этот хук подписывается на данные permissions,
+ * гарантируя re-render при их изменении.
+ */
+export function usePermissionCan() {
+  usePermissionStore((s) => s.globalPermissions);
+  usePermissionStore((s) => s.workspacePermissions);
+  return usePermissionStore.getState().can;
+}

@@ -1,4 +1,4 @@
-import { usePermissionStore } from '@/store/usePermissionStore';
+import { usePermissionStore, usePermissionCan } from '@/store/usePermissionStore';
 
 /**
  * Хук для проверки permission текущего пользователя.
@@ -23,7 +23,7 @@ export function useCan(permission: string, workspaceId?: string): boolean {
 export function useCanMultiple(
   checks: Record<string, [string, string?]>,
 ): Record<string, boolean> {
-  const can = usePermissionStore((s) => s.can);
+  const can = usePermissionCan();
   const result: Record<string, boolean> = {};
   for (const [key, [permission, wsId]] of Object.entries(checks)) {
     result[key] = can(permission, wsId);

@@ -6,9 +6,10 @@ import { X, MessageSquare, Clock, Paperclip, ChevronDown, ChevronRight, Upload, 
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
+import { useEntityNavigation } from '@/hooks/useEntityNavigation';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { usePermissionStore } from '@/store/usePermissionStore';
+import { usePermissionCan } from '@/store/usePermissionStore';
 import { CommentEditor } from '@/components/entity/CommentEditor';
 import { LinkedEntities } from '@/components/entity/LinkedEntities';
 import { EntityTimeline } from '@/components/entity/timeline';
@@ -20,6 +21,7 @@ import { KnowledgeGraph } from '@/components/ai/KnowledgeGraph';
 import { AiNotificationsPanel } from '@/components/ai/AiNotificationsPanel';
 import { useAiStore } from '@/store/useAiStore';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
+import SearchableUserSelect from '@/components/ui/SearchableUserSelect';
 import { MediaLightbox } from '@/components/ui/MediaLightbox';
 import type { FieldOption, UploadedAttachment, Field, Section, Attachment } from '@/types';
 import { fieldRegistry } from '@/components/fields';
@@ -174,18 +176,17 @@ export function EntityDetailPanel() {
     selectedEntity,
     comments,
     users,
-    deselectEntity,
-    selectEntity,
     updateStatus,
     updateAssignee,
     updateLinkedEntities,
     updateEntityData,
     addComment,
   } = useEntityStore();
+  const { openEntity, closeEntity } = useEntityNavigation();
 
   const { currentWorkspace, canEdit } = useWorkspaceStore();
   const { user } = useAuthStore();
-  const can = usePermissionStore((s) => s.can);
+  const can = usePermissionCan();
 
   // Проверка прав workspace
   const wsId = currentWorkspace?.id;
@@ -248,13 +249,13 @@ export function EntityDetailPanel() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && selectedEntity) {
-        deselectEntity();
+        closeEntity();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity, deselectEntity]);
+  }, [selectedEntity, closeEntity]);
 
   // Load process instances for this entity
   useEffect(() => {
@@ -339,7 +340,7 @@ export function EntityDetailPanel() {
       <div
         data-testid="detail-panel-overlay"
         className="fixed inset-0 bg-black/60 z-40"
-        onClick={deselectEntity}
+        onClick={closeEntity}
       />
 
       {/* Modal */}
@@ -373,7 +374,7 @@ export function EntityDetailPanel() {
               )}
             </div>
             <button
-              onClick={deselectEntity}
+              onClick={closeEntity}
               aria-label="Закрыть панель"
               data-testid="entity-close-button"
               className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
@@ -555,20 +556,15 @@ export function EntityDetailPanel() {
                     Исполнитель
                   </p>
                   {canAssign ? (
-                    <select
-                      value={selectedEntity.assigneeId || ''}
-                      onChange={(e) =>
-                        updateAssignee(selectedEntity.id, e.target.value || null)
+                    <SearchableUserSelect
+                      value={selectedEntity.assigneeId || null}
+                      onChange={(userId) =>
+                        updateAssignee(selectedEntity.id, userId)
                       }
-                      className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer"
-                    >
-                      <option value="">Не назначен</option>
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.firstName} {u.lastName}
-                        </option>
-                      ))}
-                    </select>
+                      users={users}
+                      placeholder="Не назначен"
+                      emptyLabel="Не назначен"
+                    />
                   ) : (
                     <p
                       className="text-sm text-gray-300"
@@ -768,7 +764,7 @@ export function EntityDetailPanel() {
                   <AiNotificationsPanel
                     workspaceId={currentWorkspace?.id}
                     onNavigateToEntity={(eId) => {
-                      selectEntity(eId);
+                      openEntity(eId);
                     }}
                   />
                 </div>

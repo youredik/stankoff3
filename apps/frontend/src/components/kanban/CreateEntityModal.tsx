@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import SearchableUserSelect from '@/components/ui/SearchableUserSelect';
 import { fieldRegistry } from '@/components/fields';
 import { evaluateVisibility, evaluateRequired, evaluateComputed } from '@/lib/field-rules';
 import type { Field, Section } from '@/types';
@@ -248,18 +249,13 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">
                 Исполнитель
               </label>
-              <select
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Не назначить</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.firstName} {u.lastName}
-                  </option>
-                ))}
-              </select>
+              <SearchableUserSelect
+                value={assigneeId || null}
+                onChange={(userId) => setAssigneeId(userId || '')}
+                users={users}
+                placeholder="Не назначить"
+                emptyLabel="Не назначить"
+              />
             </div>
 
             {/* Custom Fields by Sections */}

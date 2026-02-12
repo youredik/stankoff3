@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { usePermissionStore } from '@/store/usePermissionStore';
+import { useCan as useCanHook } from '@/hooks/useCan';
 
 interface CanProps {
   /** Permission для проверки (формат: scope:resource:action) */
@@ -31,9 +31,9 @@ interface CanProps {
  * </Can>
  */
 export function Can({ permission, workspaceId, children, fallback = null }: CanProps) {
-  const can = usePermissionStore((s) => s.can);
+  const allowed = useCanHook(permission, workspaceId);
 
-  if (can(permission, workspaceId)) {
+  if (allowed) {
     return <>{children}</>;
   }
 

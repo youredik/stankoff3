@@ -29,7 +29,7 @@ import {
 import { useEntityStore } from '@/store/useEntityStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { usePermissionStore } from '@/store/usePermissionStore';
+import { usePermissionCan } from '@/store/usePermissionStore';
 import type { Entity, FieldOption } from '@/types';
 import { filtersToApi } from '@/lib/utils/filters';
 import { useWorkspaceFilters } from '@/hooks/useWorkspaceFilters';
@@ -79,7 +79,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   } = useEntityStore();
   const { currentWorkspace, fetchWorkspace, canEdit } = useWorkspaceStore();
   const { user } = useAuthStore();
-  const can = usePermissionStore((s) => s.can);
+  const can = usePermissionCan();
 
   const isAdmin = can('workspace:settings:read', workspaceId);
   const canEditEntities = can('workspace:entity:update', workspaceId);
@@ -202,8 +202,8 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   return (
     <div data-testid="kanban-board">
       <div>
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="sticky top-0 z-10 -mx-6 px-6 pt-0 pb-4 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">

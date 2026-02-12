@@ -216,7 +216,7 @@ export default function ProcessesPage() {
   const showList = viewMode === 'list';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+    <div className="h-screen bg-gray-50 dark:bg-gray-950 flex flex-col overflow-hidden">
       <Header />
 
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -226,7 +226,7 @@ export default function ProcessesPage() {
             <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => router.push('/dashboard')}
+                  onClick={() => router.push(`/workspace/${workspaceId}`)}
                   className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                 >
                   <ArrowLeft className="w-5 h-5" />

@@ -152,12 +152,27 @@ export function useWorkspaceFilters(workspaceId: string): [FilterState, (filters
       return;
     }
 
-    const urlParams = filtersToUrlParams(filters);
-    const newSearch = urlParams.toString();
+    // Мержим filter params с существующими (сохраняем view, entity и др.)
+    const currentParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+
+    // Удаляем все filter-ключи из currentParams
+    const filterKeys = ['search', 'assignee', 'priority', 'dateFrom', 'dateTo'];
+    filterKeys.forEach((k) => currentParams.delete(k));
+    Array.from(currentParams.keys())
+      .filter((k) => k.startsWith('f.'))
+      .forEach((k) => currentParams.delete(k));
+
+    // Добавляем свежие filter params
+    const filterParams = filtersToUrlParams(filters);
+    for (const [key, value] of filterParams.entries()) {
+      currentParams.set(key, value);
+    }
+
+    const mergedSearch = currentParams.toString();
     const currentSearch = typeof window !== 'undefined' ? window.location.search.slice(1) : '';
 
-    if (newSearch !== currentSearch) {
-      const newUrl = newSearch ? `${pathname}?${newSearch}` : pathname;
+    if (mergedSearch !== currentSearch) {
+      const newUrl = mergedSearch ? `${pathname}?${mergedSearch}` : pathname;
       window.history.replaceState(null, '', newUrl);
     }
   }, [filters, pathname]);

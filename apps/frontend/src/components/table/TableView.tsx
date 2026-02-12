@@ -23,10 +23,12 @@ import {
   type FilterState,
 } from '@/components/kanban/FilterPanel';
 import { useEntityStore } from '@/store/useEntityStore';
+import { useEntityNavigation } from '@/hooks/useEntityNavigation';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { usePermissionStore } from '@/store/usePermissionStore';
+import { usePermissionCan } from '@/store/usePermissionStore';
 import { filtersToApi } from '@/lib/utils/filters';
+import SearchableUserSelect from '@/components/ui/SearchableUserSelect';
 import { useWorkspaceFilters } from '@/hooks/useWorkspaceFilters';
 import { useFacets } from '@/hooks/useFacets';
 import type { Entity, FieldOption } from '@/types';
@@ -205,16 +207,16 @@ export function TableView({ workspaceId }: TableViewProps) {
     setTableSort,
     setTablePage,
     fetchUsers,
-    selectEntity,
     selectedEntity,
     users,
     updateStatus,
     updateAssignee,
   } = useEntityStore();
+  const { openEntity } = useEntityNavigation();
 
   const { currentWorkspace, fetchWorkspace, canEdit } = useWorkspaceStore();
   const { user } = useAuthStore();
-  const can = usePermissionStore((s) => s.can);
+  const can = usePermissionCan();
 
   const isAdmin = can('workspace:settings:read', workspaceId);
   const canEditEntities = can('workspace:entity:update', workspaceId);
@@ -312,65 +314,67 @@ export function TableView({ workspaceId }: TableViewProps) {
     <div className="flex gap-0">
       <div className="flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-              {currentWorkspace?.name || 'Загрузка...'}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {tableTotal} {tableTotal === 1 ? 'заявка' : tableTotal < 5 ? 'заявки' : 'заявок'}
-            </p>
-          </div>
+        <div className="sticky top-0 z-10 -mx-6 px-6 pb-4 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {currentWorkspace?.name || 'Загрузка...'}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                {tableTotal} {tableTotal === 1 ? 'заявка' : tableTotal < 5 ? 'заявки' : 'заявок'}
+              </p>
+            </div>
 
-          <div className="flex items-center gap-2">
-            {/* Filter toggle */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showFilters || activeFilterCount > 0
-                  ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-              Фильтры
+            <div className="flex items-center gap-2">
+              {/* Filter toggle */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                Фильтры
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-primary-500 text-white rounded-full">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+
               {activeFilterCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-primary-500 text-white rounded-full">
-                  {activeFilterCount}
-                </span>
+                <button
+                  onClick={() => handleFiltersChange(createEmptyFilters())}
+                  className="flex items-center gap-1 px-2 py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Сбросить
+                </button>
               )}
-            </button>
 
-            {activeFilterCount > 0 && (
-              <button
-                onClick={() => handleFiltersChange(createEmptyFilters())}
-                className="flex items-center gap-1 px-2 py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                <X className="w-3.5 h-3.5" />
-                Сбросить
-              </button>
-            )}
+              {/* Settings */}
+              {isAdmin && (
+                <button
+                  onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
+                  className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              )}
 
-            {/* Settings */}
-            {isAdmin && (
-              <button
-                onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
-                className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Create */}
-            {canEditEntities && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Создать
-              </button>
-            )}
+              {/* Create */}
+              {canEditEntities && (
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Создать
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -428,7 +432,7 @@ export function TableView({ workspaceId }: TableViewProps) {
                     return (
                       <tr
                         key={entity.id}
-                        onClick={() => selectEntity(entity.id)}
+                        onClick={() => openEntity(entity.id)}
                         className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${
                           selectedEntity?.id === entity.id ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''
                         }`}
@@ -501,18 +505,14 @@ export function TableView({ workspaceId }: TableViewProps) {
                         {/* Assignee */}
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           {canEditEntities ? (
-                            <select
-                              value={entity.assigneeId || ''}
-                              onChange={(e) => handleAssigneeChange(entity.id, e.target.value || null)}
-                              className="text-xs border rounded-lg px-2 py-1 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 max-w-[160px] focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                            >
-                              <option value="">Не назначен</option>
-                              {users.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.firstName} {u.lastName}
-                                </option>
-                              ))}
-                            </select>
+                            <SearchableUserSelect
+                              value={entity.assigneeId || null}
+                              onChange={(userId) => handleAssigneeChange(entity.id, userId)}
+                              users={users}
+                              placeholder="Не назначен"
+                              emptyLabel="Не назначен"
+                              compact
+                            />
                           ) : (
                             <span className="text-sm text-gray-700 dark:text-gray-300">
                               {entity.assignee

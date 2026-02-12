@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   X,
   Loader2,
+  Search,
 } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { UserTask, User } from '@/types';
@@ -142,6 +143,14 @@ interface DelegateModalProps {
 
 function DelegateModal({ users, isLoading, onDelegate, onClose }: DelegateModalProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [search, setSearch] = useState('');
+
+  const filteredUsers = users.filter((u) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+    return fullName.includes(q) || (u.email && u.email.toLowerCase().includes(q));
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -163,41 +172,58 @@ function DelegateModal({ users, isLoading, onDelegate, onClose }: DelegateModalP
               Нет доступных пользователей для делегирования
             </p>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {users.map((user) => (
-                <label
-                  key={user.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                    selectedUserId === user.id
-                      ? 'bg-teal-50 dark:bg-teal-900/30 border-2 border-teal-500'
-                      : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="delegate-user"
-                    value={user.id}
-                    checked={selectedUserId === user.id}
-                    onChange={(e) => setSelectedUserId(e.target.value)}
-                    className="sr-only"
-                  />
-                  <UserAvatar
-                    firstName={user.firstName}
-                    lastName={user.lastName}
-                    userId={user.id}
-                    size="md"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {user.email}
-                    </p>
-                  </div>
-                </label>
-              ))}
-            </div>
+            <>
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Поиск сотрудника..."
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                />
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {filteredUsers.map((user) => (
+                  <label
+                    key={user.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                      selectedUserId === user.id
+                        ? 'bg-teal-50 dark:bg-teal-900/30 border-2 border-teal-500'
+                        : 'bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="delegate-user"
+                      value={user.id}
+                      checked={selectedUserId === user.id}
+                      onChange={(e) => setSelectedUserId(e.target.value)}
+                      className="sr-only"
+                    />
+                    <UserAvatar
+                      firstName={user.firstName}
+                      lastName={user.lastName}
+                      userId={user.id}
+                      size="md"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {user.email}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">
+                    Не найдено
+                  </p>
+                )}
+              </div>
+            </>
           )}
         </div>
         <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-gray-200 dark:border-gray-700">

@@ -5,13 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Search, Command, X } from 'lucide-react';
 import { entitiesApi, SearchResult } from '@/lib/api/entities';
 import { SkeletonSearchResult } from '@/components/ui/Skeleton';
-import { useWorkspaceStore } from '@/store/useWorkspaceStore';
-import { useEntityStore } from '@/store/useEntityStore';
-
 export function GlobalSearch() {
   const router = useRouter();
-  const { setCurrentWorkspace, workspaces, fetchWorkspace } = useWorkspaceStore();
-  const { selectEntity } = useEntityStore();
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -95,19 +90,11 @@ export function GlobalSearch() {
     }
   }, [selectedIndex, results.length]);
 
-  const handleSelect = async (result: SearchResult) => {
+  const handleSelect = (result: SearchResult) => {
     setIsOpen(false);
     setQuery('');
     setResults([]);
-
-    // Переходим к workspace и открываем entity
-    await fetchWorkspace(result.workspaceId);
-    router.push('/dashboard');
-
-    // Небольшая задержка, чтобы store обновился
-    setTimeout(() => {
-      selectEntity(result.id);
-    }, 100);
+    router.push(`/workspace/${result.workspaceId}?entity=${result.id}`);
   };
 
   const close = () => {

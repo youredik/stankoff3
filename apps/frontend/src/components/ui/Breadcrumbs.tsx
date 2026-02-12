@@ -60,6 +60,6 @@ export function createHomeBreadcrumb(): BreadcrumbItem {
   return {
     label: 'Главная',
     icon: <Home className="w-4 h-4" />,
-    href: '/dashboard',
+    href: '/workspace',
   };
 }

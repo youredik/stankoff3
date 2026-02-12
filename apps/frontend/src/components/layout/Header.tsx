@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Bell, LayoutGrid, BarChart3, List, Menu, LogOut, ChevronDown } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { NotificationPanel } from './NotificationPanel';
@@ -12,12 +13,31 @@ import { useSidebarStore } from '@/store/useSidebarStore';
 
 export type DashboardView = 'kanban' | 'table' | 'analytics';
 
-interface HeaderProps {
-  currentView?: DashboardView;
-  onViewChange?: (view: DashboardView) => void;
-}
+const VIEW_KEY = 'stankoff-dashboard-view';
 
-export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
+function HeaderInner() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Показываем view toggle только на основной странице workspace (не settings/processes)
+  const isWorkspacePage = pathname.startsWith('/workspace/') &&
+    !pathname.includes('/settings') &&
+    !pathname.includes('/processes');
+
+  const currentView = (searchParams.get('view') as DashboardView) || 'kanban';
+
+  const handleViewChange = useCallback((view: DashboardView) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (view === 'kanban') {
+      params.delete('view'); // kanban — default, не засоряем URL
+    } else {
+      params.set('view', view);
+    }
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? '?' + qs : ''}`);
+    localStorage.setItem(VIEW_KEY, view);
+  }, [router, pathname, searchParams]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { notifications } = useNotificationStore();
@@ -36,7 +56,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
   };
 
   return (
-    <header data-testid="header" className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
+    <header data-testid="header" className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-40 flex-shrink-0">
       <div className="px-4 lg:px-6 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Mobile menu button */}
@@ -51,11 +71,11 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
           {/* Search */}
           <GlobalSearch />
 
-          {/* View Toggle */}
-          {onViewChange && (
+          {/* View Toggle — только на основной странице workspace */}
+          {isWorkspacePage && (
             <div className="flex items-center gap-1 mx-6 p-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
               <button
-                onClick={() => onViewChange('kanban')}
+                onClick={() => handleViewChange('kanban')}
                 data-testid="view-toggle-kanban"
                 className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                   currentView === 'kanban'
@@ -67,7 +87,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
                 <span>Канбан</span>
               </button>
               <button
-                onClick={() => onViewChange('table')}
+                onClick={() => handleViewChange('table')}
                 data-testid="view-toggle-table"
                 className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                   currentView === 'table'
@@ -79,7 +99,7 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
                 <span>Таблица</span>
               </button>
               <button
-                onClick={() => onViewChange('analytics')}
+                onClick={() => handleViewChange('analytics')}
                 data-testid="view-toggle-analytics"
                 className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                   currentView === 'analytics'
@@ -169,5 +189,13 @@ export function Header({ currentView = 'kanban', onViewChange }: HeaderProps) {
         <NotificationPanel onClose={() => setShowNotifications(false)} />
       )}
     </header>
+  );
+}
+
+export function Header() {
+  return (
+    <Suspense>
+      <HeaderInner />
+    </Suspense>
   );
 }

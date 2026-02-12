@@ -112,6 +112,13 @@ export function useWebSocket() {
     socket.on('entity:updated', (entity) => {
       const state = useEntityStore.getState();
 
+      // Если для entity есть in-flight обновления data, не перезаписываем data из WebSocket,
+      // чтобы не потерять optimistic-значения при быстром редактировании нескольких полей
+      const hasPending = (state._pendingDataUpdates[entity.id] || 0) > 0;
+      const mergeEntity = hasPending
+        ? (() => { const { data, ...rest } = entity; return rest; })()
+        : entity;
+
       // Update in kanban columns
       const columns = { ...state.kanbanColumns };
       for (const statusId of Object.keys(columns)) {
@@ -120,19 +127,26 @@ export function useWebSocket() {
         if (idx !== -1) {
           columns[statusId] = {
             ...col,
-            items: col.items.map((e) => (e.id === entity.id ? { ...e, ...entity } : e)),
+            items: col.items.map((e) => (e.id === entity.id ? { ...e, ...mergeEntity } : e)),
           };
           break;
         }
       }
+
+      // Update in tableItems
+      const tableItems = state.tableItems.map((e) =>
+        e.id === entity.id ? { ...e, ...mergeEntity } : e,
+      );
+
       useEntityStore.setState({
         kanbanColumns: columns,
         entities: Object.values(columns).flatMap((c) => c.items),
+        tableItems,
       });
 
       if (state.selectedEntity?.id === entity.id) {
         useEntityStore.setState({
-          selectedEntity: { ...state.selectedEntity, ...entity },
+          selectedEntity: { ...state.selectedEntity, ...mergeEntity },
         });
       }
     });

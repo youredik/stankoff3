@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useParams } from 'next/navigation';
 import {
   Plus,
   Users,
@@ -30,15 +30,12 @@ import { useSidebarStore } from '@/store/useSidebarStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import { useTaskStore } from '@/store/useTaskStore';
 import { useChatStore } from '@/store/useChatStore';
-import { usePermissionStore } from '@/store/usePermissionStore';
+import { usePermissionCan } from '@/store/usePermissionStore';
 import { ImportModal } from '@/components/workspace/ImportModal';
 import { SectionMembersModal } from '@/components/section/SectionMembersModal';
 import type { Workspace, MenuSection } from '@/types';
 
-interface SidebarProps {
-  selectedWorkspace: string;
-  onWorkspaceChange: (id: string) => void;
-}
+const STORAGE_KEY = 'stankoff-selected-workspace';
 
 // Группировка workspaces по разделам
 interface GroupedWorkspaces {
@@ -90,9 +87,12 @@ function groupWorkspacesBySections(
   };
 }
 
-export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) {
+export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const params = useParams();
+  // На страницах /workspace/[id]/* — берём ID из URL; на других страницах — пусто
+  const selectedWorkspace = (params?.id as string) || '';
   const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace, duplicateWorkspace, archiveWorkspace } =
     useWorkspaceStore();
   const { sections, fetchSections, createSection, deleteSection, updateSection, collapsedSections, toggleSectionCollapsed } =
@@ -112,7 +112,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
   const [sectionMembersSection, setSectionMembersSection] = useState<MenuSection | null>(null);
 
   // Permission-based проверки
-  const can = usePermissionStore((s) => s.can);
+  const can = usePermissionCan();
   const canCreateWorkspace = can('global:workspace:create');
   const canCreateSection = can('global:section:create');
   const canManageUsers = can('global:user:manage');
@@ -193,7 +193,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
       await deleteWorkspace(id);
       if (selectedWorkspace === id && workspaces.length > 1) {
         const next = workspaces.find((w) => w.id !== id);
-        if (next) onWorkspaceChange(next.id);
+        if (next) handleWorkspaceChange(next.id);
       }
     }
   };
@@ -202,7 +202,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
     setMenuOpen(null);
     const newName = `${workspace.name} (копия)`;
     const duplicated = await duplicateWorkspace(workspace.id, newName);
-    onWorkspaceChange(duplicated.id);
+    handleWorkspaceChange(duplicated.id);
   };
 
   const handleArchiveWorkspace = async (workspace: Workspace) => {
@@ -228,9 +228,10 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
 
   const { isOpen, close } = useSidebarStore();
 
-  // Close sidebar on workspace change (mobile)
+  // Navigate to workspace via URL
   const handleWorkspaceChange = (id: string) => {
-    onWorkspaceChange(id);
+    localStorage.setItem(STORAGE_KEY, id);
+    router.push(`/workspace/${id}`);
     close();
   };
 
@@ -540,7 +541,7 @@ export function Sidebar({ selectedWorkspace, onWorkspaceChange }: SidebarProps) 
         className={`
           fixed lg:static inset-y-0 left-0 z-50
           w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
-          min-h-screen flex flex-col
+          flex flex-col overflow-hidden flex-shrink-0
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}

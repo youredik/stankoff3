@@ -29,7 +29,7 @@ import { FormDefinitionsSettings } from '@/components/forms/FormDefinitionsSetti
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { usePermissionStore } from '@/store/usePermissionStore';
+import { usePermissionStore, usePermissionCan } from '@/store/usePermissionStore';
 import { workspacesApi } from '@/lib/api/workspaces';
 import type { Field, FieldType, Workspace } from '@/types';
 
@@ -76,7 +76,8 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
   const [isInitialized, setIsInitialized] = useState(false);
 
   const { user } = useAuthStore();
-  const can = usePermissionStore((s) => s.can);
+  const permissionsLoaded = usePermissionStore((s) => s.loaded);
+  const can = usePermissionCan();
   const canManageSettings = can('workspace:settings:update', workspaceId);
   const canManageMembers = can('workspace:settings.members:manage', workspaceId);
   const canManageAutomation = can('workspace:settings.automation:manage', workspaceId);
@@ -93,13 +94,24 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
 
   useEffect(() => {
     setIsInitialized(false);
+    sectionsRef.current = null; // Сброс при смене workspace
+    setHasChanges(false);
     fetchWorkspace(workspaceId).finally(() => setIsInitialized(true));
     fetchWorkspaces();
     fetchSections();
   }, [workspaceId, fetchWorkspace, fetchWorkspaces, fetchSections]);
 
+  // Отслеживаем изменения sections после инициализации (не при первой загрузке)
+  const sectionsRef = useRef<string | null>(null);
   useEffect(() => {
-    setHasChanges(true);
+    if (!currentWorkspace?.sections) return;
+    const serialized = JSON.stringify(currentWorkspace.sections);
+    if (sectionsRef.current === null) {
+      // Первая загрузка — запоминаем, но не помечаем как изменённое
+      sectionsRef.current = serialized;
+    } else if (sectionsRef.current !== serialized) {
+      setHasChanges(true);
+    }
   }, [currentWorkspace?.sections]);
 
   const sensors = useSensors(
@@ -197,7 +209,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
         const section = currentWorkspace?.sections.find(
           (s) => s.id === toSectionId
         );
-        toIndex = section?.fields.findIndex((f) => f.id === overData.field.id) || 0;
+        toIndex = section?.fields.findIndex((f) => f.id === overData.field.id) ?? 0;
       } else {
         return;
       }
@@ -205,7 +217,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
       const fromSection = currentWorkspace?.sections.find(
         (s) => s.id === fromSectionId
       );
-      const fromIndex = fromSection?.fields.findIndex((f) => f.id === fromFieldId) || 0;
+      const fromIndex = fromSection?.fields.findIndex((f) => f.id === fromFieldId) ?? 0;
 
       if (fromSectionId !== toSectionId || fromIndex !== toIndex) {
         moveField(fromSectionId, toSectionId, fromIndex, toIndex);
@@ -218,6 +230,10 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
     await saveWorkspace();
     setSaving(false);
     setHasChanges(false);
+    // Обновляем snapshot после сохранения
+    if (currentWorkspace?.sections) {
+      sectionsRef.current = JSON.stringify(currentWorkspace.sections);
+    }
   };
 
   const handleAddSection = () => {
@@ -284,7 +300,7 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
     }
   };
 
-  if (!isInitialized || (loading && !currentWorkspace)) {
+  if (!isInitialized || !permissionsLoaded || (loading && !currentWorkspace)) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />

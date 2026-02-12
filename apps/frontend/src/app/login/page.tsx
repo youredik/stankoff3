@@ -68,7 +68,7 @@ function LoginPageContent() {
 
     // Если уже авторизован - на dashboard
     if (isAuthenticated && !isLoading) {
-      router.push('/dashboard');
+      router.push('/workspace');
       return;
     }
 
@@ -82,7 +82,7 @@ function LoginPageContent() {
   // Redirect if already authenticated (regardless of dev mode)
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      router.push('/dashboard');
+      router.push('/workspace');
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -100,7 +100,7 @@ function LoginPageContent() {
       useAuthStore.getState().setAccessToken(accessToken);
       // checkAuth загрузит профиль через /auth/me и обновит store
       await useAuthStore.getState().checkAuth();
-      router.push('/dashboard');
+      router.push('/workspace');
     } catch {
       useAuthStore.setState({ error: 'Ошибка входа. Попробуйте снова.' });
       setDevLoginLoading(null);

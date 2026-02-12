@@ -107,7 +107,12 @@ export function SectionCard({ section, onEditField }: SectionCardProps) {
             <Pencil className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => removeSection(section.id)}
+            onClick={() => {
+              const msg = section.fields.length > 0
+                ? `Удалить секцию «${section.name}» и все её поля (${section.fields.length})?`
+                : `Удалить секцию «${section.name}»?`;
+              if (window.confirm(msg)) removeSection(section.id);
+            }}
             className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
             title="Удалить секцию"
           >

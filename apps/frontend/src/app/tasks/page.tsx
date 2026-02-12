@@ -2,17 +2,13 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Header } from '@/components/layout/Header';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { ToastContainer } from '@/components/ui/ToastContainer';
+import { AppShell } from '@/components/layout/AppShell';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { TaskInbox } from '@/components/bpmn/tasks/TaskInbox';
 import { TaskDetail } from '@/components/bpmn/tasks/TaskDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTaskStore } from '@/store/useTaskStore';
 import type { UserTask } from '@/types';
-
-const STORAGE_KEY = 'stankoff-selected-workspace';
 
 function TasksContent() {
   const router = useRouter();
@@ -39,37 +35,16 @@ function TasksContent() {
   const handleNavigateToEntity = useCallback(
     (entityId: string) => {
       if (selectedTask?.workspaceId) {
-        localStorage.setItem(STORAGE_KEY, selectedTask.workspaceId);
+        router.push(`/workspace/${selectedTask.workspaceId}?entity=${entityId}`);
       }
-      router.push('/dashboard');
     },
     [selectedTask, router],
   );
 
-  const handleWorkspaceChange = useCallback(
-    (id: string) => {
-      localStorage.setItem(STORAGE_KEY, id);
-      router.push('/dashboard');
-    },
-    [router],
-  );
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <ToastContainer />
-      <Header />
-
-      <div className="flex">
-        <Sidebar
-          selectedWorkspace=""
-          onWorkspaceChange={handleWorkspaceChange}
-        />
-
-        <main className="flex-1">
-          <div className="max-w-4xl mx-auto">
-            <TaskInbox onTaskSelect={handleTaskSelect} showFilters />
-          </div>
-        </main>
+    <AppShell>
+      <div className="max-w-4xl mx-auto">
+        <TaskInbox onTaskSelect={handleTaskSelect} showFilters />
       </div>
 
       {selectedTask && user && (
@@ -81,7 +56,7 @@ function TasksContent() {
           onNavigateToEntity={handleNavigateToEntity}
         />
       )}
-    </div>
+    </AppShell>
   );
 }
 

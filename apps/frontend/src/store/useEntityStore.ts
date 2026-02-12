@@ -38,6 +38,9 @@ interface EntityStore {
   comments: Comment[];
   users: User[];
 
+  // Счётчик in-flight обновлений data по entity ID (защита от WebSocket race condition)
+  _pendingDataUpdates: Record<string, number>;
+
   // Kanban actions
   fetchKanban: (workspaceId: string, filters?: EntityFilters) => Promise<void>;
   loadMoreColumn: (statusId: string) => Promise<void>;
@@ -100,6 +103,8 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
   selectedEntity: null,
   comments: [],
   users: [],
+
+  _pendingDataUpdates: {},
 
   setEntities: (entities) => set({ entities }),
 
@@ -365,14 +370,22 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
   },
 
   updateEntityData: async (id: string, fieldId: string, value: any) => {
-    const { kanbanColumns, selectedEntity } = get();
-    const allEntities = get().getAllEntities();
-    const entity = allEntities.find((e) => e.id === id);
+    const { kanbanColumns, selectedEntity, tableItems } = get();
+
+    // Баг-фикс: ищем entity не только в kanbanColumns, но и в selectedEntity/tableItems.
+    // В table view kanbanColumns может быть пустым — раньше обновление молча не происходило.
+    const entity =
+      (selectedEntity?.id === id ? selectedEntity : null) ??
+      get().getAllEntities().find((e) => e.id === id) ??
+      tableItems.find((e) => e.id === id);
+
     if (!entity) return;
 
     const prevColumns = { ...kanbanColumns };
+    const prevTableItems = tableItems;
     const newData = { ...entity.data, [fieldId]: value };
 
+    // Optimistic update: kanbanColumns
     const newColumns: Record<string, KanbanColumnState> = {};
     for (const [status, col] of Object.entries(kanbanColumns)) {
       newColumns[status] = {
@@ -382,9 +395,19 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         ),
       };
     }
+
+    // Optimistic update: tableItems
+    const newTableItems = tableItems.map((e) =>
+      e.id === id ? { ...e, data: newData } : e,
+    );
+
+    // Increment pending counter (защита от WebSocket race condition)
+    const pending = get()._pendingDataUpdates;
     set({
       kanbanColumns: newColumns,
       entities: flattenColumns(newColumns),
+      tableItems: newTableItems,
+      _pendingDataUpdates: { ...pending, [id]: (pending[id] || 0) + 1 },
     });
     if (selectedEntity?.id === id) {
       set({ selectedEntity: { ...selectedEntity, data: newData } });
@@ -396,8 +419,19 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
       set({
         kanbanColumns: prevColumns,
         entities: flattenColumns(prevColumns),
+        tableItems: prevTableItems,
       });
       if (selectedEntity?.id === id) set({ selectedEntity });
+    } finally {
+      // Decrement pending counter
+      const cur = get()._pendingDataUpdates;
+      const count = cur[id] || 1;
+      if (count <= 1) {
+        const { [id]: _, ...rest } = cur;
+        set({ _pendingDataUpdates: rest });
+      } else {
+        set({ _pendingDataUpdates: { ...cur, [id]: count - 1 } });
+      }
     }
   },
 

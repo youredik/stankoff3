@@ -7,7 +7,7 @@ import { ru } from 'date-fns/locale';
 import { Link2, Calendar } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { Entity } from '@/types';
-import { useEntityStore } from '@/store/useEntityStore';
+import { useEntityNavigation } from '@/hooks/useEntityNavigation';
 import { SlaTimer } from '@/components/sla/SlaTimer';
 
 interface KanbanCardProps {
@@ -17,7 +17,7 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ entity, isDragging = false, canEdit = true }: KanbanCardProps) {
-  const { selectEntity } = useEntityStore();
+  const { openEntity } = useEntityNavigation();
   const {
     attributes,
     listeners,
@@ -78,7 +78,7 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
       style={style}
       {...attributes}
       {...listeners}
-      onClick={() => !isDragging && selectEntity(entity.id)}
+      onClick={() => !isDragging && openEntity(entity.id)}
       data-testid="kanban-card"
       data-entity-id={entity.id}
       className="bg-white dark:bg-gray-800 p-4 rounded border border-gray-200 dark:border-gray-700 hover:border-primary-500/30 cursor-pointer transition-colors"

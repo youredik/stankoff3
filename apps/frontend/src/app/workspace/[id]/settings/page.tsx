@@ -20,12 +20,12 @@ export default function WorkspaceSettingsPage() {
   const workspaceId = params.id as string;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+    <div className="h-screen bg-gray-50 dark:bg-gray-950 flex flex-col overflow-hidden">
       <Header />
       <main className="flex-1 flex flex-col overflow-hidden">
         <WorkspaceBuilder
           workspaceId={workspaceId}
-          onBack={() => router.push('/dashboard')}
+          onBack={() => router.push(`/workspace/${workspaceId}`)}
         />
       </main>
       <ToastContainer />
