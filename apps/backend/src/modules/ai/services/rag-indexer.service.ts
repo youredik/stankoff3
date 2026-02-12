@@ -304,7 +304,8 @@ export class RagIndexerService implements OnModuleInit {
           // Получаем ответы только для новых заявок
           const requestsWithAnswers = await this.legacyService.getRequestsWithAnswersBatch(newRequestIds);
 
-          // Индексируем каждую заявку
+          // Индексируем каждую заявку (с задержкой между ними для rate limiting)
+          let requestIndex = 0;
           for (const [requestId, data] of requestsWithAnswers) {
             try {
               const chunksCreated = await this.indexRequest(data.request, data.answers);
@@ -315,9 +316,15 @@ export class RagIndexerService implements OnModuleInit {
             }
 
             this.indexingStats.processedRequests++;
+            requestIndex++;
 
             if (onProgress) {
               onProgress(this.indexingStats);
+            }
+
+            // Rate limiting: задержка между заявками (Yandex Cloud: 10 req/sec)
+            if (requestIndex < requestsWithAnswers.size) {
+              await this.delay(this.EMBED_DELAY_MS);
             }
           }
         }
