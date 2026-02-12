@@ -200,6 +200,37 @@ describe('KnowledgeBaseService', () => {
     });
   });
 
+  describe('getIndexedSourceIds', () => {
+    it('должен вернуть Set проиндексированных sourceId', async () => {
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { sourceId: '100' },
+          { sourceId: '200' },
+        ]),
+      };
+
+      chunkRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder as never);
+
+      const result = await service.getIndexedSourceIds('legacy_request', ['100', '200', '300']);
+
+      expect(result).toBeInstanceOf(Set);
+      expect(result.size).toBe(2);
+      expect(result.has('100')).toBe(true);
+      expect(result.has('200')).toBe(true);
+      expect(result.has('300')).toBe(false);
+    });
+
+    it('должен вернуть пустой Set для пустого массива', async () => {
+      const result = await service.getIndexedSourceIds('legacy_request', []);
+
+      expect(result.size).toBe(0);
+      expect(chunkRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+  });
+
   describe('searchSimilar', () => {
     it('должен найти похожие чанки', async () => {
       providerRegistry.embed.mockResolvedValue(mockEmbeddingResult);

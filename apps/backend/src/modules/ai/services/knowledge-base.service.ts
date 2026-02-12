@@ -94,6 +94,26 @@ export class KnowledgeBaseService {
   }
 
   /**
+   * Проверяет наличие чанков для набора sourceId (batch)
+   * Возвращает Set с sourceId, для которых уже есть чанки
+   */
+  async getIndexedSourceIds(
+    sourceType: ChunkSourceType,
+    sourceIds: string[],
+  ): Promise<Set<string>> {
+    if (sourceIds.length === 0) return new Set();
+
+    const rows = await this.chunkRepo
+      .createQueryBuilder('chunk')
+      .select('DISTINCT chunk.sourceId', 'sourceId')
+      .where('chunk.sourceType = :sourceType', { sourceType })
+      .andWhere('chunk.sourceId IN (:...sourceIds)', { sourceIds })
+      .getRawMany<{ sourceId: string }>();
+
+    return new Set(rows.map(r => r.sourceId));
+  }
+
+  /**
    * Ищет похожие чанки по тексту
    */
   async searchSimilar(params: {

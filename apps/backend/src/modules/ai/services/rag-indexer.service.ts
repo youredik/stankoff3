@@ -19,6 +19,7 @@ export interface IndexResult {
 export interface IndexingStats {
   totalRequests: number;
   processedRequests: number;
+  skippedRequests: number;
   totalChunks: number;
   failedRequests: number;
   startedAt: Date;
@@ -103,6 +104,7 @@ export class RagIndexerService {
     this.indexingStats = {
       totalRequests: requestsToProcess,
       processedRequests: 0,
+      skippedRequests: 0,
       totalChunks: 0,
       failedRequests: 0,
       startedAt: new Date(),
@@ -127,34 +129,52 @@ export class RagIndexerService {
           break;
         }
 
-        // Получаем ответы для batch заявок
         const requestIds = requests.map(r => r.id);
-        const requestsWithAnswers = await this.legacyService.getRequestsWithAnswersBatch(requestIds);
 
-        // Индексируем каждую заявку
-        for (const [requestId, data] of requestsWithAnswers) {
-          try {
-            const chunksCreated = await this.indexRequest(data.request, data.answers);
-            this.indexingStats.totalChunks += chunksCreated;
-          } catch (error) {
-            this.logger.error(`Ошибка индексации заявки ${requestId}: ${error.message}`);
-            this.indexingStats.failedRequests++;
-          }
+        // Проверяем какие заявки уже проиндексированы (один SQL запрос на batch)
+        const alreadyIndexed = await this.knowledgeBase.getIndexedSourceIds(
+          'legacy_request',
+          requestIds.map(String),
+        );
 
-          this.indexingStats.processedRequests++;
+        // Фильтруем — оставляем только ещё не проиндексированные
+        const newRequestIds = requestIds.filter(id => !alreadyIndexed.has(String(id)));
+        const skippedCount = requestIds.length - newRequestIds.length;
+        this.indexingStats.skippedRequests += skippedCount;
 
-          if (onProgress) {
-            onProgress(this.indexingStats);
+        if (newRequestIds.length > 0) {
+          // Получаем ответы только для новых заявок
+          const requestsWithAnswers = await this.legacyService.getRequestsWithAnswersBatch(newRequestIds);
+
+          // Индексируем каждую заявку
+          for (const [requestId, data] of requestsWithAnswers) {
+            try {
+              const chunksCreated = await this.indexRequest(data.request, data.answers);
+              this.indexingStats.totalChunks += chunksCreated;
+            } catch (error) {
+              this.logger.error(`Ошибка индексации заявки ${requestId}: ${error.message}`);
+              this.indexingStats.failedRequests++;
+            }
+
+            this.indexingStats.processedRequests++;
+
+            if (onProgress) {
+              onProgress(this.indexingStats);
+            }
           }
         }
 
+        // processedRequests считает и пропущенные (для корректного progress %)
+        this.indexingStats.processedRequests += skippedCount;
         offset += requests.length;
 
         // Логируем прогресс каждые 100 заявок
         if (this.indexingStats.processedRequests % 100 === 0) {
+          const skipped = this.indexingStats.skippedRequests;
           this.logger.log(
             `Прогресс: ${this.indexingStats.processedRequests}/${requestsToProcess} ` +
-            `(${Math.round(this.indexingStats.processedRequests / requestsToProcess * 100)}%)`
+            `(${Math.round(this.indexingStats.processedRequests / requestsToProcess * 100)}%)` +
+            (skipped > 0 ? ` [пропущено: ${skipped}]` : '')
           );
         }
       }
@@ -166,6 +186,7 @@ export class RagIndexerService {
     this.logger.log(
       `Индексация завершена: ${this.indexingStats.processedRequests} заявок, ` +
       `${this.indexingStats.totalChunks} чанков, ` +
+      `${this.indexingStats.skippedRequests} пропущено, ` +
       `${this.indexingStats.failedRequests} ошибок`
     );
 

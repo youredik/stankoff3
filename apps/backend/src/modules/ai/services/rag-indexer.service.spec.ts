@@ -55,6 +55,7 @@ describe('RagIndexerService', () => {
       isAvailable: jest.fn().mockReturnValue(true),
       addChunk: jest.fn().mockResolvedValue({ id: 'chunk-123' }),
       removeChunksBySource: jest.fn().mockResolvedValue(0),
+      getIndexedSourceIds: jest.fn().mockResolvedValue(new Set<string>()),
       getStats: jest.fn().mockResolvedValue({
         totalChunks: 100,
         bySourceType: { legacy_request: 80, entity: 20 },
@@ -295,6 +296,40 @@ describe('RagIndexerService', () => {
       await service.indexAll({ onProgress });
 
       expect(onProgress).toHaveBeenCalled();
+    });
+
+    it('должен пропускать уже проиндексированные заявки', async () => {
+      // Заявка с id=1 уже проиндексирована
+      knowledgeBase.getIndexedSourceIds.mockResolvedValue(new Set(['1']));
+
+      // Мок возвращает только запрошенные заявки
+      const request2 = { ...mockRequest, id: 2, subject: 'Вторая заявка '.repeat(20) } as unknown as LegacyRequest;
+      legacyService.getRequestsWithAnswersBatch.mockImplementation(async (ids: number[]) => {
+        const map = new Map();
+        if (ids.includes(2)) map.set(2, { request: request2, answers: [] });
+        return map;
+      });
+
+      const stats = await service.indexAll({ batchSize: 10 });
+
+      // Обработаны обе заявки (1 пропущена, 1 проиндексирована)
+      expect(stats.processedRequests).toBe(2);
+      expect(stats.skippedRequests).toBe(1);
+      // getRequestsWithAnswersBatch вызван только для новой заявки (id=2)
+      expect(legacyService.getRequestsWithAnswersBatch).toHaveBeenCalledWith([2]);
+    });
+
+    it('должен пропустить весь batch если все уже проиндексированы', async () => {
+      // Обе заявки уже проиндексированы
+      knowledgeBase.getIndexedSourceIds.mockResolvedValue(new Set(['1', '2']));
+
+      const stats = await service.indexAll({ batchSize: 10 });
+
+      expect(stats.processedRequests).toBe(2);
+      expect(stats.skippedRequests).toBe(2);
+      expect(stats.totalChunks).toBe(0);
+      // getRequestsWithAnswersBatch не должен вызываться
+      expect(legacyService.getRequestsWithAnswersBatch).not.toHaveBeenCalled();
     });
 
     it('должен блокировать повторный запуск во время выполнения', async () => {
