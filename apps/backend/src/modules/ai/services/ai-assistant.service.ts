@@ -70,6 +70,12 @@ export class AiAssistantService {
     return this.knowledgeBaseService.isAvailable();
   }
 
+  // Минимальный порог similarity для RAG поиска
+  private readonly MIN_SIMILARITY = 0.7;
+
+  // Минимальный средний similarity чтобы считать результаты релевантными
+  private readonly CONFIDENCE_THRESHOLD = 0.65;
+
   /**
    * Получить AI помощь для entity
    */
@@ -88,7 +94,7 @@ export class AiAssistantService {
       return cached.data;
     }
 
-    // Получаем entity
+    // Получаем entity с workspace
     const entity = await this.entityRepository.findOne({
       where: { id: entityId },
     });
@@ -113,34 +119,29 @@ export class AiAssistantService {
     }
 
     try {
-      // Ищем похожие случаи в базе знаний
+      // Ищем похожие случаи в базе знаний (workspace-aware)
       const searchResults = await this.knowledgeBaseService.searchSimilar({
         query,
         sourceType: 'legacy_request',
         limit: 10,
-        minSimilarity: 0.5,
+        minSimilarity: this.MIN_SIMILARITY,
       });
 
-      // Извлекаем похожие случаи
-      const similarCases = this.extractSimilarCases(searchResults);
+      // Confidence gating: проверяем среднюю релевантность результатов
+      const lowConfidence = this.isLowConfidence(searchResults);
 
-      // Извлекаем экспертов
-      const suggestedExperts = this.extractExperts(searchResults);
-
-      // Извлекаем контекст (контрагенты, сделки)
-      const relatedContext = this.extractRelatedContext(searchResults);
-
-      // Генерируем рекомендуемые действия
-      const suggestedActions = this.generateSuggestedActions(
+      // При низкой уверенности — не показываем мусорные результаты
+      const similarCases = lowConfidence ? [] : this.extractSimilarCases(searchResults);
+      const suggestedExperts = lowConfidence ? [] : this.extractExperts(searchResults);
+      const relatedContext = lowConfidence ? {} : this.extractRelatedContext(searchResults);
+      const suggestedActions = lowConfidence ? [] : this.generateSuggestedActions(
         entity,
         similarCases,
         suggestedExperts,
       );
+      const keywords = lowConfidence ? [] : this.extractKeywords(searchResults);
 
-      // Извлекаем ключевые слова
-      const keywords = this.extractKeywords(searchResults);
-
-      // Анализ настроения (не блокируем основной ответ)
+      // Анализ настроения (не блокируем основной ответ, работает независимо от confidence)
       let sentiment: AiAssistantResponse['sentiment'];
       try {
         sentiment = await this.analyzeSentiment(entityId) ?? undefined;
@@ -156,6 +157,7 @@ export class AiAssistantService {
         suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
         keywords: keywords.length > 0 ? keywords : undefined,
         sentiment,
+        lowConfidence: lowConfidence || undefined,
       };
 
       // Сохраняем в кэш
@@ -176,6 +178,23 @@ export class AiAssistantService {
         suggestedExperts: [],
       };
     }
+  }
+
+  /**
+   * Проверяет, являются ли результаты RAG поиска нерелевантными.
+   * Используется confidence gating: если средний similarity ниже порога
+   * или результатов слишком мало — считаем контекст нерелевантным.
+   */
+  private isLowConfidence(results: Array<{ similarity: number }>): boolean {
+    if (results.length === 0) return true;
+
+    // Средний similarity по всем результатам
+    const avgSimilarity = results.reduce((sum, r) => sum + r.similarity, 0) / results.length;
+
+    // Максимальный similarity — даже лучший результат должен быть достаточно хорош
+    const maxSimilarity = Math.max(...results.map(r => r.similarity));
+
+    return avgSimilarity < this.CONFIDENCE_THRESHOLD || maxSimilarity < this.MIN_SIMILARITY;
   }
 
   /**
@@ -519,11 +538,11 @@ export class AiAssistantService {
       query,
       sourceType: 'legacy_request',
       limit: 5,
-      minSimilarity: 0.5,
+      minSimilarity: this.MIN_SIMILARITY,
     });
 
-    if (searchResults.length === 0) {
-      throw new Error('Не найдено похожих случаев');
+    if (searchResults.length === 0 || this.isLowConfidence(searchResults)) {
+      throw new Error('Не найдено достаточно релевантных случаев для генерации ответа');
     }
 
     // Формируем контекст из похожих случаев
@@ -626,11 +645,11 @@ ${context}
       query,
       sourceType: 'legacy_request',
       limit: 5,
-      minSimilarity: 0.5,
+      minSimilarity: this.MIN_SIMILARITY,
     });
 
-    if (searchResults.length === 0) {
-      throw new Error('Не найдено похожих случаев');
+    if (searchResults.length === 0 || this.isLowConfidence(searchResults)) {
+      throw new Error('Не найдено достаточно релевантных случаев для генерации ответа');
     }
 
     const contextParts: string[] = [];

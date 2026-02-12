@@ -115,6 +115,8 @@ export interface AiAssistantResponse {
     emoji: string;
     score: number;
   };
+  /** Низкая уверенность — результаты RAG нерелевантны для данного контекста */
+  lowConfidence?: boolean;
 }
 
 export interface ConversationSummary {

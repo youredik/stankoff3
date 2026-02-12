@@ -1,79 +1,101 @@
-# Roadmap до Production
+# Дорожная карта развития
 
-**Дата создания:** 2026-02-03
-**Обновлено:** 2026-02-08
-**Планируемый запуск:** ~1 месяц
+**Обновлено:** 2026-02-12
 
----
+## Текущее состояние
 
-## Неделя 1-2: Функциональность
-
-- [x] Доделать основные фичи (BPMN, SLA, DMN, Legacy, AI, Field System)
-- [ ] Настроить E2E тесты с Keycloak (или mock auth)
-- [x] Задеплоить на preprod и проверить миграции
-- [x] Тестирование поиска и новых полей
-
-## Неделя 3: Стабилизация
-
-- [ ] Исправить найденные баги
-- [x] Проверить что всё работает на preprod
-- [ ] Настроить Sentry для мониторинга ошибок
-- [ ] Нагрузочное тестирование (опционально)
-
-## Неделя 4: Подготовка к Production
-
-- [ ] Настроить автоматические бэкапы БД (S3)
-- [ ] Настроить cron для materialized views (каждые 5 мин)
-- [x] Проверить SSL и security headers
-- [ ] Production deployment pipeline
-- [ ] Документация для операторов
+Реализовано и работает на preprod:
+- Workspaces с кастомными полями (13 типов), канбан, таблица
+- BPMN процессы (Zeebe), user tasks, triggers, incidents, process mining, heat maps
+- SLA, DMN (Decision Tables)
+- AI: классификация, RAG поиск, ассистент, streaming, уведомления, feedback, knowledge graph
+- Chat (корпоративный мессенджер с reactions, pins, typing)
+- RBAC (permission-based, 8 системных ролей)
+- Knowledge Base (FAQ + документы)
+- Legacy CRM интеграция (356K+ заявок мигрировано, синхронизация каждые 5 мин)
+- Invitations (приглашение по email)
+- Автоматические бэкапы PostgreSQL → S3
 
 ---
 
-## Выполненные оптимизации БД
+## Ближайшие задачи
 
-### ✅ Инфраструктура миграций
-- `synchronize: false` везде
-- `migrationsRun: true` — автозапуск при старте
-- Скрипты: `migration:generate`, `migration:run`, `migration:revert`
+### Инфраструктура (высокий приоритет)
 
-### ✅ Индексы для аналитики
-- B-tree: workspace+status, workspace+created, workspace+assignee
-- GIN: data (JSONB), linkedEntityIds, mentionedUserIds
+- [ ] Sentry для ошибок (backend + frontend)
+- [ ] Health monitoring + Telegram алерты
+- [ ] Persistent structured logging
+- [ ] Resource limits для Docker сервисов
+- [ ] Rate limiting (ThrottlerModule)
+- [ ] Операционный runbook (docs/OPERATIONS.md)
 
-### ✅ Полнотекстовый поиск (FTS)
-- tsvector колонки в `entities` и `comments`
-- Триггеры автообновления
-- Русский язык
-- API: `GET /api/search?q=текст`
+### Стабилизация
 
-### ✅ Кэшированные поля
-- `commentCount`, `lastActivityAt`, `firstResponseAt`, `resolvedAt`
-- Триггеры автоматического обновления
-
-### ✅ Materialized Views
-- `mv_workspace_stats`, `mv_assignee_stats`, `mv_daily_activity`
-- Обновление через `AnalyticsService.refreshMaterializedViews()`
-
-### ⏸️ Отложено: Партиционирование audit_logs
-- Требует тестирования на копии prod данных
-- Реализовать когда накопится >100k записей
+- [ ] E2E тесты с Keycloak (или mock auth)
+- [ ] Нагрузочное тестирование
+- [ ] Профилирование медленных запросов
 
 ---
 
-## Миграции
+## Фаза 3: Новые модули
 
-| # | Timestamp | Название | Статус |
-|---|-----------|----------|--------|
-| 1 | 1738600000000 | InitialSchema | ✅ |
-| 2 | 1770126681086 | AddAnalyticsIndexes | ✅ |
-| 3 | 1770126700000 | AddFullTextSearch | ✅ |
-| 4 | 1770126800000 | AddCachedFields | ✅ |
-| 5 | 1770126900000 | AddMaterializedViews | ✅ |
-| 6 | 1770200000000 | AddBpmnTables | ✅ |
-| 7 | 1770270192000 | CreateOnboardingTables | ✅ |
-| 8 | 1770300000000 | AddSections | ✅ |
-| 9 | 1770400000000 | AddBpmnExtendedTables | ✅ |
-| 10 | 1770500000000 | AddSlaAndDmnTables | ✅ |
-| 11 | 1770600000000 | FixSlaAndDmnTables | ✅ |
-| 12 | 1770700000000 | AddAiTables | ✅ |
+### Reports (PDF/Excel)
+- Отчёты по заявкам, исполнителям, SLA, AI использованию
+- PDF (pdfkit), Excel (exceljs)
+
+### Notifications (Push/Email/Telegram)
+- Web Push, Telegram бот
+- Настройка по каналам и событиям
+
+### Индексация документов оборудования
+- PDF/Word парсинг из legacy
+- OCR для сканов (Tesseract)
+- Связывание с товарами
+
+---
+
+## Фаза 4: Масштабирование и Production
+
+### Инфраструктура
+- [ ] Отдельный production сервер (или Managed Kubernetes)
+- [ ] Репликация PostgreSQL (primary + read replica)
+- [ ] Redis (сессии, кэширование, rate limiting, очереди Bull)
+- [ ] CDN для статики
+
+### Мониторинг
+- [ ] ELK Stack или Grafana Loki
+- [ ] APM (Sentry + Grafana)
+- [ ] Алерты (downtime, SLA, AI ошибки, нагрузка)
+
+### Безопасность
+- [ ] Аудит OWASP
+- [ ] Ротация секретов
+- [ ] 2FA для администраторов
+
+---
+
+## Фаза 5: Расширение
+
+### Другие отделы
+- **Продажи:** воронка + AI скоринг лидов
+- **Логистика:** отслеживание доставок
+- **Установка/Наладка:** календарь выездов, чек-листы
+- **Бухгалтерия:** интеграция с 1С
+
+### Клиентский портал (v3.0)
+- Личный кабинет клиента
+- Telegram/WhatsApp бот
+- Email-to-ticket
+- Оценка качества
+
+---
+
+## KPI
+
+| Метрика | Цель |
+|---------|------|
+| Время ответа на заявку | < 2 часов |
+| Время решения | < 24 часов |
+| AI автоклассификация accuracy | > 85% |
+| AI ответы принятые | > 60% |
+| Uptime | 99.9% |

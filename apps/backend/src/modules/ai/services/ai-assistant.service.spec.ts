@@ -252,6 +252,88 @@ describe('AiAssistantService', () => {
       expect(result.available).toBe(true);
       expect(result.similarCases).toEqual([]);
     });
+
+    it('должен вернуть lowConfidence при низком среднем similarity', async () => {
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      knowledgeBaseService.searchSimilar.mockResolvedValue([
+        {
+          id: 'chunk-low-1',
+          content: 'Заточной станок S50-CBN...',
+          sourceType: 'legacy_request',
+          sourceId: 'req-low-1',
+          metadata: { requestId: 123647, subject: 'Заточной станок S50-CBN' },
+          similarity: 0.62,
+        },
+        {
+          id: 'chunk-low-2',
+          content: 'Поставка оборудования...',
+          sourceType: 'legacy_request',
+          sourceId: 'req-low-2',
+          metadata: { requestId: 219182, subject: 'Поставка оборудования' },
+          similarity: 0.59,
+        },
+      ]);
+
+      const result = await service.getAssistance('entity-1');
+
+      expect(result.available).toBe(true);
+      expect(result.lowConfidence).toBe(true);
+      expect(result.similarCases).toEqual([]);
+      expect(result.suggestedExperts).toEqual([]);
+      expect(result.suggestedActions).toBeUndefined();
+    });
+
+    it('должен вернуть lowConfidence при пустых результатах', async () => {
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      knowledgeBaseService.searchSimilar.mockResolvedValue([]);
+
+      const result = await service.getAssistance('entity-1');
+
+      expect(result.lowConfidence).toBe(true);
+      expect(result.similarCases).toEqual([]);
+    });
+
+    it('НЕ должен вернуть lowConfidence при высоком similarity', async () => {
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      knowledgeBaseService.searchSimilar.mockResolvedValue(mockSearchResults); // 0.92, 0.87
+
+      const result = await service.getAssistance('entity-1');
+
+      expect(result.lowConfidence).toBeUndefined();
+      expect(result.similarCases.length).toBeGreaterThan(0);
+    });
+
+    it('должен вернуть lowConfidence если max similarity ниже порога', async () => {
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      knowledgeBaseService.searchSimilar.mockResolvedValue([
+        {
+          id: 'chunk-borderline',
+          content: 'Что-то отдалённо похожее...',
+          sourceType: 'legacy_request',
+          sourceId: 'req-b',
+          metadata: { requestId: 999, subject: 'Нерелевантная тема' },
+          similarity: 0.68, // avg 0.68 >= CONFIDENCE_THRESHOLD, но max < MIN_SIMILARITY (0.7)
+        },
+      ]);
+
+      const result = await service.getAssistance('entity-1');
+
+      expect(result.lowConfidence).toBe(true);
+      expect(result.similarCases).toEqual([]);
+    });
+
+    it('должен использовать minSimilarity = 0.7 при вызове searchSimilar', async () => {
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      knowledgeBaseService.searchSimilar.mockResolvedValue(mockSearchResults);
+
+      await service.getAssistance('entity-1');
+
+      expect(knowledgeBaseService.searchSimilar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minSimilarity: 0.7,
+        }),
+      );
+    });
   });
 
   describe('invalidateCache', () => {
@@ -463,7 +545,25 @@ describe('AiAssistantService', () => {
       knowledgeBaseService.searchSimilar.mockResolvedValue([]);
 
       await expect(service.generateResponseSuggestion('entity-1')).rejects.toThrow(
-        'Не найдено похожих случаев',
+        'Не найдено достаточно релевантных случаев для генерации ответа',
+      );
+    });
+
+    it('должен бросать ошибку если результаты низкой уверенности', async () => {
+      entityRepo.findOne.mockResolvedValue(mockEntity);
+      knowledgeBaseService.searchSimilar.mockResolvedValue([
+        {
+          id: 'chunk-low',
+          content: 'Нерелевантный текст...',
+          sourceType: 'legacy_request',
+          sourceId: 'req-low',
+          metadata: { requestId: 111, subject: 'Нерелевантная тема' },
+          similarity: 0.55,
+        },
+      ]);
+
+      await expect(service.generateResponseSuggestion('entity-1')).rejects.toThrow(
+        'Не найдено достаточно релевантных случаев для генерации ответа',
       );
     });
 

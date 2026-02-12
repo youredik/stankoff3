@@ -83,11 +83,26 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
     );
   }
 
+  const isLowConfidence = data.lowConfidence === true;
+
   const hasContent =
-    data.similarCases.length > 0 ||
+    !isLowConfidence &&
+    (data.similarCases.length > 0 ||
     data.suggestedExperts.length > 0 ||
     data.suggestedActions?.length ||
-    data.relatedContext;
+    data.relatedContext);
+
+  if (isLowConfidence) {
+    return (
+      <div data-testid="ai-assistant-low-confidence" className="py-8 text-center text-gray-500 dark:text-gray-400">
+        <Sparkles className="w-8 h-8 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+        <p className="font-medium">Нет релевантных данных</p>
+        <p className="text-sm mt-1">
+          В базе знаний не найдено достаточно похожих случаев для этой заявки
+        </p>
+      </div>
+    );
+  }
 
   if (!hasContent) {
     return (

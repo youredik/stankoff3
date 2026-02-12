@@ -40,8 +40,11 @@ export function AiInsightsPanel({ entityId, onShowDetails, onAssignExpert }: AiI
     return null;
   }
 
+  const isLowConfidence = data?.lowConfidence === true;
+
   const hasContent =
     data &&
+    !isLowConfidence &&
     ((data.suggestedActions && data.suggestedActions.length > 0) ||
       data.similarCases.length > 0 ||
       data.suggestedExperts.length > 0 ||
@@ -91,8 +94,15 @@ export function AiInsightsPanel({ entityId, onShowDetails, onAssignExpert }: AiI
             </div>
           )}
 
+          {/* Low confidence — results not relevant */}
+          {!loading && isLowConfidence && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Нет релевантных данных в базе знаний
+            </p>
+          )}
+
           {/* No data */}
-          {!loading && !hasContent && (
+          {!loading && !isLowConfidence && !hasContent && (
             <p className="text-xs text-gray-400 dark:text-gray-500">
               Недостаточно данных для анализа
             </p>
