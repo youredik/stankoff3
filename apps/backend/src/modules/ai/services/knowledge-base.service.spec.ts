@@ -321,7 +321,7 @@ describe('KnowledgeBaseService', () => {
           'Тест', // query text
           null, // workspaceId
           null, // sourceType
-          10, // limit (default)
+          30, // fetchLimit = Math.max(10 * 3, 20) для reranking
           0.7, // minSimilarity (default)
         ]),
       );

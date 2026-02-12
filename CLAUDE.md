@@ -554,7 +554,7 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 - `GET /api/ai/indexer/health` — статус RAG индексатора
 - `GET /api/ai/indexer/status` — текущий статус индексации
 - `GET /api/ai/indexer/stats` — статистика (legacy + knowledge base + покрытие)
-- `POST /api/ai/indexer/start` — запустить индексацию legacy заявок
+- `POST /api/ai/indexer/start` — запустить индексацию legacy заявок (body: `{ forceReindex?: boolean }`)
 - `POST /api/ai/indexer/reindex/:requestId` — переиндексировать конкретную заявку
 
 **AI Notifications (проактивные уведомления, cron каждые 5 мин):**
@@ -568,8 +568,13 @@ docker buildx build --platform linux/amd64 -t ghcr.io/youredik/stankoff3/fronten
 **AI Knowledge Graph (контекстное обогащение):**
 - `GET /api/ai/knowledge-graph/:entityId` — граф связей заявки (entity → legacy → эксперты → контрагенты → темы)
 
+**AI Feedback (обратная связь):**
+- `POST /api/ai/feedback` — отправить feedback (body: `{ type, entityId, rating: 'positive'|'negative', metadata? }`)
+- `GET /api/ai/feedback/stats` — статистика feedback (query: type?, entityId?, dateFrom?, dateTo?)
+- `GET /api/ai/feedback/entity/:entityId` — feedback пользователя для entity
+
 **Примечание по AI:**
-RAG использует данные из legacy CRM (QD_requests + QD_answers). Результаты поиска включают ссылки на legacy систему (https://www.stankoff.ru/crm/request/:id). Индексация создаёт embeddings для закрытых заявок с ответами.
+RAG использует данные из legacy CRM (QD_requests + QD_answers). Результаты поиска включают ссылки на legacy систему (https://www.stankoff.ru/crm/request/:id). Индексация создаёт embeddings для закрытых заявок с ответами. Чанки v2 включают contextual prefix (метаданные заявки). Поиск использует reranking (keyword overlap, subject match, freshness). Классификация и sentiment валидируются через Zod-схемы с safe defaults.
 
 **Геокодирование (Yandex Geocoder API):**
 - `GET /api/geocoding/search?q=адрес` — прямое геокодирование (адрес → координаты)

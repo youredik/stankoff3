@@ -7,8 +7,8 @@ import {
 
 export class CreateConversationDto {
   @IsString()
-  @IsIn(['direct', 'group', 'entity'])
-  type: 'direct' | 'group' | 'entity';
+  @IsIn(['direct', 'group', 'entity', 'ai_assistant'])
+  type: 'direct' | 'group' | 'entity' | 'ai_assistant';
 
   @IsString()
   @IsOptional()

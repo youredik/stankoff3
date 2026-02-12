@@ -2,7 +2,7 @@
 
 import { format, isToday, isYesterday } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Users } from 'lucide-react';
+import { Users, Sparkles } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { getConversationName } from './ConversationList';
 import type { ChatConversation } from '@/types';
@@ -48,7 +48,11 @@ export function ConversationItem({
     >
       {/* Avatar */}
       <div className="flex-shrink-0">
-        {conversation.type === 'direct' && otherParticipant?.user ? (
+        {conversation.type === 'ai_assistant' ? (
+          <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-violet-500 rounded-full flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+        ) : conversation.type === 'direct' && otherParticipant?.user ? (
           <UserAvatar
             firstName={otherParticipant.user.firstName}
             lastName={otherParticipant.user.lastName}
@@ -65,12 +69,23 @@ export function ConversationItem({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <span
-            className={`font-medium text-sm truncate ${
-              isSelected ? 'text-white' : 'text-gray-900 dark:text-gray-100'
-            }`}
-          >
-            {name}
+          <span className="flex items-center gap-1.5 truncate">
+            <span
+              className={`font-medium text-sm truncate ${
+                isSelected ? 'text-white' : 'text-gray-900 dark:text-gray-100'
+              }`}
+            >
+              {name}
+            </span>
+            {conversation.type === 'ai_assistant' && (
+              <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                isSelected
+                  ? 'bg-white/20 text-white'
+                  : 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400'
+              }`}>
+                AI
+              </span>
+            )}
           </span>
           <span
             className={`text-xs flex-shrink-0 ml-2 ${

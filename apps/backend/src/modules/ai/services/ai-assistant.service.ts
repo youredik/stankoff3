@@ -16,6 +16,7 @@ import {
   StreamingEvent,
 } from '../dto/ai.dto';
 import { extractJson } from '../utils/extract-json';
+import { SentimentSchema } from '../utils/ai-schemas';
 
 /**
  * AI Assistant Service
@@ -804,7 +805,8 @@ ${conversation}`,
         success: true,
       });
 
-      const parsed = JSON.parse(extractJson(result.content));
+      const rawParsed = JSON.parse(extractJson(result.content));
+      const validated = SentimentSchema.parse(rawParsed);
       const emojiMap: Record<string, string> = {
         satisfied: '😊',
         neutral: '😐',
@@ -814,9 +816,9 @@ ${conversation}`,
       };
 
       const sentiment = {
-        label: parsed.label || 'neutral',
-        emoji: emojiMap[parsed.label] || '😐',
-        score: parsed.score || 0.5,
+        label: validated.label,
+        emoji: emojiMap[validated.label] || '😐',
+        score: validated.score,
       };
 
       // Сохраняем в кэш

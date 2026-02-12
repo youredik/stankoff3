@@ -155,8 +155,8 @@ describe('ClassifierService', () => {
         category: 'other',
         priority: 'medium',
         skills: [],
-        confidence: 0,
-        reasoning: 'Ошибка парсинга ответа',
+        confidence: 0.5,
+        reasoning: '',
       });
     });
 

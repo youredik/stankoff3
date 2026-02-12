@@ -1,9 +1,12 @@
 import {
   Injectable,
+  Logger,
+  OnModuleInit,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Like } from 'typeorm';
 import { Conversation, ConversationType } from './entities/conversation.entity';
@@ -17,9 +20,13 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
 import { MarkReadDto } from './dto/mark-read.dto';
 import { MessagesQueryDto } from './dto/messages-query.dto';
+import type { ChatAgentService } from '../ai/services/chat-agent.service';
 
 @Injectable()
-export class ChatService {
+export class ChatService implements OnModuleInit {
+  private readonly logger = new Logger(ChatService.name);
+  private chatAgentService: ChatAgentService | null = null;
+
   constructor(
     @InjectRepository(Conversation)
     private conversationRepo: Repository<Conversation>,
@@ -32,7 +39,18 @@ export class ChatService {
     @InjectRepository(PinnedMessage)
     private pinnedRepo: Repository<PinnedMessage>,
     private eventsGateway: EventsGateway,
+    private moduleRef: ModuleRef,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const { ChatAgentService: AgentClass } = await import('../ai/services/chat-agent.service');
+      this.chatAgentService = this.moduleRef.get(AgentClass, { strict: false });
+      this.logger.log('ChatAgentService подключён — AI-бот в чатах активен');
+    } catch {
+      this.logger.warn('ChatAgentService недоступен — AI-бот в чатах отключён');
+    }
+  }
 
   // ─── Conversations ──────────────────────────────────────────
 
@@ -114,6 +132,16 @@ export class ChatService {
             role: 'member',
           }),
         );
+      }
+    }
+
+    // AI Chat Agent: автодобавление бота в ai_assistant чаты
+    if (dto.type === 'ai_assistant' && this.chatAgentService) {
+      try {
+        const botUserId = await this.chatAgentService.getBotUserId();
+        await this.ensureParticipant(saved.id, botUserId);
+      } catch (e) {
+        this.logger.warn('Не удалось добавить AI-бота в чат:', e);
       }
     }
 
@@ -244,6 +272,9 @@ export class ChatService {
       lastMessagePreview: preview,
       lastMessageAuthorId: userId,
     });
+
+    // AI Chat Agent: если сообщение в ai_assistant чате и автор НЕ бот — запросить ответ бота
+    this.triggerAiBotResponse(conversationId, userId, dto.content || '').catch(() => {});
 
     return full;
   }
@@ -536,6 +567,52 @@ export class ChatService {
     });
 
     return { success: true };
+  }
+
+  // ─── AI Bot ──────────────────────────────────────────────
+
+  private async triggerAiBotResponse(conversationId: string, userId: string, content: string) {
+    if (!this.chatAgentService || !content) return;
+
+    const conversation = await this.conversationRepo.findOne({ where: { id: conversationId } });
+    if (!conversation || conversation.type !== 'ai_assistant') return;
+
+    const isBot = await this.chatAgentService.isBotUser(userId);
+    if (isBot) return;
+
+    // Загружаем последние сообщения для контекста
+    const recentMessages = await this.messageRepo.find({
+      where: { conversationId, isDeleted: false },
+      order: { createdAt: 'DESC' },
+      take: 10,
+      relations: ['author'],
+    });
+
+    const botUserId = await this.chatAgentService.getBotUserId();
+    const previousMessages = recentMessages
+      .reverse()
+      .slice(0, -1) // убираем текущее сообщение (оно уже в content)
+      .map((m) => ({
+        role: (m.authorId === botUserId ? 'assistant' : 'user') as 'user' | 'assistant',
+        content: m.content || '',
+      }));
+
+    // Отправляем typing индикатор
+    this.emitToConversation(conversationId, 'chat:typing', {
+      conversationId,
+      userId: botUserId,
+    });
+
+    const response = await this.chatAgentService.processMessage(
+      conversationId,
+      content,
+      userId,
+      previousMessages,
+    );
+
+    // Отправляем ответ бота как сообщение
+    await this.ensureParticipant(conversationId, botUserId);
+    await this.sendMessage(conversationId, botUserId, { content: response });
   }
 
   // ─── Helpers ──────────────────────────────────────────────

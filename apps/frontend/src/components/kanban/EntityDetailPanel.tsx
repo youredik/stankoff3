@@ -49,6 +49,14 @@ const sentimentLabels: Record<string, string> = {
   urgent: 'Срочно',
 };
 
+const sentimentColors: Record<string, string> = {
+  satisfied: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  neutral: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+  concerned: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  frustrated: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  urgent: 'bg-red-200 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+};
+
 const PRIORITY_COLORS: Record<string, string> = {
   high: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800',
   medium: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-800',
@@ -481,8 +489,11 @@ export function EntityDetailPanel() {
                   >
                     {selectedEntity.title}
                     {aiSentiment && (
-                      <span title={`Настроение: ${sentimentLabels[aiSentiment.label] || aiSentiment.label}`} className="text-lg cursor-default">
-                        {aiSentiment.emoji}
+                      <span
+                        title={`Настроение: ${sentimentLabels[aiSentiment.label] || aiSentiment.label}`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-default ${sentimentColors[aiSentiment.label] || sentimentColors.neutral}`}
+                      >
+                        {aiSentiment.emoji} {sentimentLabels[aiSentiment.label] || aiSentiment.label}
                       </span>
                     )}
                   </h2>

@@ -4,6 +4,7 @@ import { Repository, DataSource } from 'typeorm';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
 import { KnowledgeChunk, ChunkSourceType } from '../entities/knowledge-chunk.entity';
 import { AiUsageLog } from '../entities/ai-usage-log.entity';
+import { rerankResults } from '../utils/reranker';
 
 interface SimilarChunk {
   id: string;
@@ -245,9 +246,13 @@ export class KnowledgeBaseService implements OnModuleInit {
     // Формируем vector строку для SQL
     const embeddingVector = `[${embedding.join(',')}]`;
 
+    // Запрашиваем больше результатов для reranking (3x от limit, минимум 20)
+    const fetchLimit = Math.max(limit * 3, 20);
+
     // Пробуем гибридный поиск
+    let rawResults: SimilarChunk[];
     try {
-      const results = await this.dataSource.query<SimilarChunk[]>(
+      rawResults = await this.dataSource.query<SimilarChunk[]>(
         `SELECT id, content, "sourceType", "sourceId", metadata, similarity, "textRank"
          FROM search_hybrid_chunks($1::vector, $2, $3, $4, $5, $6)`,
         [
@@ -255,29 +260,28 @@ export class KnowledgeBaseService implements OnModuleInit {
           params.query,
           params.workspaceId || null,
           params.sourceType || null,
-          limit,
+          fetchLimit,
           minSimilarity,
         ],
       );
-      return results;
     } catch {
       // Fallback на обычный vector search (если гибридная функция не существует)
       this.logger.debug('Hybrid search недоступен, используем vector search');
+      rawResults = await this.dataSource.query<SimilarChunk[]>(
+        `SELECT * FROM search_similar_chunks($1::vector, $2, $3, $4, $5)`,
+        [
+          embeddingVector,
+          params.workspaceId || null,
+          params.sourceType || null,
+          fetchLimit,
+          minSimilarity,
+        ],
+      );
     }
 
-    // Fallback: обычный vector search
-    const results = await this.dataSource.query<SimilarChunk[]>(
-      `SELECT * FROM search_similar_chunks($1::vector, $2, $3, $4, $5)`,
-      [
-        embeddingVector,
-        params.workspaceId || null,
-        params.sourceType || null,
-        limit,
-        minSimilarity,
-      ],
-    );
-
-    return results;
+    // Reranking: переранжируем по дополнительным сигналам
+    const reranked = rerankResults(rawResults, params.query, limit);
+    return reranked;
   }
 
   /**

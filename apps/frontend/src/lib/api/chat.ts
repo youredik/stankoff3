@@ -15,7 +15,7 @@ export const chatApi = {
       .then((r) => r.data),
 
   createConversation: (data: {
-    type: 'direct' | 'group' | 'entity';
+    type: 'direct' | 'group' | 'entity' | 'ai_assistant';
     name?: string;
     entityId?: string;
     participantIds: string[];

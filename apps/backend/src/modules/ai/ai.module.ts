@@ -19,15 +19,21 @@ import { KnowledgeChunk } from './entities/knowledge-chunk.entity';
 import { AiUsageLog } from './entities/ai-usage-log.entity';
 import { AiClassification } from './entities/ai-classification.entity';
 import { AiNotification } from './entities/ai-notification.entity';
+import { AiFeedback } from './entities/ai-feedback.entity';
+import { AiFeedbackService } from './services/ai-feedback.service';
+import { ChatAgentService } from './services/chat-agent.service';
 import { WorkspaceEntity } from '../entity/entity.entity';
 import { Comment } from '../entity/comment.entity';
+import { User } from '../user/user.entity';
 import { LegacyModule } from '../legacy/legacy.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([KnowledgeChunk, AiUsageLog, AiClassification, AiNotification, WorkspaceEntity, Comment]),
+    TypeOrmModule.forFeature([KnowledgeChunk, AiUsageLog, AiClassification, AiNotification, AiFeedback, WorkspaceEntity, Comment, User]),
     forwardRef(() => LegacyModule),
+    forwardRef(() => ChatModule),
   ],
   controllers: [AiController],
   providers: [
@@ -46,6 +52,8 @@ import { LegacyModule } from '../legacy/legacy.module';
     AiUsageService,
     AiNotificationService,
     KnowledgeGraphService,
+    AiFeedbackService,
+    ChatAgentService,
   ],
   exports: [
     // Реестр - основной способ доступа к AI
@@ -63,6 +71,8 @@ import { LegacyModule } from '../legacy/legacy.module';
     AiUsageService,
     AiNotificationService,
     KnowledgeGraphService,
+    AiFeedbackService,
+    ChatAgentService,
   ],
 })
 export class AiModule {}

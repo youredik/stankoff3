@@ -35,11 +35,12 @@ interface ChatState {
   deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
   markAsRead: (conversationId: string, lastReadMessageId: string) => Promise<void>;
   createConversation: (data: {
-    type: 'direct' | 'group' | 'entity';
+    type: 'direct' | 'group' | 'entity' | 'ai_assistant';
     name?: string;
     entityId?: string;
     participantIds: string[];
   }) => Promise<ChatConversation>;
+  createAiChat: () => Promise<ChatConversation | null>;
   setReplyTo: (message: ChatMessage | null) => void;
   fetchUnreadCounts: () => Promise<void>;
   toggleReaction: (conversationId: string, messageId: string, emoji: string) => Promise<void>;
@@ -180,6 +181,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
       selectedConversationId: conversation.id,
     }));
     return conversation;
+  },
+
+  createAiChat: async () => {
+    // Проверяем, есть ли уже AI-чат
+    const state = get();
+    const existing = state.conversations.find((c) => c.type === 'ai_assistant');
+    if (existing) {
+      set({ selectedConversationId: existing.id });
+      return existing;
+    }
+    try {
+      const conversation = await chatApi.createConversation({
+        type: 'ai_assistant',
+        name: 'AI Ассистент',
+        participantIds: [],
+      });
+      set((s) => ({
+        conversations: [conversation, ...s.conversations],
+        selectedConversationId: conversation.id,
+      }));
+      return conversation;
+    } catch {
+      toast.error('Не удалось создать чат с AI');
+      return null;
+    }
   },
 
   setReplyTo: (message) => set({ replyToMessage: message }),

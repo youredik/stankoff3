@@ -54,6 +54,8 @@ export interface IndexingOptions {
   onProgress?: (stats: IndexingStats) => void;
   /** Начать сначала, игнорируя сохранённый прогресс */
   resetProgress?: boolean;
+  /** Переиндексировать даже уже проиндексированные заявки (с новым context prefix) */
+  forceReindex?: boolean;
 }
 
 /**
@@ -220,6 +222,7 @@ export class RagIndexerService implements OnModuleInit {
       modifiedAfter,
       onProgress,
       resetProgress = false,
+      forceReindex = false,
     } = options;
 
     if (!this.isAvailable()) {
@@ -289,15 +292,25 @@ export class RagIndexerService implements OnModuleInit {
 
         const requestIds = requests.map(r => r.id);
 
-        // Проверяем какие заявки уже проиндексированы (один SQL запрос на batch)
-        const alreadyIndexed = await this.knowledgeBase.getIndexedSourceIds(
-          'legacy_request',
-          requestIds.map(String),
-        );
+        let newRequestIds: number[];
+        let skippedCount: number;
 
-        // Фильтруем — оставляем только ещё не проиндексированные
-        const newRequestIds = requestIds.filter(id => !alreadyIndexed.has(String(id)));
-        const skippedCount = requestIds.length - newRequestIds.length;
+        if (forceReindex) {
+          // При forceReindex индексируем все заявки (старые чанки удалятся в indexRequest)
+          newRequestIds = requestIds;
+          skippedCount = 0;
+        } else {
+          // Проверяем какие заявки уже проиндексированы (один SQL запрос на batch)
+          const alreadyIndexed = await this.knowledgeBase.getIndexedSourceIds(
+            'legacy_request',
+            requestIds.map(String),
+          );
+
+          // Фильтруем — оставляем только ещё не проиндексированные
+          newRequestIds = requestIds.filter(id => !alreadyIndexed.has(String(id)));
+          skippedCount = requestIds.length - newRequestIds.length;
+        }
+
         this.indexingStats.skippedRequests += skippedCount;
 
         if (newRequestIds.length > 0) {
@@ -393,7 +406,12 @@ export class RagIndexerService implements OnModuleInit {
     await this.knowledgeBase.removeChunksBySource('legacy_request', String(request.id));
 
     // Разбиваем на чанки
-    const chunks = this.splitIntoChunks(fullText);
+    const rawChunks = this.splitIntoChunks(fullText);
+
+    // Contextual Retrieval: добавляем контекстный префикс к каждому чанку
+    // Это обогащает embedding семантикой заявки (клиент, тема, менеджер)
+    const contextPrefix = this.buildContextPrefix(request, employeeInfo, customerInfo, analytics);
+    const chunks = rawChunks.map(chunk => `${contextPrefix}\n\n${chunk}`);
 
     // Создаём чанки в базе знаний
     let createdCount = 0;
@@ -413,6 +431,7 @@ export class RagIndexerService implements OnModuleInit {
             chunkIndex: i,
             totalChunks: chunks.length,
             answersCount: answers.length,
+            chunkVersion: 2,
             // Ссылка на legacy систему
             legacyUrl: `https://www.stankoff.ru/crm/request/${request.id}`,
             // Информация о сотрудниках (для подсказок AI)
@@ -435,6 +454,26 @@ export class RagIndexerService implements OnModuleInit {
     }
 
     return createdCount;
+  }
+
+  /**
+   * Строит контекстный префикс для чанка из метаданных заявки.
+   * Детерминированный (без LLM вызова), обогащает embedding семантикой.
+   */
+  buildContextPrefix(
+    request: LegacyRequest,
+    employeeInfo: { managerName?: string },
+    customerInfo: { customerName?: string; counterpartyName?: string },
+    analytics: { requestType?: string },
+  ): string {
+    const parts: string[] = [];
+    parts.push(`Заявка #${request.id}`);
+    if (request.subject) parts.push(`Тема: ${request.subject}`);
+    if (customerInfo.customerName) parts.push(`Клиент: ${customerInfo.customerName}`);
+    if (customerInfo.counterpartyName) parts.push(`Контрагент: ${customerInfo.counterpartyName}`);
+    if (analytics.requestType) parts.push(`Категория: ${analytics.requestType}`);
+    if (employeeInfo.managerName) parts.push(`Менеджер: ${employeeInfo.managerName}`);
+    return parts.join(' | ');
   }
 
   /**

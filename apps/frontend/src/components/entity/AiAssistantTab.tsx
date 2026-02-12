@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Copy, Check, Sparkles, MessageSquare } from 'lucide-react';
 import { useAiStore } from '@/store/useAiStore';
+import { AiFeedbackButtons } from '@/components/ai/AiFeedbackButtons';
+import { aiApi } from '@/lib/api/ai';
 import type {
   SimilarCase,
   SuggestedExpert,
@@ -45,13 +47,23 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
     navigator.clipboard.writeText(generatedResponse.draft);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [generatedResponse]);
+    // Implicit positive feedback
+    aiApi.submitFeedback({
+      type: 'response', entityId, rating: 'positive',
+      metadata: { action: 'copy' },
+    }).catch(() => {});
+  }, [generatedResponse, entityId]);
 
   // Вставить в редактор
   const handleInsert = useCallback(() => {
     if (!generatedResponse?.draft || !onInsertDraft) return;
     onInsertDraft(generatedResponse.draft);
-  }, [generatedResponse, onInsertDraft]);
+    // Implicit positive feedback
+    aiApi.submitFeedback({
+      type: 'response', entityId, rating: 'positive',
+      metadata: { action: 'insert' },
+    }).catch(() => {});
+  }, [generatedResponse, onInsertDraft, entityId]);
 
   if (loading) {
     return (
@@ -175,6 +187,19 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
                 ))}
               </div>
             )}
+
+            {/* Feedback */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-gray-400">Было полезно?</span>
+              <AiFeedbackButtons
+                type="response"
+                entityId={entityId}
+                metadata={{
+                  draftLength: generatedResponse.draft.length,
+                  sourcesCount: generatedResponse.sources.length,
+                }}
+              />
+            </div>
           </div>
         )}
       </section>

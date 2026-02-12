@@ -15,7 +15,7 @@ import { Workspace } from '../../workspace/workspace.entity';
 import { ConversationParticipant } from './conversation-participant.entity';
 import { Message } from './message.entity';
 
-export type ConversationType = 'direct' | 'group' | 'entity';
+export type ConversationType = 'direct' | 'group' | 'entity' | 'ai_assistant';
 
 @Entity('conversations')
 @Index('idx_conversations_created_by', ['createdById'])

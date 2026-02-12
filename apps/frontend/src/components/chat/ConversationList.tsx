@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Sparkles } from 'lucide-react';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ConversationItem } from './ConversationItem';
@@ -17,6 +17,7 @@ export function ConversationList() {
     fetchConversations,
     fetchMessages,
     unreadCounts,
+    createAiChat,
   } = useChatStore();
   const [search, setSearch] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
@@ -51,6 +52,20 @@ export function ConversationList() {
               className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 border-0 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:text-gray-200"
             />
           </div>
+          <button
+            data-testid="chat-ai-btn"
+            onClick={async () => {
+              const conv = await createAiChat();
+              if (conv) {
+                selectConversation(conv.id);
+                fetchMessages(conv.id);
+              }
+            }}
+            className="p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/30 text-primary-500 transition-colors"
+            title="AI Ассистент"
+          >
+            <Sparkles className="w-5 h-5" />
+          </button>
           <button
             data-testid="chat-new-btn"
             onClick={() => setShowNewChat(true)}
@@ -104,6 +119,10 @@ export function getConversationName(
 
   if (conv.type === 'entity') {
     return `Обсуждение заявки`;
+  }
+
+  if (conv.type === 'ai_assistant') {
+    return 'AI Ассистент';
   }
 
   return 'Без названия';

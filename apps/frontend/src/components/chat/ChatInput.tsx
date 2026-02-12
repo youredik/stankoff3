@@ -12,6 +12,7 @@ interface ChatInputProps {
   replyTo: ChatMessage | null;
   onCancelReply: () => void;
   conversationId: string;
+  isAiChat?: boolean;
 }
 
 interface PendingFile {
@@ -25,6 +26,7 @@ export function ChatInput({
   replyTo,
   onCancelReply,
   conversationId,
+  isAiChat,
 }: ChatInputProps) {
   const [content, setContent] = useState('');
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
@@ -358,7 +360,7 @@ export function ChatInput({
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="Сообщение..."
+              placeholder={isAiChat ? 'Спросите AI ассистента...' : 'Сообщение...'}
               rows={1}
               className="w-full resize-none bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500 max-h-[200px]"
             />

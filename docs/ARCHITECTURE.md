@@ -1090,7 +1090,7 @@ interface ProcessActivityLog {
 | `send-email` | Отправка email через EmailService | Мгновенное |
 | `log-activity` | Запись в audit log (ProcessActivityLog) | Мгновенное |
 | `set-assignee` | Назначение исполнителя на заявку | Мгновенное |
-| `classify-entity` | AI-классификация через AiClassifierService | Мгновенное |
+| `classify-entity` | AI-классификация + **auto-routing** (при confidence ≥ 0.85 назначает эксперта) | Мгновенное |
 | `process-completed` | Пометка ProcessInstance как completed | Мгновенное |
 | `io.camunda.zeebe:userTask` | **User task** — создаёт задачу в inbox | Отложенное (job.forward) |
 | `create-entity` | Создание связанной сущности (cross-workspace) | Мгновенное |
@@ -1459,6 +1459,7 @@ UI-компоненты для AI функций располагаются в `
 | `AiSummaryBanner` | Компактный баннер AI-резюме переписки над таймлайном. Показывается при >= 5 комментариях, сворачиваемый. |
 | `AiNotificationsPanel` | Панель проактивных AI уведомлений (кластеры, критические заявки). Показывает типизированные уведомления с иконками, dismiss/markRead/markAllRead, навигация к заявке. |
 | `KnowledgeGraph` | SVG-визуализация графа знаний для заявки. Radial layout: центральная заявка → похожие legacy → эксперты → контрагенты → темы. Hover-эффекты, expand/collapse, клик на legacy открывает ссылку. |
+| `AiFeedbackButtons` | Кнопки ThumbsUp/ThumbsDown для оценки AI ответов. Поддержка explicit (клик) и implicit (copy/insert) feedback. Используется в `AiAssistantTab` после генерации черновика. |
 
 **Использование:**
 ```tsx
@@ -1619,7 +1620,7 @@ chat/
 │   ├── add-participants.dto.ts
 │   └── messages-query.dto.ts
 └── entities/
-    ├── conversation.entity.ts           # conversations (direct, group, entity)
+    ├── conversation.entity.ts           # conversations (direct, group, entity, ai_assistant)
     ├── conversation-participant.entity.ts # conversation_participants
     ├── message.entity.ts                # messages (text, voice, system)
     ├── message-reaction.entity.ts       # message_reactions (emoji toggle)
@@ -1627,7 +1628,7 @@ chat/
 ```
 
 **Ключевые возможности:**
-- Три типа чатов: `direct` (1-на-1), `group`, `entity` (привязан к заявке)
+- Четыре типа чатов: `direct` (1-на-1), `group`, `entity` (привязан к заявке), `ai_assistant` (чат с AI-ботом)
 - Дедупликация: один direct чат между двумя пользователями, один чат на заявку
 - Cursor-based пагинация сообщений
 - Soft delete сообщений, редактирование своих
@@ -1641,6 +1642,7 @@ chat/
 - WebSocket: real-time доставка, typing indicators, room-based routing
 - Desktop notifications + звуковые уведомления (Web Audio API)
 - Link previews (OG meta-теги через `/api/og-preview`)
+- **AI Chat Agent**: AI-бот как участник чата — поиск по базе знаний, ответы на вопросы, auto-routing при confidence ≥ 0.85
 
 **Frontend компоненты:**
 - `ChatPage` — два столбца: ConversationList (380px) + ChatView
@@ -2951,7 +2953,8 @@ modules/ai/
 │   ├── knowledge-chunk.entity.ts    # Чанки знаний с embeddings (pgvector)
 │   ├── ai-usage-log.entity.ts       # Логи использования AI
 │   ├── ai-classification.entity.ts  # Результаты классификации
-│   └── ai-notification.entity.ts    # Проактивные AI уведомления
+│   ├── ai-notification.entity.ts    # Проактивные AI уведомления
+│   └── ai-feedback.entity.ts       # Обратная связь пользователей
 ├── providers/
 │   ├── base-llm.provider.ts         # Базовый интерфейс провайдера
 │   ├── yandex-cloud.provider.ts      # Yandex Cloud YandexGPT (облачный, нативный русский)
@@ -2959,13 +2962,19 @@ modules/ai/
 │   ├── groq.provider.ts             # Groq API (облачный, бесплатный tier)
 │   ├── openai.provider.ts           # OpenAI API (облачный, платно)
 │   └── ai-provider.registry.ts      # Реестр провайдеров с fallback
+├── utils/
+│   ├── ai-schemas.ts              # Zod-схемы валидации AI outputs (Classification, Sentiment)
+│   ├── validate-ai-output.ts      # Утилита валидации с retry и safe defaults
+│   └── reranker.ts                # Lightweight алгоритмический reranker
 └── services/
-    ├── classifier.service.ts        # Классификация заявок
-    ├── knowledge-base.service.ts    # Работа с векторной БД
-    ├── rag-indexer.service.ts       # Индексация legacy данных
+    ├── classifier.service.ts        # Классификация заявок (Zod-валидация)
+    ├── knowledge-base.service.ts    # Работа с векторной БД + reranking
+    ├── rag-indexer.service.ts       # Индексация legacy данных (contextual retrieval)
     ├── ai-assistant.service.ts      # AI помощник (похожие случаи, эксперты)
     ├── ai-notification.service.ts   # Проактивные уведомления (кластеры, критические)
-    └── knowledge-graph.service.ts   # Граф знаний (связи entity ↔ legacy ↔ эксперты)
+    ├── ai-feedback.service.ts       # Обратная связь (thumbs up/down, implicit tracking)
+    ├── knowledge-graph.service.ts   # Граф знаний (связи entity ↔ legacy ↔ эксперты)
+    └── chat-agent.service.ts        # AI-бот в корпоративном мессенджере
 ```
 
 ### Провайдеры AI
@@ -3038,6 +3047,12 @@ CREATE INDEX ON knowledge_chunks USING GIN (search_vector);
 - Условие: `vector_sim >= min_similarity OR search_vector @@ ts_query` — находит и семантически похожие, и текстово совпадающие результаты
 - Fallback на `search_similar_chunks` (чистый vector) если гибридная функция недоступна
 
+**Reranking (post-retrieval):**
+- После SQL-запроса (top-N*3 или min 20 результатов) алгоритмический reranker переранжирует и возвращает top-N
+- Сигналы: keyword overlap (+0.15 max), subject match (+0.1 max), closedAt (+0.05), freshness 5y decay (+0.05 max), responseCount >= 3 (+0.03)
+- Чисто алгоритмический (TypeScript), <1ms latency на 20 результатов, без LLM/API вызовов
+- Утилита: `ai/utils/reranker.ts` → `rerankResults(results, query, topK)`
+
 **Embedding cache:**
 - Кэширует embedding-вектор для идентичных текстовых запросов (TTL 5 мин)
 - Экономит вызовы к Yandex Cloud Embeddings API (rate limit 10 req/sec)
@@ -3052,6 +3067,14 @@ CREATE INDEX ON knowledge_chunks USING GIN (search_vector);
 - При рестарте контейнера продолжает с сохранённого offset (а не с 0)
 - Комбинируется со skip-оптимизацией (`getIndexedSourceIds`) для обработки частично обработанных batch'ей
 - Опция `resetProgress: true` для принудительного запуска сначала
+
+**Contextual Retrieval (v2):**
+- Перед эмбеддингом каждого чанка prepend-ится контекстная строка из метаданных заявки
+- Формат: `Заявка #12345 | Тема: Ремонт станка ЧПУ | Клиент: ООО Металлург | Контрагент: Кировский завод | Менеджер: Иванов`
+- Детерминированный (без LLM), бесплатно, до 49% улучшения точности retrieval (по исследованию Anthropic)
+- Чанки v2 помечаются `chunkVersion: 2` в metadata
+- Backward compatible: старые v1 чанки продолжают работать
+- `forceReindex: true` в `POST /api/ai/indexer/start` — принудительная переиндексация всех заявок
 
 **Оптимизации индексации:**
 - **Skip already-indexed** — перед каждым batch проверяет `knowledge_chunks` одним SQL-запросом
@@ -3114,16 +3137,17 @@ CREATE INDEX ON knowledge_chunks USING GIN (search_vector);
   - Рекомендует экспертов на основе истории решений
   - Генерирует ответ на основе найденного контекста
 
-**Классификация:**
+**Классификация (Zod-валидация):**
 - `POST /api/ai/classify` - Автоматическая классификация заявки
   - Определяет категорию, приоритет, требуемые навыки
   - Предлагает исполнителя
+  - Zod-схема `ClassificationSchema` с `.catch()` fallback'ами — невалидные поля получают безопасные значения вместо ошибок
 
 **Индексация:**
 - `GET /api/ai/indexer/health` - Статус индексера
 - `GET /api/ai/indexer/status` - Текущий статус индексации
 - `GET /api/ai/indexer/stats` - Статистика (legacy/KB/coverage)
-- `POST /api/ai/indexer/start` - Запуск полной индексации
+- `POST /api/ai/indexer/start` - Запуск полной индексации (body: `{ forceReindex?: boolean }` — переиндексация всех, включая уже обработанные)
 - `POST /api/ai/indexer/reindex/:requestId` - Переиндексация одной заявки
 
 **AI Помощник:**
@@ -3178,6 +3202,18 @@ CREATE INDEX ON knowledge_chunks USING GIN (search_vector);
 | `sla_risk` | Риск нарушения SLA |
 | `duplicate_suspected` | Подозрение на дублирование |
 | `trend_anomaly` | Аномалия в тренде заявок |
+
+**AI Feedback (обратная связь):**
+- `POST /api/ai/feedback` - Отправить feedback
+  - Body: `{ type: 'response'|'classification'|'search'|'assistance', entityId, rating: 'positive'|'negative', metadata? }`
+  - Upsert: один feedback на (user + type + entityId), повторный вызов обновляет рейтинг
+- `GET /api/ai/feedback/stats` - Статистика feedback
+  - Параметры: type?, entityId?, dateFrom?, dateTo?
+  - Возвращает: `{ totalPositive, totalNegative, satisfactionRate, byType }`
+- `GET /api/ai/feedback/entity/:entityId` - Feedback пользователя для entity
+  - Возвращает массив feedback-записей текущего пользователя
+- Implicit tracking: копирование/вставка AI-ответа автоматически создаёт positive feedback
+- Frontend: `<AiFeedbackButtons>` (ThumbsUp/ThumbsDown) в `AiAssistantTab`
 
 **Граф знаний (контекстное обогащение):**
 - `GET /api/ai/knowledge-graph/:entityId` - Построить граф связей для заявки
@@ -3293,6 +3329,26 @@ Frontend: SVG-визуализация с radial layout в `KnowledgeGraph.tsx`.
 - Поля: provider, model, operation, inputTokens, outputTokens, latencyMs, success, error
 - Доступно через API: `GET /api/ai/usage/stats`, `GET /api/ai/usage/logs`
 
+### Zod-валидация AI outputs
+
+LLM-ответы валидируются через Zod-схемы с `.catch()` fallback'ами:
+
+```typescript
+// ai/utils/ai-schemas.ts
+ClassificationSchema — category, priority, skills, confidence, reasoning
+SentimentSchema — label (satisfied/neutral/concerned/frustrated/urgent), score
+
+// ai/utils/validate-ai-output.ts
+validateAiOutput({ rawOutput, schema, retryFn?, maxRetries? })
+// 1. Извлекает JSON (в т.ч. из markdown code blocks)
+// 2. Валидирует через zod schema
+// 3. При ошибке: retry через retryFn или safe defaults через .catch()
+```
+
+**Используется в:**
+- `ClassifierService.parseClassificationResponse()` — `ClassificationSchema.parse()` с safeParse fallback
+- `AiAssistantService.analyzeSentiment()` — `SentimentSchema.parse()` для гарантированной структуры
+
 ### Планы на будущее
 
 **Индексация документов (TODO):**
@@ -3392,12 +3448,12 @@ interface OnboardingStore {
 - Рекомендации обучающих материалов на основе типичных ошибок
 - Интеграция с базой знаний для повышения квалификации
 
-**Улучшения RAG:**
+**Улучшения RAG (будущее):**
 - Автоматическая переиндексация при обновлении заявок
-- Кэширование embeddings
-- Batch processing для ускорения индексации
+- Cross-encoder reranker (замена алгоритмического на ML-based)
 - Fine-tuning модели на доменных данных
 - Мультимодальный поиск (текст + изображения)
+- A/B тестирование на основе feedback данных
 
 ## Сервисный отдел (Service Department)
 

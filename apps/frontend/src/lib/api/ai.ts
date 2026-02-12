@@ -191,4 +191,29 @@ export const aiApi = {
 
   getKnowledgeGraph: (entityId: string) =>
     apiClient.get<KnowledgeGraphResponse>(`/ai/knowledge-graph/${entityId}`).then((r) => r.data),
+
+  // ==================== Feedback ====================
+
+  submitFeedback: (data: {
+    type: string;
+    entityId?: string;
+    rating: string;
+    metadata?: Record<string, unknown>;
+  }) => apiClient.post('/ai/feedback', data).then((r) => r.data),
+
+  getFeedbackStats: (options?: { type?: string; days?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.type) params.append('type', options.type);
+    if (options?.days) params.append('days', String(options.days));
+    const query = params.toString();
+    return apiClient.get<{
+      totalPositive: number;
+      totalNegative: number;
+      byType: Record<string, { positive: number; negative: number }>;
+      satisfactionRate: number;
+    }>(`/ai/feedback/stats${query ? `?${query}` : ''}`).then((r) => r.data);
+  },
+
+  getEntityFeedback: (entityId: string) =>
+    apiClient.get<Array<{ id: string; type: string; rating: string; metadata: Record<string, unknown> }>>(`/ai/feedback/entity/${entityId}`).then((r) => r.data),
 };

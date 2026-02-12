@@ -22,6 +22,8 @@ import { RagIndexerService, IndexingStats } from './services/rag-indexer.service
 import { AiAssistantService } from './services/ai-assistant.service';
 import { AiUsageService, UsageStatsDto } from './services/ai-usage.service';
 import { AiNotificationService } from './services/ai-notification.service';
+import { AiFeedbackService } from './services/ai-feedback.service';
+import { AiFeedback, FeedbackType, FeedbackRating } from './entities/ai-feedback.entity';
 import { KnowledgeGraphService, KnowledgeGraphResponse } from './services/knowledge-graph.service';
 import { LegacyUrlService } from '../legacy/services/legacy-url.service';
 import {
@@ -52,6 +54,7 @@ export class AiController {
     private readonly aiNotificationService: AiNotificationService,
     private readonly knowledgeGraphService: KnowledgeGraphService,
     private readonly legacyUrlService: LegacyUrlService,
+    private readonly aiFeedbackService: AiFeedbackService,
   ) {}
 
   /**
@@ -337,7 +340,7 @@ export class AiController {
    */
   @Post('indexer/start')
   async startIndexing(
-    @Body() options: { batchSize?: number; maxRequests?: number },
+    @Body() options: { batchSize?: number; maxRequests?: number; forceReindex?: boolean },
     @CurrentUser() user: User,
   ): Promise<{ message: string; status: IndexingStats }> {
     if (!user?.id) {
@@ -358,6 +361,7 @@ export class AiController {
       const statsPromise = this.ragIndexerService.indexAll({
         batchSize: options.batchSize,
         maxRequests: options.maxRequests,
+        forceReindex: options.forceReindex,
       });
 
       // Возвращаем начальный статус сразу
@@ -859,5 +863,68 @@ export class AiController {
       }))
       .sort((a, b) => b.relevantCases - a.relevantCases)
       .slice(0, 5); // Топ-5 экспертов
+  }
+
+  // ==================== FEEDBACK ====================
+
+  /**
+   * Отправить feedback на AI-ответ
+   *
+   * POST /api/ai/feedback
+   */
+  @Post('feedback')
+  async submitFeedback(
+    @Body() body: { type: FeedbackType; entityId?: string; rating: FeedbackRating; metadata?: Record<string, unknown> },
+    @CurrentUser() user: User,
+  ): Promise<AiFeedback> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+
+    return this.aiFeedbackService.submitFeedback({
+      type: body.type,
+      entityId: body.entityId,
+      userId: user.id,
+      rating: body.rating,
+      metadata: body.metadata,
+    });
+  }
+
+  /**
+   * Статистика feedback
+   *
+   * GET /api/ai/feedback/stats
+   */
+  @Get('feedback/stats')
+  async getFeedbackStats(
+    @Query('type') type?: FeedbackType,
+    @Query('days') days?: string,
+  ): Promise<{
+    totalPositive: number;
+    totalNegative: number;
+    byType: Record<string, { positive: number; negative: number }>;
+    satisfactionRate: number;
+  }> {
+    return this.aiFeedbackService.getFeedbackStats({
+      type,
+      days: days ? parseInt(days, 10) : undefined,
+    });
+  }
+
+  /**
+   * Feedback пользователя для entity
+   *
+   * GET /api/ai/feedback/entity/:entityId
+   */
+  @Get('feedback/entity/:entityId')
+  async getEntityFeedback(
+    @Param('entityId') entityId: string,
+    @CurrentUser() user: User,
+  ): Promise<AiFeedback[]> {
+    if (!user?.id) {
+      throw new HttpException('Требуется авторизация', HttpStatus.UNAUTHORIZED);
+    }
+
+    return this.aiFeedbackService.getUserFeedbackForEntity(entityId, user.id);
   }
 }

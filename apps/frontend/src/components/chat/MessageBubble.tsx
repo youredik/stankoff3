@@ -2,12 +2,14 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Check, CheckCheck, Reply, Copy, Pencil, Trash2, Pin, SmilePlus } from 'lucide-react';
+import { Check, CheckCheck, Reply, Copy, Pencil, Trash2, Pin, SmilePlus, Sparkles } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { VoicePlayer } from './VoicePlayer';
 import type { ChatMessage, ChatMessageReaction } from '@/types';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
+
+const AI_BOT_EMAIL = 'ai-assistant@stankoff.ru';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -144,6 +146,7 @@ export function MessageBubble({
 
   if (message.type === 'system') return <SystemMessage message={message} />;
 
+  const isAiBot = message.author?.email === AI_BOT_EMAIL;
   const time = format(new Date(message.createdAt), 'HH:mm');
   const showAvatar = !isOwn && isLastInGroup;
   const showName = !isOwn && isFirstInGroup;
@@ -183,7 +186,13 @@ export function MessageBubble({
       {!isOwn && (
         <div className="w-8 flex-shrink-0 self-end mr-1.5">
           {showAvatar && message.author && (
-            <UserAvatar firstName={message.author.firstName} lastName={message.author.lastName} userId={message.authorId} size="sm" />
+            isAiBot ? (
+              <div className="w-7 h-7 bg-gradient-to-br from-primary-400 to-violet-500 rounded-full flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5 text-white" />
+              </div>
+            ) : (
+              <UserAvatar firstName={message.author.firstName} lastName={message.author.lastName} userId={message.authorId} size="sm" />
+            )
           )}
         </div>
       )}
@@ -196,12 +205,12 @@ export function MessageBubble({
           </div>
         )}
 
-        <div className={`relative px-3 py-1.5 after:content-[''] after:clear-both after:block ${isOwn ? `bg-[#EFFDDE] dark:bg-[#2B5278] ${ownRadius}` : `bg-white dark:bg-[#212121] ${otherRadius}`}`}>
+        <div className={`relative px-3 py-1.5 after:content-[''] after:clear-both after:block ${isOwn ? `bg-[#EFFDDE] dark:bg-[#2B5278] ${ownRadius}` : `${isAiBot ? 'bg-violet-50 dark:bg-violet-900/20' : 'bg-white dark:bg-[#212121]'} ${otherRadius}`}`}>
           {message.isPinned && <Pin data-testid="chat-message-pin-icon" className="absolute -top-1 -right-1 w-3 h-3 text-primary-500 rotate-45" />}
 
           {showName && message.author && (
-            <div className="text-xs font-medium text-primary-600 dark:text-primary-400 mb-0.5">
-              {message.author.firstName} {message.author.lastName}
+            <div className={`text-xs font-medium mb-0.5 ${isAiBot ? 'text-violet-600 dark:text-violet-400' : 'text-primary-600 dark:text-primary-400'}`}>
+              {isAiBot ? 'AI Ассистент' : `${message.author.firstName} ${message.author.lastName}`}
             </div>
           )}
 

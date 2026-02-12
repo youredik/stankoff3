@@ -10,14 +10,9 @@ import {
 } from '../prompts/classification.prompt';
 import { ClassifyRequestDto, ClassifyResponseDto } from '../dto/ai.dto';
 import { extractJson } from '../utils/extract-json';
+import { ClassificationSchema, ClassificationOutput } from '../utils/ai-schemas';
 
-interface ClassificationResult {
-  category: string;
-  priority: string;
-  skills: string[];
-  confidence: number;
-  reasoning: string;
-}
+type ClassificationResult = ClassificationOutput;
 
 @Injectable()
 export class ClassifierService {
@@ -202,27 +197,23 @@ export class ClassifierService {
   }
 
   /**
-   * Парсит JSON ответ от LLM
+   * Парсит JSON ответ от LLM через zod-схему с fallback defaults
    */
   private parseClassificationResponse(content: string): ClassificationResult {
     try {
       const parsed = JSON.parse(extractJson(content));
-
-      return {
-        category: parsed.category || 'other',
-        priority: parsed.priority || 'medium',
-        skills: Array.isArray(parsed.skills) ? parsed.skills : [],
-        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
-        reasoning: parsed.reasoning || '',
-      };
+      return ClassificationSchema.parse(parsed);
     } catch {
-      this.logger.warn(`Не удалось распарсить JSON: ${content}`);
+      this.logger.warn(`Не удалось распарсить JSON классификации: ${content}`);
+      // .catch() defaults из zod-схемы
+      const safe = ClassificationSchema.safeParse({});
+      if (safe.success) return safe.data;
       return {
         category: 'other',
         priority: 'medium',
         skills: [],
-        confidence: 0,
-        reasoning: 'Ошибка парсинга ответа',
+        confidence: 0.5,
+        reasoning: '',
       };
     }
   }

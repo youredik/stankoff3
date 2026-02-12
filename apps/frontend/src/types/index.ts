@@ -883,7 +883,7 @@ export interface DecisionTableStatistics {
 
 // ─── Chat / Messenger ──────────────────────────────────────
 
-export type ConversationType = 'direct' | 'group' | 'entity';
+export type ConversationType = 'direct' | 'group' | 'entity' | 'ai_assistant';
 export type MessageType = 'text' | 'voice' | 'system';
 export type ParticipantRole = 'owner' | 'admin' | 'member';
 

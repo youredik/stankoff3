@@ -17,6 +17,7 @@ interface ChatViewProps {
 export function ChatView({ conversationId }: ChatViewProps) {
   const { user } = useAuthStore();
   const {
+    conversations,
     messages,
     messagesLoading,
     hasMore,
@@ -35,6 +36,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const currentMessages = messages[conversationId] || [];
   const canLoadMore = hasMore[conversationId] || false;
   const pinned = pinnedMessages[conversationId] || [];
+  const isAiChat = conversations.find((c) => c.id === conversationId)?.type === 'ai_assistant';
 
   useEffect(() => {
     fetchMessages(conversationId);
@@ -143,6 +145,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         replyTo={replyToMessage}
         onCancelReply={() => setReplyTo(null)}
         conversationId={conversationId}
+        isAiChat={isAiChat}
       />
     </div>
   );

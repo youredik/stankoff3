@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ModuleRef } from '@nestjs/core';
 import { Camunda8 } from '@camunda8/sdk';
 import { EntityService } from '../entity/entity.service';
@@ -16,6 +16,7 @@ import { CreateEntityWorker } from './entity-links/create-entity.worker';
 import { IncidentService } from './incidents/incident.service';
 import { AiAssistantService } from '../ai/services/ai-assistant.service';
 import { ClassifierService } from '../ai/services/classifier.service';
+import { User } from '../user/user.entity';
 
 @Injectable()
 export class BpmnWorkersService implements OnModuleInit {
@@ -34,6 +35,7 @@ export class BpmnWorkersService implements OnModuleInit {
   private aiClassifierService?: any;
   private aiAssistantService?: any;
   private incidentService?: IncidentService;
+  private userRepository?: Repository<User>;
   private userTasksWorker?: UserTasksWorker;
   private createEntityWorker?: CreateEntityWorker;
 
@@ -88,6 +90,13 @@ export class BpmnWorkersService implements OnModuleInit {
       this.aiAssistantService = this.moduleRef.get(AiAssistantService, { strict: false });
     } catch {
       this.logger.warn('AiAssistantService not available for workers');
+    }
+
+    try {
+      const dataSource = this.moduleRef.get(DataSource, { strict: false });
+      this.userRepository = dataSource.getRepository(User);
+    } catch {
+      this.logger.warn('UserRepository not available for workers');
     }
 
     try {
@@ -445,12 +454,49 @@ export class BpmnWorkersService implements OnModuleInit {
             this.logger.log(
               `Entity ${entityId} classified: category=${classification?.category}, priority=${classification?.priority}`,
             );
+
+            // Intelligent Auto-Routing: при confidence >= 0.85 назначить эксперта
+            let autoAssigned = false;
+            let autoAssigneeId = '';
+            let autoAssigneeName = '';
+            const confidence = classification?.confidence || 0;
+
+            if (confidence >= 0.85 && this.aiAssistantService && this.entityService && this.userRepository) {
+              try {
+                const assistance = await this.aiAssistantService.getAssistance(entityId);
+                if (assistance?.suggestedExperts?.length > 0) {
+                  const topExpert = assistance.suggestedExperts[0];
+                  // Ищем User по имени эксперта
+                  const nameParts = topExpert.name.trim().split(/\s+/);
+                  if (nameParts.length >= 2) {
+                    const matchedUser = await this.userRepository.findOne({
+                      where: { lastName: nameParts[0], firstName: nameParts[1], isActive: true },
+                    });
+                    if (matchedUser) {
+                      await this.entityService.updateAssignee(entityId, matchedUser.id);
+                      autoAssigned = true;
+                      autoAssigneeId = matchedUser.id;
+                      autoAssigneeName = `${matchedUser.lastName} ${matchedUser.firstName}`;
+                      this.logger.log(
+                        `Auto-routed entity ${entityId} to ${autoAssigneeName} (confidence=${confidence})`,
+                      );
+                    }
+                  }
+                }
+              } catch (routingErr) {
+                this.logger.warn(`Auto-routing failed for ${entityId}: ${routingErr.message}`);
+              }
+            }
+
             await this.logElementExecution(job, 'success', startTime);
             return job.complete({
               classified: true,
               category: classification?.category || 'other',
               aiPriority: classification?.priority || 'medium',
-              confidence: classification?.confidence || 0,
+              confidence,
+              autoAssigned,
+              autoAssigneeId: autoAssigneeId || '',
+              autoAssigneeName: autoAssigneeName || '',
             });
           }
           this.logger.warn(
