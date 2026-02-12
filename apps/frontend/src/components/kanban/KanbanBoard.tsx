@@ -190,7 +190,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
   if (kanbanLoading && Object.keys(kanbanColumns).length === 0) {
     return (
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto flex-1 min-h-0">
         <SkeletonColumn />
         <SkeletonColumn />
         <SkeletonColumn />
@@ -200,9 +200,9 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   }
 
   return (
-    <div data-testid="kanban-board">
-      <div>
-        <div className="sticky top-0 z-10 -mx-6 px-6 pt-0 pb-4 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm">
+    <div data-testid="kanban-board" className="flex flex-col flex-1 min-h-0">
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="pb-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
@@ -273,7 +273,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         </div>
 
         {!canEditEntities && can('workspace:entity:read', workspaceId) && (
-          <div data-testid="kanban-view-mode-badge" className="mb-4 flex items-center gap-2 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+          <div data-testid="kanban-view-mode-badge" className="mb-4 flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">
             <Eye className="w-4 h-4" />
             <span className="text-sm">Режим просмотра — вы можете просматривать заявки, но не можете их редактировать</span>
           </div>
@@ -285,7 +285,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex overflow-x-auto pb-4">
+          <div className="flex overflow-x-auto flex-1 min-h-0">
             {columns.map((column) => {
               const colData = kanbanColumns[column.id] || {
                 items: [],

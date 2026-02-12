@@ -39,7 +39,7 @@ export function KanbanColumn({
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2.5">
           {color && (
             <div
@@ -59,7 +59,7 @@ export function KanbanColumn({
         ref={setNodeRef}
         data-testid="kanban-column"
         data-status={id}
-        className="space-y-3 min-h-[200px] flex-1"
+        className="space-y-3 flex-1 min-h-0 overflow-y-auto pb-4"
       >
         <SortableContext
           items={cards.map((c) => c.id)}

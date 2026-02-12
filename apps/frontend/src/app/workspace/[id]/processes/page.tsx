@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, AlertCircle, CheckCircle, FileCode, Play, BarChart3 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
 import { ToastContainer } from '@/components/ui/ToastContainer';
+import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ProcessList, ProcessInstanceList, TemplateSelector } from '@/components/bpmn';
 import { bpmnApi } from '@/lib/api/bpmn';
 import type { ProcessDefinition, ProcessInstance, BpmnHealthStatus } from '@/types';
@@ -48,14 +49,32 @@ const ProcessMiningDashboard = dynamic(
 );
 
 type Tab = 'definitions' | 'instances' | 'analytics';
+const VALID_TABS: Tab[] = ['definitions', 'instances', 'analytics'];
 type ViewMode = 'list' | 'edit' | 'detail';
 
-export default function ProcessesPage() {
+function ProcessesContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const workspaceId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<Tab>('definitions');
+  const initialTab = useMemo(() => {
+    const param = searchParams.get('tab');
+    return param && VALID_TABS.includes(param as Tab) ? param as Tab : 'definitions';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [activeTab, setActiveTabState] = useState<Tab>(initialTab);
+
+  const setActiveTab = useCallback((tab: Tab) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'definitions') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', tab);
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [definitions, setDefinitions] = useState<ProcessDefinition[]>([]);
   const [instances, setInstances] = useState<ProcessInstance[]>([]);
@@ -378,5 +397,15 @@ export default function ProcessesPage() {
 
       <ToastContainer />
     </div>
+  );
+}
+
+export default function ProcessesPage() {
+  return (
+    <AuthProvider>
+      <Suspense>
+        <ProcessesContent />
+      </Suspense>
+    </AuthProvider>
   );
 }

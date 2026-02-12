@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { TaskInbox } from '@/components/bpmn/tasks/TaskInbox';
@@ -12,6 +12,8 @@ import type { UserTask } from '@/types';
 
 function TasksContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') || undefined;
   const { user } = useAuthStore();
   const { fetchInboxCount } = useTaskStore();
   const [selectedTask, setSelectedTask] = useState<UserTask | null>(null);
@@ -44,7 +46,7 @@ function TasksContent() {
   return (
     <AppShell>
       <div className="max-w-4xl mx-auto">
-        <TaskInbox onTaskSelect={handleTaskSelect} showFilters />
+        <TaskInbox onTaskSelect={handleTaskSelect} showFilters initialTab={initialTab} />
       </div>
 
       {selectedTask && user && (
@@ -63,7 +65,9 @@ function TasksContent() {
 export default function TasksPage() {
   return (
     <AuthProvider>
-      <TasksContent />
+      <Suspense>
+        <TasksContent />
+      </Suspense>
     </AuthProvider>
   );
 }

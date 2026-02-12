@@ -57,6 +57,7 @@ interface EntityStore {
   setEntities: (entities: Entity[]) => void;
 
   // Mutations
+  updateTitle: (id: string, title: string) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
   updateAssignee: (id: string, assigneeId: string | null) => Promise<void>;
   updateLinkedEntities: (id: string, linkedEntityIds: string[]) => Promise<void>;
@@ -237,6 +238,48 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
       set({ users });
     } catch {
       // silent
+    }
+  },
+
+  updateTitle: async (id: string, title: string) => {
+    const { kanbanColumns, selectedEntity, tableItems } = get();
+    const prevColumns = { ...kanbanColumns };
+    const prevTableItems = tableItems;
+
+    // Optimistic update: kanbanColumns
+    const newColumns: Record<string, KanbanColumnState> = {};
+    for (const [status, col] of Object.entries(kanbanColumns)) {
+      newColumns[status] = {
+        ...col,
+        items: col.items.map((e) =>
+          e.id === id ? { ...e, title } : e,
+        ),
+      };
+    }
+
+    // Optimistic update: tableItems
+    const newTableItems = tableItems.map((e) =>
+      e.id === id ? { ...e, title } : e,
+    );
+
+    set({
+      kanbanColumns: newColumns,
+      entities: flattenColumns(newColumns),
+      tableItems: newTableItems,
+    });
+    if (selectedEntity?.id === id) {
+      set({ selectedEntity: { ...selectedEntity, title } });
+    }
+
+    try {
+      await entitiesApi.update(id, { title } as any);
+    } catch {
+      set({
+        kanbanColumns: prevColumns,
+        entities: flattenColumns(prevColumns),
+        tableItems: prevTableItems,
+      });
+      if (selectedEntity?.id === id) set({ selectedEntity });
     }
   },
 

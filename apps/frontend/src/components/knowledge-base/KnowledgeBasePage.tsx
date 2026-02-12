@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { BookOpen, FileText, HelpCircle, BarChart3, Plus } from 'lucide-react';
 import { useKnowledgeBaseStore } from '@/store/useKnowledgeBaseStore';
 import { KnowledgeBaseList } from './KnowledgeBaseList';
@@ -9,9 +9,30 @@ import { FaqEditorDialog } from './FaqEditorDialog';
 import { KnowledgeBaseStatsPanel } from './KnowledgeBaseStatsPanel';
 
 type Tab = 'documents' | 'faq' | 'stats';
+const VALID_TABS: Tab[] = ['documents', 'faq', 'stats'];
 
-export function KnowledgeBasePage() {
-  const [activeTab, setActiveTab] = useState<Tab>('documents');
+interface KnowledgeBasePageProps {
+  initialTab?: string;
+}
+
+export function KnowledgeBasePage({ initialTab }: KnowledgeBasePageProps) {
+  const resolvedInitialTab = useMemo(() =>
+    initialTab && VALID_TABS.includes(initialTab as Tab) ? initialTab as Tab : 'documents',
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [activeTab, setActiveTabRaw] = useState<Tab>(resolvedInitialTab);
+
+  const setActiveTab = useCallback((tab: Tab) => {
+    setActiveTabRaw(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'documents') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', tab);
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showFaqDialog, setShowFaqDialog] = useState(false);
 
@@ -33,7 +54,7 @@ export function KnowledgeBasePage() {
 
   useEffect(() => {
     fetchCategories();
-    handleTabChange('documents');
+    handleTabChange(resolvedInitialTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

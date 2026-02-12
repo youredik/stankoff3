@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/react';
 import { X, MessageSquare, Clock, Paperclip, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
@@ -176,6 +176,7 @@ export function EntityDetailPanel() {
     selectedEntity,
     comments,
     users,
+    updateTitle,
     updateStatus,
     updateAssignee,
     updateLinkedEntities,
@@ -206,6 +207,40 @@ export function EntityDetailPanel() {
   const [loadingProcesses, setLoadingProcesses] = useState(false);
   const [assigneeRecommendations, setAssigneeRecommendations] = useState<AssigneeRecommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTitleDoubleClick = useCallback(() => {
+    if (!canEditEntity || !selectedEntity) return;
+    setTitleDraft(selectedEntity.title);
+    setEditingTitle(true);
+  }, [canEditEntity, selectedEntity]);
+
+  const handleTitleSave = useCallback(() => {
+    if (!selectedEntity) return;
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== selectedEntity.title) {
+      updateTitle(selectedEntity.id, trimmed);
+    }
+    setEditingTitle(false);
+  }, [selectedEntity, titleDraft, updateTitle]);
+
+  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      setEditingTitle(false);
+    }
+  }, [handleTitleSave]);
+
+  useEffect(() => {
+    if (editingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [editingTitle]);
 
   // Get status options from workspace
   const statuses = useMemo(() => {
@@ -388,14 +423,32 @@ export function EntityDetailPanel() {
             {/* Left column: title, description, custom fields */}
             <div className="flex-1 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
               <div className="p-6">
-                <h2 id="entity-detail-title" data-testid="entity-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                  {selectedEntity.title}
-                  {aiSentiment && (
-                    <span title={`Настроение: ${sentimentLabels[aiSentiment.label] || aiSentiment.label}`} className="text-lg cursor-default">
-                      {aiSentiment.emoji}
-                    </span>
-                  )}
-                </h2>
+                {editingTitle ? (
+                  <input
+                    ref={titleInputRef}
+                    data-testid="entity-title-input"
+                    className="text-xl font-semibold text-gray-900 dark:text-gray-100 bg-transparent border-b-2 border-primary-500 outline-none w-full py-0.5"
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={handleTitleKeyDown}
+                  />
+                ) : (
+                  <h2
+                    id="entity-detail-title"
+                    data-testid="entity-title"
+                    className={`text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2${canEditEntity ? ' cursor-pointer hover:text-primary-400 transition-colors' : ''}`}
+                    onDoubleClick={handleTitleDoubleClick}
+                    title={canEditEntity ? 'Двойной клик для редактирования' : undefined}
+                  >
+                    {selectedEntity.title}
+                    {aiSentiment && (
+                      <span title={`Настроение: ${sentimentLabels[aiSentiment.label] || aiSentiment.label}`} className="text-lg cursor-default">
+                        {aiSentiment.emoji}
+                      </span>
+                    )}
+                  </h2>
+                )}
 
                 {/* Description from data */}
                 {selectedEntity.data?.description && (

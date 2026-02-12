@@ -42,6 +42,11 @@ export class DevAuthController {
     const users = await this.userService.findAll();
     return users
       .filter((u) => u.isActive)
+      .sort((a, b) => {
+        if (a.email === 'youredik@gmail.com') return -1;
+        if (b.email === 'youredik@gmail.com') return 1;
+        return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'ru');
+      })
       .slice(0, 100)
       .map((u) => ({
         id: u.id,

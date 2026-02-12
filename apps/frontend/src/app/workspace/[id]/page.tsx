@@ -38,19 +38,9 @@ function WorkspaceContent() {
   }
 
   return (
-    <AppShell
-      mainStyle={view === 'kanban' ? {
-        backgroundImage: 'url(/kanban-bg.svg)',
-        backgroundSize: '200px 200px',
-        backgroundRepeat: 'repeat',
-      } : undefined}
-    >
+    <AppShell>
       {view === 'kanban' && (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-50/60 via-gray-100/50 to-gray-50/60 dark:from-gray-900/70 dark:via-gray-800/60 dark:to-gray-900/70 pointer-events-none" />
-      )}
-
-      {view === 'kanban' && (
-        <div className="relative p-6">
+        <div className="relative p-6 h-full flex flex-col">
           <KanbanBoard workspaceId={workspaceId} />
         </div>
       )}

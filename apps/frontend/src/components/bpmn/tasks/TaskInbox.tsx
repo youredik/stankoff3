@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Inbox,
   Filter,
@@ -22,6 +22,7 @@ interface TaskInboxProps {
   workspaceId?: string;
   onTaskSelect?: (task: UserTask) => void;
   showFilters?: boolean;
+  initialTab?: string;
 }
 
 type TabType = 'my' | 'available' | 'all';
@@ -49,11 +50,19 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: 'createdAt', label: 'По дате создания' },
 ];
 
+const VALID_TABS: TabType[] = ['my', 'available', 'all'];
+
 export function TaskInbox({
   workspaceId,
   onTaskSelect,
   showFilters = true,
+  initialTab,
 }: TaskInboxProps) {
+  const resolvedInitialTab = useMemo(() =>
+    initialTab && VALID_TABS.includes(initialTab as TabType) ? initialTab as TabType : 'my',
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
   const [tasks, setTasks] = useState<UserTask[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -61,7 +70,18 @@ export function TaskInbox({
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('my');
+  const [activeTab, setActiveTabState] = useState<TabType>(resolvedInitialTab);
+
+  const setActiveTab = useCallback((tab: TabType) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'my') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', tab);
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
   const [statusFilter, setStatusFilter] = useState<UserTaskStatus | ''>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('priority');

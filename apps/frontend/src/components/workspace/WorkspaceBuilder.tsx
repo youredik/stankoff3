@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -40,10 +40,13 @@ const WORKSPACE_ICONS = ['📋', '📁', '🔧', '💼', '📊', '🎯', '📝',
 
 interface WorkspaceBuilderProps {
   workspaceId: string;
+  initialTab?: string;
   onBack: () => void;
 }
 
-export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps) {
+const VALID_TABS: TabType[] = ['structure', 'members', 'automation', 'sla', 'dmn', 'forms'];
+
+export function WorkspaceBuilder({ workspaceId, initialTab, onBack }: WorkspaceBuilderProps) {
   const {
     currentWorkspace,
     workspaces,
@@ -72,8 +75,24 @@ export function WorkspaceBuilder({ workspaceId, onBack }: WorkspaceBuilderProps)
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('structure');
+  const resolvedInitialTab = useMemo(() =>
+    initialTab && VALID_TABS.includes(initialTab as TabType) ? initialTab as TabType : 'structure',
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [activeTab, setActiveTabState] = useState<TabType>(resolvedInitialTab);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  const setActiveTab = useCallback((tab: TabType) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'structure') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', tab);
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
 
   const { user } = useAuthStore();
   const permissionsLoaded = usePermissionStore((s) => s.loaded);

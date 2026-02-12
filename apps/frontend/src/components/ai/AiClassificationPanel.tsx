@@ -255,16 +255,13 @@ export function AiClassificationPanel({
             </div>
           )}
 
-          {/* Провайдер */}
-          <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
-            <span>{classification.provider} / {classification.model}</span>
-            {classification.applied && (
-              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                <Check className="w-3 h-3" />
-                Применено
-              </span>
-            )}
-          </div>
+          {/* Статус */}
+          {classification.applied && (
+            <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+              <Check className="w-3 h-3 shrink-0" />
+              <span>Применено</span>
+            </div>
+          )}
 
           {/* Действия */}
           {!readOnly && (
