@@ -25,6 +25,7 @@ import { KnowledgeArticle } from '../modules/knowledge-base/entities/knowledge-a
 // Modules (forwardRef для избежания circular dependencies)
 import { AuthModule } from '../modules/auth/auth.module';
 import { BpmnModule } from '../modules/bpmn/bpmn.module';
+import { LegacyModule } from '../modules/legacy/legacy.module';
 
 // Seed services
 import { SeedCleanupService } from './seed-cleanup.service';
@@ -37,6 +38,8 @@ import { SeedItDepartmentService } from './seed-it-department.service';
 import { SeedBpmnService } from './seed-bpmn.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
 import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
+import { SeedUserGroupsService } from './seed-user-groups.service';
+import { SeedSystemWorkspacesService } from './seed-system-workspaces.service';
 import { SeedOrchestratorService } from './seed-orchestrator.service';
 
 @Module({
@@ -64,6 +67,7 @@ import { SeedOrchestratorService } from './seed-orchestrator.service';
     ]),
     forwardRef(() => AuthModule),
     forwardRef(() => BpmnModule),
+    forwardRef(() => LegacyModule),
   ],
   providers: [
     SeedCleanupService,
@@ -76,6 +80,8 @@ import { SeedOrchestratorService } from './seed-orchestrator.service';
     SeedBpmnService,
     SeedSlaDmnService,
     SeedKnowledgeBaseService,
+    SeedUserGroupsService,
+    SeedSystemWorkspacesService,
     SeedOrchestratorService,
   ],
 })

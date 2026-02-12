@@ -1,4 +1,4 @@
-import { IsString, IsUUID, IsOptional, IsArray, IsBoolean, IsEnum, ValidateNested, IsNumber } from 'class-validator';
+import { IsString, IsUUID, IsOptional, IsArray, IsBoolean, IsEnum, ValidateNested, IsNumber, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 import { HitPolicy, InputColumn, OutputColumn, DecisionRule } from '../entities/decision-table.entity';
 
@@ -70,6 +70,7 @@ export class EvaluateDecisionDto {
   @IsUUID()
   targetId?: string;
 
+  @IsObject()
   inputData: Record<string, unknown>;
 
   @IsOptional()

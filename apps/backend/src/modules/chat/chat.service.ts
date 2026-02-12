@@ -415,12 +415,14 @@ export class ChatService implements OnModuleInit {
   // ─── Search ──────────────────────────────────────────────
 
   async searchMessages(userId: string, query: string) {
+    if (!query || !query.trim()) return [];
+
     const participantConvIds = await this.participantRepo
       .createQueryBuilder('cp')
-      .select('cp.conversationId')
+      .select('cp.conversationId', 'conversationId')
       .where('cp.userId = :userId AND cp.leftAt IS NULL', { userId })
       .getRawMany()
-      .then((rows) => rows.map((r) => r.cp_conversationId));
+      .then((rows) => rows.map((r) => r.conversationId));
 
     if (participantConvIds.length === 0) return [];
 
@@ -428,10 +430,11 @@ export class ChatService implements OnModuleInit {
       .createQueryBuilder('m')
       .leftJoinAndSelect('m.author', 'a')
       .leftJoinAndSelect('m.conversation', 'c')
+      .addSelect(`ts_rank(m."searchVector", plainto_tsquery('russian', :query))`, 'rank')
       .where('m.conversationId IN (:...convIds)', { convIds: participantConvIds })
       .andWhere('m.isDeleted = false')
       .andWhere(`m."searchVector" @@ plainto_tsquery('russian', :query)`, { query })
-      .orderBy(`ts_rank(m."searchVector", plainto_tsquery('russian', :query))`, 'DESC')
+      .orderBy('rank', 'DESC')
       .take(50)
       .getMany();
 

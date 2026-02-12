@@ -14,6 +14,7 @@ import { SeedBpmnService } from './seed-bpmn.service';
 import { SeedRbacService } from './seed-rbac.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
 import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
+import { SeedUserGroupsService } from './seed-user-groups.service';
 import { Workspace } from '../modules/workspace/workspace.entity';
 
 describe('SeedOrchestratorService', () => {
@@ -30,6 +31,7 @@ describe('SeedOrchestratorService', () => {
   let seedBpmn: jest.Mocked<SeedBpmnService>;
   let seedSlaDmn: jest.Mocked<SeedSlaDmnService>;
   let seedKnowledgeBase: jest.Mocked<SeedKnowledgeBaseService>;
+  let seedUserGroups: jest.Mocked<SeedUserGroupsService>;
 
   const originalEnv = process.env;
 
@@ -127,6 +129,10 @@ describe('SeedOrchestratorService', () => {
           provide: SeedKnowledgeBaseService,
           useValue: { createAll: jest.fn() },
         },
+        {
+          provide: SeedUserGroupsService,
+          useValue: { createAll: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -143,6 +149,7 @@ describe('SeedOrchestratorService', () => {
     seedBpmn = module.get(SeedBpmnService);
     seedSlaDmn = module.get(SeedSlaDmnService);
     seedKnowledgeBase = module.get(SeedKnowledgeBaseService);
+    seedUserGroups = module.get(SeedUserGroupsService);
   });
 
   afterEach(() => {
@@ -216,6 +223,7 @@ describe('SeedOrchestratorService', () => {
       seedBpmn.createAll.mockImplementation(async () => { callOrder.push('bpmn'); });
       seedSlaDmn.createAll.mockImplementation(async () => { callOrder.push('slaDmn'); });
       seedKnowledgeBase.createAll.mockImplementation(async () => { callOrder.push('knowledgeBase'); });
+      seedUserGroups.createAll.mockImplementation(async () => { callOrder.push('userGroups'); });
 
       await service.onModuleInit();
 
@@ -228,6 +236,7 @@ describe('SeedOrchestratorService', () => {
         'rbac-membership',
         'entities',
         'itDept',
+        'userGroups',
         'bpmn',
         'slaDmn',
         'knowledgeBase',

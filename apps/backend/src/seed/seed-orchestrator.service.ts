@@ -13,6 +13,8 @@ import { SeedRbacService } from './seed-rbac.service';
 import { SeedBpmnService } from './seed-bpmn.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
 import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
+import { SeedUserGroupsService } from './seed-user-groups.service';
+import { SeedSystemWorkspacesService } from './seed-system-workspaces.service';
 
 @Injectable()
 export class SeedOrchestratorService implements OnModuleInit {
@@ -32,6 +34,8 @@ export class SeedOrchestratorService implements OnModuleInit {
     private readonly seedBpmn: SeedBpmnService,
     private readonly seedSlaDmn: SeedSlaDmnService,
     private readonly seedKnowledgeBase: SeedKnowledgeBaseService,
+    private readonly seedUserGroups: SeedUserGroupsService,
+    private readonly seedSystemWorkspaces: SeedSystemWorkspacesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -100,6 +104,22 @@ export class SeedOrchestratorService implements OnModuleInit {
       return;
     }
     const { workspace: itWs, entities: itEntities } = await this.seedItDept.createAll(users, itSection);
+
+    // 9.1 Создание групп пользователей для BPMN candidateGroups
+    this.logger.log('Создание групп пользователей...');
+    try {
+      await this.seedUserGroups.createAll(workspaces, itWs, users);
+    } catch (e) {
+      this.logger.warn(`Ошибка создания групп (не критично): ${e.message}`);
+    }
+
+    // 9.2 Системные workspace (справочники: контрагенты, контакты, товары)
+    this.logger.log('Создание системных workspace...');
+    try {
+      await this.seedSystemWorkspaces.createAll(sections, users);
+    } catch (e) {
+      this.logger.warn(`Ошибка системных workspace (не критично): ${e.message}`);
+    }
 
     // 10. BPMN определения + deploy + триггеры + запуск процессов
     if (zeebeAvailable) {

@@ -10,6 +10,8 @@ export class UserController {
 
   @Get()
   findAll() {
+    // TODO: Для не-админов фильтровать чувствительные поля (password hash, role_id)
+    // Сейчас все внутренние сотрудники — допустимо без ограничений
     return this.userService.findAll();
   }
 

@@ -8,7 +8,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, DataSource } from 'typeorm';
+import { Repository, In, DataSource, Brackets } from 'typeorm';
 import {
   UserTask,
   UserTaskStatus,
@@ -175,10 +175,19 @@ export class UserTasksService {
     // Task is in inbox if:
     // 1. Assigned to user, OR
     // 2. User is in candidateUsers array, OR
-    // 3. User is member of a candidate group
+    // 3. User is member of a candidate group, OR
+    // 4. No candidates specified (open task available to all workspace members)
     qb.andWhere(
-      '(task.assigneeId = :userId OR :userId = ANY(task.candidateUsers) OR task.candidateGroups && ARRAY[:...groups]::text[])',
-      { userId, groups: groupNames.length > 0 ? groupNames : ['__none__'] },
+      new Brackets((sub) => {
+        sub.where('task.assigneeId = :userId', { userId })
+          .orWhere(':userId = ANY(task.candidateUsers)', { userId })
+          .orWhere('task.candidateGroups && ARRAY[:...groups]::text[]', {
+            groups: groupNames.length > 0 ? groupNames : ['__none__'],
+          })
+          .orWhere(
+            '(COALESCE(array_length(task.candidateGroups, 1), 0) = 0 AND COALESCE(array_length(task.candidateUsers, 1), 0) = 0 AND task.assigneeId IS NULL)',
+          );
+      }),
     );
 
     // Sorting
