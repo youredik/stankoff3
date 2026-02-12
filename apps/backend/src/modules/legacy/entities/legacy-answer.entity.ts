@@ -27,6 +27,12 @@ export class LegacyAnswer {
   @Column({ name: 'add_date', type: 'datetime', nullable: true })
   createdAt: Date;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  transport: string;
+
+  @Column({ type: 'int', nullable: true })
+  rating: number;
+
   /**
    * Длина текста ответа
    */

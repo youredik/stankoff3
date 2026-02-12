@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { RagIndexerService } from './rag-indexer.service';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { LegacyService } from '../../legacy/services/legacy.service';
+import { LegacyUrlService } from '../../legacy/services/legacy-url.service';
 import { LegacyRequest, LegacyAnswer } from '../../legacy/entities';
 
 describe('RagIndexerService', () => {
@@ -18,10 +19,14 @@ describe('RagIndexerService', () => {
     managerId: 50,
     closed: 1, // закрытая
     type: 'technical',
+    hash: 'testhash1abcdefghijklmnopqrst',
     createdAt: new Date('2024-01-15T09:00:00'),
     updatedAt: new Date('2024-01-16T15:00:00'),
     answerDate: new Date('2024-01-15T11:00:00'),
     firstReactionTime: null,
+    transportType: 'email',
+    origins: 'site',
+    comments: 'Внутренняя заметка менеджера: клиент VIP',
     get isClosed() { return this.closed === 1; },
   } as unknown as LegacyRequest;
 
@@ -33,6 +38,8 @@ describe('RagIndexerService', () => {
       isClient: 1,
       text: 'Первый ответ от клиента',
       createdAt: new Date('2024-01-15T10:00:00'),
+      transport: 'email',
+      rating: null as unknown as number,
     } as LegacyAnswer,
     {
       id: 2,
@@ -41,6 +48,8 @@ describe('RagIndexerService', () => {
       isClient: 0,
       text: 'Ответ специалиста с решением проблемы',
       createdAt: new Date('2024-01-15T11:00:00'),
+      transport: 'email',
+      rating: 5,
     } as LegacyAnswer,
     {
       id: 3,
@@ -49,6 +58,8 @@ describe('RagIndexerService', () => {
       isClient: 1,
       text: 'Спасибо, проблема решена!',
       createdAt: new Date('2024-01-15T12:00:00'),
+      transport: 'whatsapp',
+      rating: 4,
     } as LegacyAnswer,
   ];
 
@@ -116,6 +127,18 @@ describe('RagIndexerService', () => {
       query: jest.fn().mockResolvedValue([]),
     };
 
+    const mockLegacyUrlService = {
+      getRequestUrl: jest.fn((hash?: string | null, id?: number) =>
+        hash ? `https://www.stankoff.ru/request/view/${hash}` : `https://www.stankoff.ru/request/list`,
+      ),
+      getCounterpartyUrl: jest.fn((id: number) =>
+        `https://www.stankoff.ru/commerce/counterparty/view/${id}`,
+      ),
+      getDealUrl: jest.fn((id: number) =>
+        `https://www.stankoff.ru/deal/view/${id}`,
+      ),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RagIndexerService,
@@ -126,6 +149,10 @@ describe('RagIndexerService', () => {
         {
           provide: LegacyService,
           useValue: mockLegacyService,
+        },
+        {
+          provide: LegacyUrlService,
+          useValue: mockLegacyUrlService,
         },
         {
           provide: DataSource,
@@ -215,6 +242,9 @@ describe('RagIndexerService', () => {
       const shortRequest = {
         ...mockRequest,
         subject: '',
+        comments: null,
+        transportType: null,
+        origins: null,
       } as unknown as LegacyRequest;
 
       const chunksCreated = await service.indexRequest(shortRequest, []);
@@ -235,7 +265,8 @@ describe('RagIndexerService', () => {
             managerId: 50,
             customerId: 100,
             answersCount: 3,
-            legacyUrl: 'https://www.stankoff.ru/crm/request/1',
+            requestHash: 'testhash1abcdefghijklmnopqrst',
+            legacyUrl: 'https://www.stankoff.ru/request/view/testhash1abcdefghijklmnopqrst',
           }),
         }),
       );
@@ -598,7 +629,7 @@ describe('RagIndexerService', () => {
             counterpartyId: 200,
             counterpartyName: 'ООО Рога и Копыта',
             counterpartyInn: '7701234567',
-            counterpartyUrl: 'https://www.stankoff.ru/crm/counterparty/200',
+            counterpartyUrl: 'https://www.stankoff.ru/commerce/counterparty/view/200',
           }),
         }),
       );
@@ -616,7 +647,7 @@ describe('RagIndexerService', () => {
                 id: 500,
                 name: 'Поставка оборудования',
                 sum: 1500000,
-                url: 'https://www.stankoff.ru/crm/deal/500',
+                url: 'https://www.stankoff.ru/deal/view/500',
               }),
             ]),
           }),
@@ -853,6 +884,95 @@ describe('RagIndexerService', () => {
       expect(knowledgeBase.addChunk).toHaveBeenCalled();
       const call = knowledgeBase.addChunk.mock.calls[0][0];
       expect(call?.metadata?.resolutionTimeHours).toBeUndefined();
+    });
+
+    it('должен включить transportType и origins в аналитику', async () => {
+      await service.indexRequest(mockRequest, mockAnswers);
+
+      expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            transportType: 'email',
+            origins: 'site',
+          }),
+        }),
+      );
+    });
+
+    it('должен собрать уникальные каналы ответов', async () => {
+      await service.indexRequest(mockRequest, mockAnswers);
+
+      expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            transportChannels: expect.arrayContaining(['email', 'whatsapp']),
+          }),
+        }),
+      );
+    });
+
+    it('должен рассчитать средний рейтинг ответов', async () => {
+      await service.indexRequest(mockRequest, mockAnswers);
+
+      // rating 5 и 4, null пропускается → среднее = 4.5
+      expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            averageRating: 4.5,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('enriched content formatting', () => {
+    it('должен включить канал обращения в текст', async () => {
+      await service.indexRequest(mockRequest, mockAnswers);
+
+      expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('Канал: email'),
+        }),
+      );
+    });
+
+    it('должен включить канал ответа в формат переписки', async () => {
+      await service.indexRequest(mockRequest, mockAnswers);
+
+      expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('(email)'),
+        }),
+      );
+    });
+
+    it('должен включить внутренние заметки менеджера', async () => {
+      await service.indexRequest(mockRequest, mockAnswers);
+
+      expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('Внутренние заметки'),
+        }),
+      );
+      expect(knowledgeBase.addChunk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('клиент VIP'),
+        }),
+      );
+    });
+
+    it('не должен добавлять секцию заметок если comments пустой', async () => {
+      const requestNoComments = {
+        ...mockRequest,
+        comments: null,
+      } as unknown as LegacyRequest;
+
+      await service.indexRequest(requestNoComments, mockAnswers);
+
+      const calls = knowledgeBase.addChunk.mock.calls;
+      for (const call of calls) {
+        expect(call[0]?.content).not.toContain('Внутренние заметки');
+      }
     });
   });
 });

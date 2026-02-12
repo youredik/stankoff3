@@ -22,6 +22,9 @@ export class LegacyRequest {
   @Column({ type: 'varchar', length: 50, nullable: true })
   type: string;
 
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  hash: string;
+
   @Column({ type: 'tinyint', default: 0 })
   closed: number;
 
@@ -36,6 +39,15 @@ export class LegacyRequest {
 
   @Column({ name: 'first_reaction_time', type: 'int', nullable: true })
   firstReactionTime: number;
+
+  @Column({ name: 'transport_type', type: 'varchar', length: 20, nullable: true })
+  transportType: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  origins: string;
+
+  @Column({ type: 'mediumtext', nullable: true })
+  comments: string;
 
   /**
    * Закрыто ли обращение

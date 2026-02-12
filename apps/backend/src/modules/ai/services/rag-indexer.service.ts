@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { LegacyService } from '../../legacy/services/legacy.service';
+import { LegacyUrlService } from '../../legacy/services/legacy-url.service';
 import { LegacyRequest, LegacyAnswer } from '../../legacy/entities';
 
 /**
@@ -93,6 +94,7 @@ export class RagIndexerService implements OnModuleInit {
   constructor(
     private readonly knowledgeBase: KnowledgeBaseService,
     private readonly legacyService: LegacyService,
+    private readonly legacyUrlService: LegacyUrlService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -431,9 +433,10 @@ export class RagIndexerService implements OnModuleInit {
             chunkIndex: i,
             totalChunks: chunks.length,
             answersCount: answers.length,
-            chunkVersion: 2,
+            chunkVersion: 3,
             // Ссылка на legacy систему
-            legacyUrl: `https://www.stankoff.ru/crm/request/${request.id}`,
+            requestHash: request.hash || null,
+            legacyUrl: this.legacyUrlService.getRequestUrl(request.hash, request.id),
             // Информация о сотрудниках (для подсказок AI)
             ...employeeInfo,
             // Информация о клиенте и контрагенте
@@ -538,7 +541,7 @@ export class RagIndexerService implements OnModuleInit {
           result.counterpartyId = customerInfo.counterparty.id;
           result.counterpartyName = customerInfo.counterparty.name;
           result.counterpartyInn = customerInfo.counterparty.inn;
-          result.counterpartyUrl = `https://www.stankoff.ru/crm/counterparty/${customerInfo.counterparty.id}`;
+          result.counterpartyUrl = this.legacyUrlService.getCounterpartyUrl(customerInfo.counterparty.id);
 
           // Получаем связанные сделки контрагента
           const deals = await this.legacyService.getDealsByCounterpartyId(customerInfo.counterparty.id);
@@ -548,7 +551,7 @@ export class RagIndexerService implements OnModuleInit {
               name: deal.name,
               sum: deal.sum,
               isClosed: deal.isClosed,
-              url: `https://www.stankoff.ru/crm/deal/${deal.id}`,
+              url: this.legacyUrlService.getDealUrl(deal.id),
             }));
           }
         }
@@ -568,6 +571,10 @@ export class RagIndexerService implements OnModuleInit {
     answers: LegacyAnswer[],
   ): {
     requestType?: string;
+    transportType?: string;
+    origins?: string;
+    transportChannels?: string[];
+    averageRating?: number;
     resolutionTimeHours?: number;
     resolutionTimeDays?: number;
     firstResponseTimeHours?: number;
@@ -576,6 +583,10 @@ export class RagIndexerService implements OnModuleInit {
   } {
     const result: {
       requestType?: string;
+      transportType?: string;
+      origins?: string;
+      transportChannels?: string[];
+      averageRating?: number;
       resolutionTimeHours?: number;
       resolutionTimeDays?: number;
       firstResponseTimeHours?: number;
@@ -583,9 +594,26 @@ export class RagIndexerService implements OnModuleInit {
       clientResponseCount: number;
     } = {
       requestType: request.type || undefined,
+      transportType: request.transportType || undefined,
+      origins: request.origins || undefined,
       responseCount: answers.length,
       clientResponseCount: answers.filter(a => a.isClient === 1).length,
     };
+
+    // Каналы ответов (уникальные)
+    const channels = new Set<string>();
+    for (const answer of answers) {
+      if (answer.transport) channels.add(answer.transport);
+    }
+    if (channels.size > 0) {
+      result.transportChannels = Array.from(channels);
+    }
+
+    // Средний рейтинг ответов
+    const ratings = answers.filter(a => a.rating != null && a.rating > 0).map(a => a.rating);
+    if (ratings.length > 0) {
+      result.averageRating = Math.round(ratings.reduce((sum, r) => sum + r, 0) / ratings.length * 10) / 10;
+    }
 
     // Расчёт времени решения (используем updatedAt как приблизительную дату закрытия)
     const closedAt = request.isClosed ? (request.updatedAt || request.createdAt) : null;
@@ -779,6 +807,12 @@ export class RagIndexerService implements OnModuleInit {
       parts.push(`Тема: ${request.subject}`);
     }
 
+    // Канал обращения
+    if (request.transportType || request.origins) {
+      const channel = request.transportType || request.origins;
+      parts.push(`Канал: ${channel}`);
+    }
+
     // Ответы (диалог)
     if (answers.length > 0) {
       parts.push('\n--- Переписка ---');
@@ -789,11 +823,18 @@ export class RagIndexerService implements OnModuleInit {
           const date = answer.createdAt
             ? answer.createdAt.toLocaleDateString('ru-RU')
             : '';
+          const channel = answer.transport ? ` (${answer.transport})` : '';
 
-          parts.push(`\n[${sender}${date ? ` от ${date}` : ''}]:`);
+          parts.push(`\n[${sender}${channel}${date ? ` от ${date}` : ''}]:`);
           parts.push(this.cleanHtml(answer.text));
         }
       }
+    }
+
+    // Внутренние заметки менеджера
+    if (request.comments && request.comments.trim()) {
+      parts.push('\n--- Внутренние заметки ---');
+      parts.push(this.cleanHtml(request.comments));
     }
 
     return parts.join('\n');
