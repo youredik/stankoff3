@@ -135,6 +135,21 @@ export function Sidebar() {
     fetchInboxCount();
   }, [fetchInboxCount]);
 
+  // Закрытие выпадающих меню при клике снаружи
+  useEffect(() => {
+    if (!menuOpen && !sectionMenuOpen) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-dropdown-menu]')) return;
+      setMenuOpen(null);
+      setSectionMenuOpen(null);
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [menuOpen, sectionMenuOpen]);
+
   const handleCreateWorkspace = async (sectionId?: string) => {
     setCreating(true);
     try {
@@ -285,12 +300,7 @@ export function Sidebar() {
             </button>
 
             {menuOpen === workspace.id && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setMenuOpen(null)}
-                />
-                <div role="menu" className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-48">
+                <div data-dropdown-menu role="menu" className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-48">
                   <button
                     onClick={() => handleEditWorkspace(workspace.id)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
@@ -362,7 +372,6 @@ export function Sidebar() {
                     <span>Удалить</span>
                   </button>
                 </div>
-              </>
             )}
           </div>
         )}
@@ -440,14 +449,14 @@ export function Sidebar() {
               </button>
 
               {sectionMenuOpen === section.id && (
-                  <div className="absolute right-0 top-full mt-1 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-44">
+                  <div data-dropdown-menu className="absolute right-0 top-full mt-1 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg py-1 w-44">
                     <button
                       onClick={() => {
                         setSectionMenuOpen(null);
                         setEditingSectionId(section.id);
                         setEditingSectionName(section.name);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 cursor-pointer"
                     >
                       <Pencil className="w-4 h-4 text-gray-400" />
                       <span>Переименовать</span>
@@ -457,7 +466,7 @@ export function Sidebar() {
                         setSectionMenuOpen(null);
                         setSectionMembersSection(section);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 cursor-pointer"
                     >
                       <Users className="w-4 h-4 text-gray-400" />
                       <span>Участники</span>
@@ -467,7 +476,7 @@ export function Sidebar() {
                         setSectionMenuOpen(null);
                         handleCreateWorkspace(section.id);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 cursor-pointer"
                     >
                       <Plus className="w-4 h-4 text-gray-400" />
                       <span>Добавить место</span>
@@ -475,7 +484,7 @@ export function Sidebar() {
                     <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                     <button
                       onClick={() => handleDeleteSection(section.id)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Удалить раздел</span>
@@ -517,14 +526,6 @@ export function Sidebar() {
         <SectionMembersModal
           section={sectionMembersSection}
           onClose={() => setSectionMembersSection(null)}
-        />
-      )}
-
-      {/* Section Menu Overlay */}
-      {sectionMenuOpen && (
-        <div
-          className="fixed inset-0 z-[55]"
-          onClick={() => setSectionMenuOpen(null)}
         />
       )}
 
