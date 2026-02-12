@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { LegacyService } from './legacy.service';
+import { LegacyUrlService } from './legacy-url.service';
 import { LegacyMigrationLog } from '../entities/legacy-migration-log.entity';
 import { LegacyRequest } from '../entities/legacy-request.entity';
 import { LegacyAnswer } from '../entities/legacy-answer.entity';
@@ -88,6 +89,7 @@ export class LegacyMigrationService {
 
   constructor(
     private readonly legacyService: LegacyService,
+    private readonly legacyUrlService: LegacyUrlService,
     @InjectRepository(LegacyMigrationLog)
     private readonly migrationLogRepository: Repository<LegacyMigrationLog>,
     @InjectRepository(User)
@@ -731,7 +733,7 @@ export class LegacyMigrationService {
     const data: Record<string, any> = {
       legacyRequestId: request.id,
       requestType: request.type || null,
-      legacyUrl: `https://www.stankoff.ru/crm/request/${request.id}`,
+      legacyUrl: this.legacyUrlService.getRequestUrl(request.hash, request.id),
     };
 
     if (customer) {

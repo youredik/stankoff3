@@ -35,6 +35,12 @@ export class Workspace {
   @Column({ default: false })
   isInternal: boolean; // Внутренний workspace (не отображается в UI, используется для AI/RAG)
 
+  @Column({ default: false })
+  isSystem: boolean; // Системный workspace (справочник: контрагенты, контакты, товары)
+
+  @Column({ type: 'varchar', length: 30, nullable: true, default: null })
+  systemType: string | null; // 'counterparties' | 'contacts' | 'products' | null
+
   @Column({ type: 'uuid', nullable: true })
   sectionId: string | null; // FK на раздел (может быть без раздела)
 
@@ -63,6 +69,7 @@ export class Workspace {
       relatedWorkspaceId?: string;
       config?: Record<string, any>;
       rules?: { id: string; type: string; condition: Record<string, any>; action: Record<string, any> }[];
+      system?: boolean; // Системное поле (нельзя удалить)
     }[];
     order: number;
   }[];

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -106,12 +106,78 @@ export class WorkspaceService {
   }
 
   async update(id: string, workspaceData: Partial<Workspace>): Promise<Workspace | null> {
+    const existing = await this.findOne(id);
+
+    if (existing?.isSystem) {
+      // Запрещаем менять ключевые поля системного workspace
+      delete workspaceData.prefix;
+      delete workspaceData.systemType;
+      delete workspaceData.isSystem;
+
+      // Защищаем системные поля от удаления
+      if (workspaceData.sections && existing.sections) {
+        workspaceData.sections = this.protectSystemFields(existing.sections, workspaceData.sections);
+      }
+    }
+
     await this.workspaceRepository.update(id, workspaceData);
     return this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
+    const ws = await this.findOne(id);
+    if (ws?.isSystem) {
+      throw new ForbiddenException('Системный workspace нельзя удалить');
+    }
     await this.workspaceRepository.delete(id);
+  }
+
+  /**
+   * Защищает системные поля от удаления при обновлении workspace.
+   * Пользователь может добавлять новые поля, но не удалять поля с system: true.
+   */
+  private protectSystemFields(
+    existingSections: Workspace['sections'],
+    newSections: Workspace['sections'],
+  ): Workspace['sections'] {
+    // Собираем все системные поля из существующих секций
+    const systemFields = new Map<string, { sectionId: string; field: typeof existingSections[0]['fields'][0] }>();
+    for (const section of existingSections) {
+      for (const field of section.fields) {
+        if (field.system) {
+          systemFields.set(field.id, { sectionId: section.id, field });
+        }
+      }
+    }
+
+    // Проверяем что все системные поля присутствуют в новых секциях
+    const newFieldIds = new Set<string>();
+    for (const section of newSections) {
+      for (const field of section.fields) {
+        newFieldIds.add(field.id);
+      }
+    }
+
+    // Возвращаем отсутствующие системные поля в их секции
+    for (const [fieldId, { sectionId, field }] of systemFields) {
+      if (!newFieldIds.has(fieldId)) {
+        const targetSection = newSections.find((s) => s.id === sectionId);
+        if (targetSection) {
+          targetSection.fields.push(field);
+        } else {
+          // Секция удалена — восстанавливаем
+          const existingSection = existingSections.find((s) => s.id === sectionId);
+          if (existingSection) {
+            newSections.push({
+              ...existingSection,
+              fields: [field],
+            });
+          }
+        }
+      }
+    }
+
+    return newSections;
   }
 
   // Получить роли пользователя во всех workspaces

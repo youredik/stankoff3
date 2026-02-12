@@ -6,6 +6,7 @@ import {
   MigrationProgress,
 } from './legacy-migration.service';
 import { LegacyService } from './legacy.service';
+import { LegacyUrlService } from './legacy-url.service';
 import { LegacyMigrationLog } from '../entities/legacy-migration-log.entity';
 import { LegacyRequest } from '../entities/legacy-request.entity';
 import { LegacyAnswer } from '../entities/legacy-answer.entity';
@@ -106,6 +107,14 @@ describe('LegacyMigrationService', () => {
       providers: [
         LegacyMigrationService,
         { provide: LegacyService, useValue: legacyService },
+        {
+          provide: LegacyUrlService,
+          useValue: {
+            getRequestUrl: jest.fn((hash?: string | null, id?: number) =>
+              hash ? `https://www.stankoff.ru/request/view/${hash}` : `https://www.stankoff.ru/request/list`,
+            ),
+          },
+        },
         {
           provide: getRepositoryToken(LegacyMigrationLog),
           useValue: migrationLogRepository,
@@ -787,6 +796,14 @@ describe('LegacyMigrationService', () => {
         providers: [
           LegacyMigrationService,
           { provide: LegacyService, useValue: legacyService },
+          {
+            provide: LegacyUrlService,
+            useValue: {
+              getRequestUrl: jest.fn((hash?: string | null, id?: number) =>
+                hash ? `https://www.stankoff.ru/request/view/${hash}` : `https://www.stankoff.ru/request/list`,
+              ),
+            },
+          },
           {
             provide: getRepositoryToken(LegacyMigrationLog),
             useValue: migrationLogRepository,

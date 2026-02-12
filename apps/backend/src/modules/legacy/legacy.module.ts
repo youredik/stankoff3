@@ -6,12 +6,15 @@ import { LegacyController } from './legacy.controller';
 import { LegacyImportController } from './legacy-import.controller';
 import { LegacyMigrationController } from './legacy-migration.controller';
 import { LegacySyncController } from './legacy-sync.controller';
+import { LegacySystemSyncController } from './legacy-system-sync.controller';
 import { LegacyService } from './services/legacy.service';
 import { LegacyUrlService } from './services/legacy-url.service';
 import { LegacyMigrationService } from './services/legacy-migration.service';
 import { LegacySyncService } from './services/legacy-sync.service';
+import { SystemSyncService } from './services/system-sync.service';
 import { LEGACY_DATA_SOURCE, legacyDatabaseConfig } from './legacy-database.config';
 import { LegacyMigrationLog } from './entities/legacy-migration-log.entity';
+import { SystemSyncLog } from './entities/system-sync-log.entity';
 import { User } from '../user/user.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { AuthModule } from '../auth/auth.module';
@@ -29,10 +32,10 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([LegacyMigrationLog, User, Workspace]),
+    TypeOrmModule.forFeature([LegacyMigrationLog, SystemSyncLog, User, Workspace]),
     forwardRef(() => AuthModule),
   ],
-  controllers: [LegacyController, LegacyImportController, LegacyMigrationController, LegacySyncController],
+  controllers: [LegacyController, LegacyImportController, LegacyMigrationController, LegacySyncController, LegacySystemSyncController],
   providers: [
     {
       provide: LEGACY_DATA_SOURCE,
@@ -88,7 +91,8 @@ import { AuthModule } from '../auth/auth.module';
     LegacyUrlService,
     LegacyMigrationService,
     LegacySyncService,
+    SystemSyncService,
   ],
-  exports: [LegacyService, LegacyUrlService, LEGACY_DATA_SOURCE],
+  exports: [LegacyService, LegacyUrlService, SystemSyncService, LEGACY_DATA_SOURCE],
 })
 export class LegacyModule {}

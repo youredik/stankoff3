@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
 /**
- * Сервис для генерации ссылок на Legacy CRM систему
- * Базовый URL: https://www.stankoff.ru
+ * Сервис для генерации ссылок на Legacy CRM систему (stankoff.ru)
+ *
+ * URL-паттерны взяты из .htaccess и router.php legacy проекта.
  */
 @Injectable()
 export class LegacyUrlService {
@@ -10,58 +11,67 @@ export class LegacyUrlService {
 
   /**
    * URL заявки (обращения в техподдержку)
+   * Legacy: /request/view/{hash} — используется 30-символьный hash, НЕ числовой ID
    */
-  getRequestUrl(requestId: number): string {
-    return `${this.baseUrl}/crm/request/${requestId}`;
+  getRequestUrl(hash?: string | null, requestId?: number): string {
+    if (hash) {
+      return `${this.baseUrl}/request/view/${hash}`;
+    }
+    return `${this.baseUrl}/request/list`;
   }
 
   /**
    * URL сделки
+   * Legacy: /deal/view/{id}
    */
   getDealUrl(dealId: number): string {
-    return `${this.baseUrl}/crm/deal/${dealId}`;
+    return `${this.baseUrl}/deal/view/${dealId}`;
   }
 
   /**
    * URL клиента (контакта)
+   * Legacy: /client/view/{id}
    */
   getCustomerUrl(customerId: number): string {
-    return `${this.baseUrl}/crm/customer/${customerId}`;
+    return `${this.baseUrl}/client/view/${customerId}`;
   }
 
   /**
    * URL контрагента (компании)
+   * Legacy: /commerce/counterparty/view/{id}
    */
   getCounterpartyUrl(counterpartyId: number): string {
-    return `${this.baseUrl}/crm/counterparty/${counterpartyId}`;
+    return `${this.baseUrl}/commerce/counterparty/view/${counterpartyId}`;
   }
 
   /**
-   * URL товара в каталоге
+   * URL товара
+   * Legacy: /blog/product/{uri} — используется URI slug, не числовой ID
    */
-  getProductUrl(productId: number): string {
-    return `${this.baseUrl}/catalog/product/${productId}`;
+  getProductUrl(uri?: string | null): string {
+    if (uri) {
+      return `${this.baseUrl}/blog/product/${uri}`;
+    }
+    return `${this.baseUrl}/blog`;
   }
 
   /**
    * URL категории товаров
+   * Legacy: /blog/{uri} — используется URI slug, не числовой ID
    */
-  getCategoryUrl(categoryId: number): string {
-    return `${this.baseUrl}/catalog/category/${categoryId}`;
+  getCategoryUrl(uri?: string | null): string {
+    if (uri) {
+      return `${this.baseUrl}/blog/${uri}`;
+    }
+    return `${this.baseUrl}/blog`;
   }
 
   /**
    * URL менеджера (сотрудника)
+   * Legacy: /admin/settings/employees/{id}
    */
   getManagerUrl(managerId: number): string {
-    return `${this.baseUrl}/crm/manager/${managerId}`;
-  }
-
-  /**
-   * URL отдела
-   */
-  getDepartmentUrl(departmentId: number): string {
-    return `${this.baseUrl}/crm/department/${departmentId}`;
+    return `${this.baseUrl}/admin/settings/employees/${managerId}`;
   }
 
   /**
@@ -69,15 +79,15 @@ export class LegacyUrlService {
    * Возвращает объект со всеми релевантными ссылками
    */
   getRequestRelatedUrls(data: {
-    requestId: number;
+    requestHash?: string | null;
+    requestId?: number;
     customerId?: number | null;
     managerId?: number | null;
     dealId?: number | null;
-    productId?: number | null;
     counterpartyId?: number | null;
   }): Record<string, string> {
     const urls: Record<string, string> = {
-      request: this.getRequestUrl(data.requestId),
+      request: this.getRequestUrl(data.requestHash, data.requestId),
     };
 
     if (data.customerId) {
@@ -90,10 +100,6 @@ export class LegacyUrlService {
 
     if (data.dealId) {
       urls.deal = this.getDealUrl(data.dealId);
-    }
-
-    if (data.productId) {
-      urls.product = this.getProductUrl(data.productId);
     }
 
     if (data.counterpartyId) {
@@ -139,7 +145,8 @@ export class LegacyUrlService {
       if (source.sourceType === 'legacy_request') {
         const requestId = parseInt(source.sourceId, 10);
         if (!isNaN(requestId)) {
-          const url = this.getRequestUrl(requestId);
+          const requestHash = source.metadata?.requestHash as string | undefined;
+          const url = this.getRequestUrl(requestHash, requestId);
           if (!seenUrls.has(url)) {
             seenUrls.add(url);
             const subject = source.metadata?.subject as string || `Заявка #${requestId}`;
@@ -160,14 +167,6 @@ export class LegacyUrlService {
                 url: customerUrl,
                 sourceType: 'customer',
               });
-            }
-          }
-
-          // Если есть legacyUrl в metadata, используем его
-          if (source.metadata?.legacyUrl && typeof source.metadata.legacyUrl === 'string') {
-            const legacyUrl = source.metadata.legacyUrl;
-            if (!seenUrls.has(legacyUrl)) {
-              seenUrls.add(legacyUrl);
             }
           }
         }

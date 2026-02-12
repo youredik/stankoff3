@@ -720,6 +720,105 @@ export class LegacyService implements OnModuleInit {
       .getMany();
   }
 
+  // ==================== SYSTEM SYNC HELPERS ====================
+
+  /**
+   * Получить контрагентов батчем (для синхронизации справочников)
+   */
+  async getAllCounterpartiesBatch(offset: number, limit: number): Promise<LegacyCounterparty[]> {
+    if (!this.isAvailable()) return [];
+    return this.counterpartyRepository
+      .createQueryBuilder('cp')
+      .orderBy('cp.id', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Общее количество контрагентов
+   */
+  async getCounterpartiesCount(): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    return this.counterpartyRepository.count();
+  }
+
+  /**
+   * Получить контакты (не сотрудников) батчем
+   */
+  async getAllContactsBatch(offset: number, limit: number): Promise<LegacyCustomer[]> {
+    if (!this.isAvailable()) return [];
+    return this.customerRepository
+      .createQueryBuilder('c')
+      .where('c.is_manager = :isManager', { isManager: 0 })
+      .orderBy('c.customerID', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Получить контакты с привязкой к контрагентам (приоритетные)
+   */
+  async getContactsWithCounterpartyBatch(offset: number, limit: number): Promise<LegacyCustomer[]> {
+    if (!this.isAvailable()) return [];
+    return this.customerRepository
+      .createQueryBuilder('c')
+      .where('c.is_manager = :isManager', { isManager: 0 })
+      .andWhere('c.default_counterparty_id > 0')
+      .orderBy('c.customerID', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Общее количество контактов (не сотрудников)
+   */
+  async getContactsCount(withCounterpartyOnly = false): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    const qb = this.customerRepository
+      .createQueryBuilder('c')
+      .where('c.is_manager = :isManager', { isManager: 0 });
+    if (withCounterpartyOnly) {
+      qb.andWhere('c.default_counterparty_id > 0');
+    }
+    return qb.getCount();
+  }
+
+  /**
+   * Получить активные товары батчем
+   */
+  async getAllActiveProductsBatch(offset: number, limit: number): Promise<LegacyProduct[]> {
+    if (!this.isAvailable()) return [];
+    return this.productRepository
+      .createQueryBuilder('p')
+      .where('p.enabled = :enabled', { enabled: 1 })
+      .orderBy('p.productID', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Общее количество активных товаров
+   */
+  async getActiveProductsCount(): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    return this.productRepository.count({ where: { enabled: 1 } });
+  }
+
+  /**
+   * Получить все активные категории
+   */
+  async getAllActiveCategories(): Promise<LegacyCategory[]> {
+    if (!this.isAvailable()) return [];
+    return this.categoryRepository.find({
+      where: { isActive: 1 },
+      order: { sortOrder: 'ASC', name: 'ASC' },
+    });
+  }
+
   // ==================== RICH DATA FOR AI ====================
 
   /**
