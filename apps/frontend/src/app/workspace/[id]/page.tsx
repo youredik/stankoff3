@@ -1,12 +1,14 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { Breadcrumbs, createHomeBreadcrumb } from '@/components/ui/Breadcrumbs';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useEntitySync } from '@/hooks/useEntitySync';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import type { DashboardView } from '@/components/layout/Header';
 
 const KanbanBoard = dynamic(
@@ -27,8 +29,10 @@ const TableView = dynamic(
 function WorkspaceContent() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const workspaceId = params.id as string;
   const view = (searchParams.get('view') as DashboardView) || 'kanban';
+  const { currentWorkspace } = useWorkspaceStore();
 
   useWebSocket();
   useEntitySync();
@@ -39,6 +43,12 @@ function WorkspaceContent() {
 
   return (
     <AppShell>
+      <div className="px-6 pt-4 pb-2">
+        <Breadcrumbs items={[
+          { ...createHomeBreadcrumb(), onClick: () => router.push('/workspace') },
+          { label: currentWorkspace?.name ?? '...' },
+        ]} />
+      </div>
       {view === 'kanban' && (
         <div className="relative p-6 h-full flex flex-col">
           <KanbanBoard workspaceId={workspaceId} />

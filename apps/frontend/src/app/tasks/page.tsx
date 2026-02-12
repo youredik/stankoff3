@@ -4,6 +4,7 @@ import { Suspense, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { Breadcrumbs, createHomeBreadcrumb } from '@/components/ui/Breadcrumbs';
 import { TaskInbox } from '@/components/bpmn/tasks/TaskInbox';
 import { TaskDetail } from '@/components/bpmn/tasks/TaskDetail';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -46,6 +47,12 @@ function TasksContent() {
   return (
     <AppShell>
       <div className="max-w-4xl mx-auto">
+        <div className="px-6 pt-4 pb-2">
+          <Breadcrumbs items={[
+            { ...createHomeBreadcrumb(), onClick: () => router.push('/workspace') },
+            { label: 'Входящие задания' },
+          ]} />
+        </div>
         <TaskInbox onTaskSelect={handleTaskSelect} showFilters initialTab={initialTab} />
       </div>
 

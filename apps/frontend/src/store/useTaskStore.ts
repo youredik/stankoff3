@@ -15,7 +15,7 @@ export const useTaskStore = create<TaskState>((set) => ({
       const result = await tasksApi.getInbox({ perPage: 1 });
       set({ inboxCount: result.total });
     } catch {
-      // Silent fail — badge won't show if API is unavailable
+      // Допустимо молча — бейдж просто не покажется
     }
   },
 }));

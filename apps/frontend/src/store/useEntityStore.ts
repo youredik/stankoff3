@@ -4,6 +4,7 @@ import { entitiesApi, type EntityFilters, type KanbanColumnData, type TableQuery
 import { commentsApi } from '@/lib/api/comments';
 import { usersApi } from '@/lib/api/users';
 import { useWorkspaceStore } from './useWorkspaceStore';
+import { toast } from '@/lib/toast';
 
 export interface KanbanColumnState {
   items: Entity[];
@@ -173,6 +174,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         entities: flattenColumns(updatedColumns),
       });
     } catch {
+      toast.error('Не удалось загрузить ещё заявки');
       const state = get();
       const currentCol = state.kanbanColumns[statusId];
       if (currentCol) {
@@ -214,6 +216,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         tableLoading: false,
       });
     } catch {
+      toast.error('Не удалось загрузить таблицу');
       set({ tableLoading: false });
     }
   },
@@ -237,7 +240,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
       const users = await usersApi.getAll();
       set({ users });
     } catch {
-      // silent
+      toast.error('Не удалось загрузить список пользователей');
     }
   },
 
@@ -274,6 +277,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
     try {
       await entitiesApi.update(id, { title } as any);
     } catch {
+      toast.error('Не удалось обновить заголовок');
       set({
         kanbanColumns: prevColumns,
         entities: flattenColumns(prevColumns),
@@ -334,7 +338,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
     try {
       await entitiesApi.updateStatus(id, status);
     } catch {
-      // Rollback
+      toast.error('Не удалось изменить статус');
       set({
         kanbanColumns: prevColumns,
         entities: flattenColumns(prevColumns),
@@ -372,6 +376,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
     try {
       await entitiesApi.updateAssignee(id, assigneeId);
     } catch {
+      toast.error('Не удалось назначить исполнителя');
       set({
         kanbanColumns: prevColumns,
         entities: flattenColumns(prevColumns),
@@ -404,6 +409,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
     try {
       await entitiesApi.update(id, { linkedEntityIds } as any);
     } catch {
+      toast.error('Не удалось обновить связанные заявки');
       set({
         kanbanColumns: prevColumns,
         entities: flattenColumns(prevColumns),
@@ -459,6 +465,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
     try {
       await entitiesApi.update(id, { data: newData } as any);
     } catch {
+      toast.error('Не удалось сохранить поле');
       set({
         kanbanColumns: prevColumns,
         entities: flattenColumns(prevColumns),
@@ -486,7 +493,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
       const entity = await entitiesApi.getById(id);
       set({ selectedEntity: entity, comments: entity.comments || [] });
     } catch {
-      // keep local
+      toast.error('Не удалось загрузить заявку');
     }
   },
 
@@ -504,7 +511,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         set({ comments: [...currentComments, comment] });
       }
     } catch {
-      // silent
+      toast.error('Не удалось отправить комментарий');
     }
   },
 
@@ -569,7 +576,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         });
       }
     } catch {
-      // silent
+      toast.error('Не удалось создать заявку');
     }
   },
 }));

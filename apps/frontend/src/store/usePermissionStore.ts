@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { rbacApi } from '@/lib/api/rbac';
+import { toast } from '@/lib/toast';
 
 /**
  * Wildcard permission matching (зеркалит backend RbacService.matchPermission)
@@ -90,8 +91,8 @@ export const usePermissionStore = create<PermissionState & PermissionActions>()(
           loaded: true,
           loading: false,
         });
-      } catch (error) {
-        console.error('[PermissionStore] Failed to fetch permissions:', error);
+      } catch {
+        toast.error('Не удалось загрузить права доступа');
         set({ loading: false });
       }
     },

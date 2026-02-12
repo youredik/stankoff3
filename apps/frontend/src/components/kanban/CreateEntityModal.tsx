@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import SearchableUserSelect from '@/components/ui/SearchableUserSelect';
 import { fieldRegistry } from '@/components/fields';
 import { evaluateVisibility, evaluateRequired, evaluateComputed } from '@/lib/field-rules';
+import { useBeforeUnload } from '@/hooks/useBeforeUnload';
 import type { Field, Section } from '@/types';
 
 const PRIORITIES = [
@@ -125,6 +126,13 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
   const [assigneeId, setAssigneeId] = useState('');
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const isDirty = !!title || !!assigneeId || Object.keys(formData).length > 0;
+  useBeforeUnload(isDirty);
+
+  const titleError = (titleTouched || submitAttempted) && !title.trim() ? 'Название обязательно' : null;
 
   // Проверяем, есть ли кастомные поля
   const hasCustomFields = useMemo(() => {
@@ -163,6 +171,7 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
   };
 
   const handleSubmit = async () => {
+    setSubmitAttempted(true);
     if (!title.trim() || submitting || requiredFieldsMissing) return;
     setSubmitting(true);
     await createEntity({
@@ -214,11 +223,19 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
                 data-testid="create-entity-title-input"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => setTitleTouched(true)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmit()}
                 placeholder="Описание проблемы или задачи"
-                className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={`w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  titleError
+                    ? 'border-red-400 dark:border-red-600'
+                    : 'border-gray-200 dark:border-gray-600'
+                }`}
                 autoFocus
               />
+              {titleError && (
+                <p className="mt-1 text-xs text-red-500">{titleError}</p>
+              )}
             </div>
 
             {/* Priority */}

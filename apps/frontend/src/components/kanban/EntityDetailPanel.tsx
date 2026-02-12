@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/react';
-import { X, MessageSquare, Clock, Paperclip, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play, Sparkles } from 'lucide-react';
+import { X, MessageSquare, Clock, Paperclip, ChevronDown, ChevronRight, Upload, Link2, ExternalLink, GitBranch, Play, Sparkles, Check, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEntityStore } from '@/store/useEntityStore';
@@ -211,6 +211,27 @@ export function EntityDetailPanel() {
   const [titleDraft, setTitleDraft] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  // Autosave indicator
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const saveTimerRef = useRef<NodeJS.Timeout>(undefined);
+
+  const trackSave = useCallback(async (fn: () => Promise<void>) => {
+    setSaveState('saving');
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    try {
+      await fn();
+      setSaveState('saved');
+      saveTimerRef.current = setTimeout(() => setSaveState('idle'), 2000);
+    } catch {
+      setSaveState('error');
+      saveTimerRef.current = setTimeout(() => setSaveState('idle'), 3000);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, []);
+
   const handleTitleDoubleClick = useCallback(() => {
     if (!canEditEntity || !selectedEntity) return;
     setTitleDraft(selectedEntity.title);
@@ -221,10 +242,10 @@ export function EntityDetailPanel() {
     if (!selectedEntity) return;
     const trimmed = titleDraft.trim();
     if (trimmed && trimmed !== selectedEntity.title) {
-      updateTitle(selectedEntity.id, trimmed);
+      trackSave(() => updateTitle(selectedEntity.id, trimmed));
     }
     setEditingTitle(false);
-  }, [selectedEntity, titleDraft, updateTitle]);
+  }, [selectedEntity, titleDraft, updateTitle, trackSave]);
 
   const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -408,14 +429,31 @@ export function EntityDetailPanel() {
                 </span>
               )}
             </div>
-            <button
-              onClick={closeEntity}
-              aria-label="Закрыть панель"
-              data-testid="entity-close-button"
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
-            >
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
+            <div className="flex items-center gap-3">
+              {saveState === 'saving' && (
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Сохранение...
+                </span>
+              )}
+              {saveState === 'saved' && (
+                <span className="flex items-center gap-1 text-xs text-green-500">
+                  <Check className="w-3 h-3" />
+                  Сохранено
+                </span>
+              )}
+              {saveState === 'error' && (
+                <span className="text-xs text-red-500">Ошибка сохранения</span>
+              )}
+              <button
+                onClick={closeEntity}
+                aria-label="Закрыть панель"
+                data-testid="entity-close-button"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
           </div>
 
           {/* Body — three columns */}
@@ -470,7 +508,7 @@ export function EntityDetailPanel() {
                           users={users}
                           canEdit={canEditEntity}
                           onUpdateField={(fieldId, value) =>
-                            updateEntityData(selectedEntity.id, fieldId, value)
+                            trackSave(() => updateEntityData(selectedEntity.id, fieldId, value))
                           }
                         />
                       ))}

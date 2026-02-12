@@ -12,10 +12,14 @@ import {
   AlertTriangle,
   AlertOctagon,
   Sparkles,
+  CheckCircle2,
+  XCircle,
+  Info,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import type { AppNotification, NotificationType } from '@/store/useNotificationStore';
+import { useToastStore, type Toast as UiToast, type ToastType } from '@/lib/toast';
 
 const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
   entity: FileText,
@@ -41,9 +45,31 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   ai_suggestion: 'text-teal-500 bg-teal-100 dark:bg-teal-900/40',
 };
 
+const UI_TOAST_ICONS: Record<ToastType, typeof Bell> = {
+  success: CheckCircle2,
+  error: XCircle,
+  info: Info,
+  warning: AlertTriangle,
+};
+
+const UI_TOAST_COLORS: Record<ToastType, string> = {
+  success: 'text-green-500 bg-green-100 dark:bg-green-900/40',
+  error: 'text-red-500 bg-red-100 dark:bg-red-900/40',
+  info: 'text-blue-500 bg-blue-100 dark:bg-blue-900/40',
+  warning: 'text-amber-500 bg-amber-100 dark:bg-amber-900/40',
+};
+
+const UI_TOAST_BORDERS: Record<ToastType, string> = {
+  success: 'border-green-300 dark:border-green-700',
+  error: 'border-red-300 dark:border-red-700',
+  info: 'border-gray-200 dark:border-gray-700',
+  warning: 'border-amber-300 dark:border-amber-700',
+};
+
 export function ToastContainer() {
   const router = useRouter();
   const { notifications } = useNotificationStore();
+  const { toasts: uiToasts, removeToast: removeUiToast } = useToastStore();
   const [toasts, setToasts] = useState<AppNotification[]>([]);
   const shownIdsRef = useRef<Set<string>>(new Set());
   const timersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -74,10 +100,25 @@ export function ToastContainer() {
     }
   }, [notifications]);
 
+  // Таймеры для UI toast'ов
+  const uiTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  useEffect(() => {
+    for (const t of uiToasts) {
+      if (!uiTimersRef.current.has(t.id)) {
+        const timer = setTimeout(() => {
+          removeUiToast(t.id);
+          uiTimersRef.current.delete(t.id);
+        }, t.duration);
+        uiTimersRef.current.set(t.id, timer);
+      }
+    }
+  }, [uiToasts, removeUiToast]);
+
   // Очистка всех таймеров при размонтировании
   useEffect(() => {
     return () => {
       timersRef.current.forEach((timer) => clearTimeout(timer));
+      uiTimersRef.current.forEach((timer) => clearTimeout(timer));
     };
   }, []);
 
@@ -91,6 +132,15 @@ export function ToastContainer() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const handleDismissUi = (id: string) => {
+    const timer = uiTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      uiTimersRef.current.delete(id);
+    }
+    removeUiToast(id);
+  };
+
   const handleClick = (toast: AppNotification) => {
     if (toast.entityId && toast.workspaceId) {
       router.push(`/workspace/${toast.workspaceId}?entity=${toast.entityId}`);
@@ -98,10 +148,50 @@ export function ToastContainer() {
     handleDismiss(toast.id);
   };
 
-  if (toasts.length === 0) return null;
+  if (toasts.length === 0 && uiToasts.length === 0) return null;
 
   return (
     <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+      {/* UI toasts (error/success/info/warning) */}
+      {uiToasts.map((t) => {
+        const Icon = UI_TOAST_ICONS[t.type];
+        const colorClass = UI_TOAST_COLORS[t.type];
+        const borderClass = UI_TOAST_BORDERS[t.type];
+
+        return (
+          <div
+            key={t.id}
+            className={`bg-white dark:bg-gray-900 border rounded-lg shadow-lg px-4 py-3 max-w-sm pointer-events-auto flex items-start gap-3 ${borderClass}`}
+            style={{ animation: 'slideIn 0.3s ease-out' }}
+          >
+            <div className={`p-2 rounded-full flex-shrink-0 ${colorClass}`}>
+              <Icon className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-900 dark:text-gray-100 font-medium">{t.text}</p>
+              {t.action && (
+                <button
+                  onClick={() => {
+                    t.action!.onClick();
+                    handleDismissUi(t.id);
+                  }}
+                  className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 mt-1"
+                >
+                  {t.action.label}
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => handleDismissUi(t.id)}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors flex-shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      })}
+
+      {/* Notification toasts (entity/comment/status etc.) */}
       {toasts.map((toast) => {
         const Icon = toast.type ? NOTIFICATION_ICONS[toast.type] : Bell;
         const colorClass = toast.type
@@ -111,14 +201,12 @@ export function ToastContainer() {
         return (
           <div
             key={toast.id}
-            className={`bg-white dark:bg-gray-900 border rounded-lg shadow-lg px-4 py-3 max-w-sm pointer-events-auto flex items-start gap-3 animate-slide-in ${
+            className={`bg-white dark:bg-gray-900 border rounded-lg shadow-lg px-4 py-3 max-w-sm pointer-events-auto flex items-start gap-3 ${
               toast.urgent
                 ? 'border-red-500 border-2 ring-2 ring-red-500/20'
                 : 'border-gray-200 dark:border-gray-700'
             }`}
-            style={{
-              animation: 'slideIn 0.3s ease-out',
-            }}
+            style={{ animation: 'slideIn 0.3s ease-out' }}
           >
             <div className={`p-2 rounded-full flex-shrink-0 ${colorClass}`}>
               <Icon className="w-4 h-4" />

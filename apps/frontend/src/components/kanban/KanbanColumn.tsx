@@ -34,6 +34,8 @@ export function KanbanColumn({
 
   return (
     <div
+      role="group"
+      aria-label={`${title} — ${totalCount}`}
       className={`flex-shrink-0 w-80 px-4 border-r border-gray-300 dark:border-gray-600 last:border-r-0 transition-colors flex flex-col ${
         isOver ? 'bg-primary-100/50 dark:bg-primary-900/20' : ''
       }`}
@@ -45,11 +47,12 @@ export function KanbanColumn({
             <div
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: color }}
+              aria-hidden="true"
             />
           )}
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
         </div>
-        <span className="bg-white/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded text-sm font-medium">
+        <span aria-live="polite" className="bg-white/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded text-sm font-medium">
           {totalCount}
         </span>
       </div>

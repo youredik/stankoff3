@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { knowledgeBaseApi } from '@/lib/api/knowledge-base';
+import { toast } from '@/lib/toast';
 import type {
   KnowledgeArticle,
   ArticleType,
@@ -68,8 +69,8 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
         totalPages: response.totalPages,
         isLoading: false,
       });
-    } catch (error) {
-      console.error('Ошибка загрузки статей:', error);
+    } catch {
+      toast.error('Не удалось загрузить статьи');
       set({ isLoading: false });
     }
   },
@@ -118,8 +119,8 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
     try {
       const categories = await knowledgeBaseApi.getCategories(workspaceId);
       set({ categories });
-    } catch (error) {
-      console.error('Ошибка загрузки категорий:', error);
+    } catch {
+      toast.error('Не удалось загрузить категории');
     }
   },
 
@@ -127,8 +128,8 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
     try {
       const stats = await knowledgeBaseApi.getStats(workspaceId);
       set({ stats });
-    } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+    } catch {
+      toast.error('Не удалось загрузить статистику');
     }
   },
 }));

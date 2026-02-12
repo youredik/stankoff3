@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { aiApi } from '@/lib/api/ai';
 import { useAuthStore } from './useAuthStore';
+import { toast } from '@/lib/toast';
 import type {
   AiAssistantResponse,
   AiClassification,
@@ -193,6 +194,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       });
       return result;
     } catch {
+      toast.error('Не удалось классифицировать заявку');
       set((state) => {
         const loading = new Map(state.classificationLoading);
         loading.set(entityId, false);
@@ -212,6 +214,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       });
       return applied;
     } catch {
+      toast.error('Не удалось применить классификацию');
       return null;
     }
   },
@@ -226,6 +229,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       set({ generatedResponse: response, isGenerating: false });
       return response;
     } catch {
+      toast.error('Не удалось сгенерировать ответ');
       set({ isGenerating: false });
       return null;
     }
@@ -288,6 +292,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       set({ generatedResponse: result, isGenerating: false, streamingDraft: '' });
       return result;
     } catch {
+      toast.error('Не удалось сгенерировать ответ');
       set({ isGenerating: false, streamingDraft: '' });
       return null;
     }

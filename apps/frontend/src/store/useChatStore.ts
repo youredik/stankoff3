@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ChatConversation, ChatMessage, ChatMessageReaction } from '@/types';
 import { chatApi } from '@/lib/api/chat';
+import { toast } from '@/lib/toast';
 
 interface ChatState {
   // Data
@@ -207,7 +208,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
       }
     } catch {
-      // Silently fail
+      toast.error('Не удалось обновить реакцию');
     }
   },
 
@@ -236,7 +237,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
       });
     } catch {
-      // Silently fail
+      toast.error('Не удалось закрепить сообщение');
     }
   },
 
@@ -261,7 +262,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
       });
     } catch {
-      // Silently fail
+      toast.error('Не удалось открепить сообщение');
     }
   },
 
@@ -272,7 +273,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         pinnedMessages: { ...state.pinnedMessages, [conversationId]: pinned },
       }));
     } catch {
-      // Silently fail
+      // Допустимо — закреплённые загрузятся при следующем открытии
     }
   },
 

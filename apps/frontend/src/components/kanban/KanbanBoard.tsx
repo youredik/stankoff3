@@ -63,6 +63,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const [activeCard, setActiveCard] = useState<Entity | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [mobileColumn, setMobileColumn] = useState<string | null>(null);
   const [filters, setFilters] = useWorkspaceFilters(workspaceId);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -110,6 +111,13 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     }
     return DEFAULT_COLUMNS;
   }, [currentWorkspace]);
+
+  // Инициализируем мобильную колонку первым статусом
+  useEffect(() => {
+    if (columns.length > 0 && !mobileColumn) {
+      setMobileColumn(columns[0].id);
+    }
+  }, [columns, mobileColumn]);
 
   // Count loaded entities across all columns
   const loadedCount = useMemo(() => {
@@ -230,7 +238,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                 }`}
               >
                 <Filter className="w-5 h-5" />
-                <span>Фильтры</span>
+                <span className="hidden sm:inline">Фильтры</span>
                 {activeFilterCount > 0 && (
                   <span className="bg-primary-600 text-white text-xs px-1.5 py-0.5 rounded-full">
                     {activeFilterCount}
@@ -244,7 +252,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                   className="flex items-center gap-1 px-3 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80 rounded-lg transition-colors cursor-pointer backdrop-blur-sm"
                 >
                   <X className="w-4 h-4" />
-                  <span>Сбросить</span>
+                  <span className="hidden sm:inline">Сбросить</span>
                 </button>
               )}
               {isAdmin && (
@@ -254,7 +262,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                   className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80 text-gray-700 dark:text-gray-300 transition-colors cursor-pointer backdrop-blur-sm"
                 >
                   <Settings className="w-5 h-5" />
-                  <span>Настройки</span>
+                  <span className="hidden sm:inline">Настройки</span>
                 </button>
               )}
               {canEditEntities && (
@@ -265,7 +273,7 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors cursor-pointer"
                 >
                   <Plus className="w-5 h-5" />
-                  <span>Новая заявка</span>
+                  <span className="hidden sm:inline">Новая заявка</span>
                 </button>
               )}
             </div>
@@ -279,13 +287,67 @@ export function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           </div>
         )}
 
+        {/* Mobile: single column with status tabs */}
+        <div className="md:hidden flex flex-col flex-1 min-h-0">
+          <div className="flex gap-1 overflow-x-auto pb-3 flex-shrink-0">
+            {columns.map((col) => {
+              const colData = kanbanColumns[col.id];
+              const count = colData?.total ?? 0;
+              const isActive = mobileColumn === col.id;
+              return (
+                <button
+                  key={col.id}
+                  onClick={() => setMobileColumn(col.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                    isActive
+                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  {col.color && (
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
+                  )}
+                  {col.label}
+                  <span className="text-xs opacity-70">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-2 pb-4">
+            {(() => {
+              const colData = mobileColumn ? kanbanColumns[mobileColumn] : null;
+              if (!colData) return null;
+              return (
+                <>
+                  {colData.items.map((card) => (
+                    <KanbanCard key={card.id} entity={card} canEdit={canEditEntities} />
+                  ))}
+                  {colData.hasMore && (
+                    <button
+                      onClick={() => mobileColumn && loadMoreColumn(mobileColumn)}
+                      disabled={colData.loading}
+                      className="w-full py-2.5 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 rounded-lg transition-colors"
+                    >
+                      {colData.loading ? 'Загрузка...' : `Показать ещё (${colData.total - colData.items.length})`}
+                    </button>
+                  )}
+                  {colData.items.length === 0 && (
+                    <p className="text-center text-gray-400 dark:text-gray-500 py-8 text-sm">Нет заявок</p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Desktop: full kanban with drag & drop */}
         <DndContext
           sensors={sensors}
           collisionDetection={kanbanCollisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex overflow-x-auto flex-1 min-h-0">
+          <div className="hidden md:flex overflow-x-auto flex-1 min-h-0">
             {columns.map((column) => {
               const colData = kanbanColumns[column.id] || {
                 items: [],

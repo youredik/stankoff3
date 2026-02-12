@@ -2,13 +2,15 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, AlertCircle, CheckCircle, FileCode, Play, BarChart3 } from 'lucide-react';
+import { AlertCircle, CheckCircle, FileCode, Play, BarChart3 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
 import { ToastContainer } from '@/components/ui/ToastContainer';
+import { Breadcrumbs, createHomeBreadcrumb } from '@/components/ui/Breadcrumbs';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ProcessList, ProcessInstanceList, TemplateSelector } from '@/components/bpmn';
 import { bpmnApi } from '@/lib/api/bpmn';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import type { ProcessDefinition, ProcessInstance, BpmnHealthStatus } from '@/types';
 
 // Dynamic imports for browser-only components
@@ -86,6 +88,7 @@ function ProcessesContent() {
   const [health, setHealth] = useState<BpmnHealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const { currentWorkspace } = useWorkspaceStore();
   const [templateData, setTemplateData] = useState<{
     name: string;
     description: string;
@@ -243,13 +246,12 @@ function ProcessesContent() {
         {showList && (
           <>
             <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => router.push(`/workspace/${workspaceId}`)}
-                  className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
+              <div className="flex flex-col gap-2">
+                <Breadcrumbs items={[
+                  { ...createHomeBreadcrumb(), onClick: () => router.push('/workspace') },
+                  { label: currentWorkspace?.name ?? '...', onClick: () => router.push(`/workspace/${workspaceId}`) },
+                  { label: 'Процессы' },
+                ]} />
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Бизнес-процессы
                 </h1>
