@@ -15,6 +15,7 @@ import {
 import { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../user/user.entity';
+import { AiProviderRegistry } from './providers/ai-provider.registry';
 import { ClassifierService } from './services/classifier.service';
 import { KnowledgeBaseService } from './services/knowledge-base.service';
 import { RagIndexerService, IndexingStats } from './services/rag-indexer.service';
@@ -42,6 +43,7 @@ export class AiController {
   private readonly logger = new Logger(AiController.name);
 
   constructor(
+    private readonly providerRegistry: AiProviderRegistry,
     private readonly classifierService: ClassifierService,
     private readonly knowledgeBaseService: KnowledgeBaseService,
     private readonly ragIndexerService: RagIndexerService,
@@ -60,13 +62,26 @@ export class AiController {
   @Get('health')
   getHealth(): {
     available: boolean;
-    providers: { openai: boolean };
+    completionAvailable: boolean;
+    embeddingAvailable: boolean;
+    providers: Array<{
+      name: string;
+      isConfigured: boolean;
+      supportsCompletion: boolean;
+      supportsEmbeddings: boolean;
+    }>;
   } {
+    const providersInfo = this.providerRegistry.getProvidersInfo();
     return {
-      available: this.classifierService.isAvailable(),
-      providers: {
-        openai: this.classifierService.isAvailable(),
-      },
+      available: this.providerRegistry.isAvailable(),
+      completionAvailable: this.providerRegistry.isCompletionAvailable(),
+      embeddingAvailable: this.providerRegistry.isEmbeddingAvailable(),
+      providers: providersInfo.map(p => ({
+        name: p.name,
+        isConfigured: p.isConfigured,
+        supportsCompletion: p.supportsCompletion,
+        supportsEmbeddings: p.supportsEmbeddings,
+      })),
     };
   }
 
@@ -82,7 +97,7 @@ export class AiController {
   ): Promise<ClassifyResponseDto> {
     if (!this.classifierService.isAvailable()) {
       throw new HttpException(
-        'AI сервис не настроен. Добавьте OPENAI_API_KEY в переменные окружения.',
+        'AI сервис не настроен. Нет доступных LLM провайдеров.',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
@@ -261,14 +276,13 @@ export class AiController {
   @Get('indexer/health')
   getIndexerHealth(): {
     available: boolean;
-    services: { openai: boolean; legacy: boolean };
+    services: { embeddings: boolean; legacy: boolean };
   } {
-    const isAvailable = this.ragIndexerService.isAvailable();
     return {
-      available: isAvailable,
+      available: this.ragIndexerService.isAvailable(),
       services: {
-        openai: this.knowledgeBaseService.isAvailable(),
-        legacy: isAvailable, // RAG indexer checks both
+        embeddings: this.knowledgeBaseService.isAvailable(),
+        legacy: this.ragIndexerService.isAvailable(),
       },
     };
   }
@@ -308,7 +322,7 @@ export class AiController {
   }> {
     if (!this.ragIndexerService.isAvailable()) {
       throw new HttpException(
-        'RAG Indexer недоступен: проверьте настройки OpenAI и Legacy DB',
+        'RAG Indexer недоступен: проверьте настройки AI провайдеров и Legacy DB',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
@@ -332,7 +346,7 @@ export class AiController {
 
     if (!this.ragIndexerService.isAvailable()) {
       throw new HttpException(
-        'RAG Indexer недоступен: проверьте настройки OpenAI и Legacy DB',
+        'RAG Indexer недоступен: проверьте настройки AI провайдеров и Legacy DB',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
@@ -342,7 +356,7 @@ export class AiController {
     try {
       // Запускаем индексацию асинхронно
       const statsPromise = this.ragIndexerService.indexAll({
-        batchSize: options.batchSize || 50,
+        batchSize: options.batchSize,
         maxRequests: options.maxRequests,
       });
 

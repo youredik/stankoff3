@@ -89,7 +89,7 @@ export class RagIndexerService {
     } = options;
 
     if (!this.isAvailable()) {
-      throw new Error('RAG Indexer недоступен: проверьте настройки OpenAI и Legacy DB');
+      throw new Error('RAG Indexer недоступен: проверьте настройки AI провайдеров и Legacy DB');
     }
 
     if (this.indexingStats?.isRunning) {
