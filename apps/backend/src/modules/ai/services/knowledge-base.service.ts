@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { AiProviderRegistry } from '../providers/ai-provider.registry';
@@ -27,7 +27,7 @@ interface CachedEmbedding {
 }
 
 @Injectable()
-export class KnowledgeBaseService {
+export class KnowledgeBaseService implements OnModuleInit {
   private readonly logger = new Logger(KnowledgeBaseService.name);
 
   // Embedding cache: in-memory с TTL
@@ -43,6 +43,54 @@ export class KnowledgeBaseService {
     @InjectRepository(AiUsageLog)
     private readonly usageLogRepo: Repository<AiUsageLog>,
   ) {}
+
+  /**
+   * Асинхронный backfill search_vector для существующих чанков
+   * Выполняется после старта приложения, не блокирует миграцию
+   */
+  async onModuleInit(): Promise<void> {
+    // Запускаем backfill в фоне (не await, чтобы не блокировать старт)
+    this.backfillSearchVector().catch(err => {
+      this.logger.warn(`Backfill search_vector пропущен: ${err.message}`);
+    });
+  }
+
+  private async backfillSearchVector(): Promise<void> {
+    try {
+      // Проверяем есть ли колонка search_vector (миграция могла ещё не пройти)
+      const cols = await this.dataSource.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name = 'knowledge_chunks' AND column_name = 'search_vector'`,
+      );
+      if (cols.length === 0) return;
+
+      // Проверяем есть ли чанки без search_vector
+      const [{ count }] = await this.dataSource.query<[{ count: string }]>(
+        `SELECT COUNT(*) as count FROM knowledge_chunks WHERE search_vector IS NULL`,
+      );
+      const nullCount = parseInt(count, 10);
+      if (nullCount === 0) return;
+
+      this.logger.log(`Backfill search_vector: ${nullCount} чанков без tsvector, заполняем batch'ами...`);
+
+      // Batch backfill (по 5000 строк) чтобы не блокировать БД надолго
+      let updated = 0;
+      while (updated < nullCount) {
+        const result = await this.dataSource.query(
+          `UPDATE knowledge_chunks SET search_vector = to_tsvector('russian', COALESCE(content, ''))
+           WHERE id IN (SELECT id FROM knowledge_chunks WHERE search_vector IS NULL LIMIT 5000)`,
+        );
+        const affected = result?.[1] || 0;
+        if (affected === 0) break;
+        updated += affected;
+        this.logger.log(`Backfill search_vector: ${updated}/${nullCount}`);
+      }
+
+      this.logger.log(`Backfill search_vector завершён: ${updated} чанков обновлено`);
+    } catch {
+      // Таблица или колонка не существует — миграция ещё не прошла, пропускаем
+    }
+  }
 
   /**
    * Проверяет доступность сервиса

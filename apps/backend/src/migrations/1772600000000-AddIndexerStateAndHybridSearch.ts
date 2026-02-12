@@ -66,13 +66,9 @@ export class AddIndexerStateAndHybridSearch1772600000000 implements MigrationInt
       FOR EACH ROW EXECUTE FUNCTION knowledge_chunks_search_vector_update()
     `);
 
-    // 6. Backfill search_vector для существующих чанков
-    // Может занять 10-30 секунд для 100K+ строк
-    await queryRunner.query(`
-      UPDATE "knowledge_chunks"
-      SET search_vector = to_tsvector('russian', COALESCE(content, ''))
-      WHERE search_vector IS NULL
-    `);
+    // 6. Backfill search_vector будет выполнен асинхронно после старта приложения
+    // (через OnModuleInit в KnowledgeBaseService), чтобы не блокировать миграцию
+    // Новые чанки получат search_vector автоматически через триггер (шаг 5)
 
     // 7. Функция гибридного поиска (Vector + Full-Text)
     await queryRunner.query(`
