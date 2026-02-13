@@ -50,7 +50,7 @@ export class KnowledgeArticleService {
     }
     if (search) {
       qb.andWhere(
-        '(article.title ILIKE :search OR :searchExact = ANY(article.tags))',
+        '(article.title ILIKE :search OR article.content ILIKE :search OR :searchExact = ANY(article.tags))',
         { search: `%${search}%`, searchExact: search },
       );
     }
