@@ -51,8 +51,8 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
     const el = document.getElementById(`msg-${messageId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('ring-2', 'ring-primary-500', 'ring-offset-1');
-      setTimeout(() => el.classList.remove('ring-2', 'ring-primary-500', 'ring-offset-1'), 2000);
+      el.classList.add('animate-highlight-msg');
+      setTimeout(() => el.classList.remove('animate-highlight-msg'), 2000);
     }
   }, []);
 

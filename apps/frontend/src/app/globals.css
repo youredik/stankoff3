@@ -127,4 +127,33 @@
   .border-accent {
     border-color: #22d3ee;
   }
+
+  /* Telegram-style message highlight when scrolling to pinned/reply */
+  .animate-highlight-msg {
+    animation: msg-highlight 2s ease-out;
+  }
+
+  @keyframes msg-highlight {
+    0%, 15% {
+      background-color: hsl(187 85% 53% / 0.15);
+      border-radius: 12px;
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  .dark .animate-highlight-msg {
+    animation: msg-highlight-dark 2s ease-out;
+  }
+
+  @keyframes msg-highlight-dark {
+    0%, 15% {
+      background-color: hsl(187 85% 53% / 0.1);
+      border-radius: 12px;
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
 }

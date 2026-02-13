@@ -93,6 +93,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
     loadMoreMessages(conversationId);
   }, [conversationId, loadMoreMessages]);
 
+  const scrollToMessage = useCallback((messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('animate-highlight-msg');
+      setTimeout(() => el.classList.remove('animate-highlight-msg'), 2000);
+    }
+  }, []);
+
   return (
     <div data-testid="chat-view" className="flex flex-col h-full bg-[#E8EFFA] dark:bg-[#0E1621]">
       <ChatHeader
@@ -103,19 +112,26 @@ export function ChatView({ conversationId }: ChatViewProps) {
       />
 
       {/* Pinned message banner */}
-      {pinned.length > 0 && (
-        <div data-testid="chat-pinned-banner" className="flex items-center gap-2 px-4 py-1.5 bg-white/80 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700 backdrop-blur-sm">
-          <div className="w-0.5 h-6 bg-primary-500 rounded-full flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-medium text-primary-600 dark:text-primary-400">
-              Закреплённое сообщение
-            </span>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {(pinned[pinned.length - 1]?.content || '').replace(/<[^>]*>/g, '').substring(0, 80)}
-            </p>
-          </div>
-        </div>
-      )}
+      {pinned.length > 0 && (() => {
+        const lastPinned = pinned[pinned.length - 1];
+        return (
+          <button
+            data-testid="chat-pinned-banner"
+            onClick={() => scrollToMessage(lastPinned.id)}
+            className="flex items-center gap-2 px-4 py-1.5 bg-white/80 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700 backdrop-blur-sm w-full text-left hover:bg-white/90 dark:hover:bg-gray-800/90 transition-colors cursor-pointer"
+          >
+            <div className="w-0.5 h-6 bg-primary-500 rounded-full flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-medium text-primary-600 dark:text-primary-400">
+                Закреплённое сообщение
+              </span>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {(lastPinned?.content || '').replace(/<[^>]*>/g, '').substring(0, 80)}
+              </p>
+            </div>
+          </button>
+        );
+      })()}
 
       {showSearch && (
         <ChatSearchPanel

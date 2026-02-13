@@ -234,6 +234,7 @@ export function MessageBubble({
   const [showReactions, setShowReactions] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [menuFlip, setMenuFlip] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
   const { editMessage, deleteMessage, toggleReaction, pinMessage, unpinMessage } = useChatStore();
@@ -247,12 +248,29 @@ export function MessageBubble({
   const ownRadius = `${isFirstInGroup ? 'rounded-tl-2xl' : 'rounded-tl-lg'} ${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-lg'} rounded-bl-2xl rounded-br-lg`;
   const otherRadius = `${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-lg'} ${isFirstInGroup ? 'rounded-tl-2xl' : 'rounded-tl-lg'} rounded-br-2xl rounded-bl-lg`;
 
-  const handleContextMenu = (e: React.MouseEvent) => { e.preventDefault(); setShowMenu(!showMenu); };
+  // Flip context menu upward if it overflows the viewport
+  useEffect(() => {
+    if (!showMenu || !menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    setMenuFlip(rect.bottom > window.innerHeight - 8);
+  }, [showMenu]);
+
+  const handleContextMenu = (e: React.MouseEvent) => { e.preventDefault(); setMenuFlip(false); setShowMenu(!showMenu); };
   const handleCopy = () => { navigator.clipboard.writeText((message.content || '').replace(/<[^>]*>/g, '')); setShowMenu(false); };
   const handleEdit = () => { setEditContent((message.content || '').replace(/<[^>]*>/g, '')); setEditing(true); setShowMenu(false); };
   const handleSaveEdit = async () => { if (editContent.trim()) await editMessage(message.conversationId, message.id, editContent); setEditing(false); };
   const handleDelete = async () => { await deleteMessage(message.conversationId, message.id); setShowMenu(false); };
   const handlePin = async () => { message.isPinned ? await unpinMessage(conversationId, message.id) : await pinMessage(conversationId, message.id); setShowMenu(false); };
+
+  const scrollToReply = () => {
+    if (!message.replyTo) return;
+    const el = document.getElementById(`msg-${message.replyTo.id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('animate-highlight-msg');
+      setTimeout(() => el.classList.remove('animate-highlight-msg'), 2000);
+    }
+  };
 
   // Extract first URL for link preview
   const textContent = (message.content || '').replace(/<[^>]*>/g, '');
@@ -289,7 +307,7 @@ export function MessageBubble({
 
       <div data-testid="chat-message-content" className={`relative max-w-[65%] group ${isOwn ? 'mr-1' : ''}`} onContextMenu={handleContextMenu}>
         {message.replyTo && (
-          <div className={`mb-0.5 px-3 py-1.5 border-l-2 border-primary-400 ${isOwn ? 'bg-[#D8F6C6] dark:bg-[#1F3F2E] rounded-t-xl' : 'bg-gray-50 dark:bg-gray-700 rounded-t-xl'}`}>
+          <div onClick={scrollToReply} className={`mb-0.5 px-3 py-1.5 border-l-2 border-primary-400 cursor-pointer hover:opacity-80 transition-opacity ${isOwn ? 'bg-[#D8F6C6] dark:bg-[#1F3F2E] rounded-t-xl' : 'bg-gray-50 dark:bg-gray-700 rounded-t-xl'}`}>
             <span className="text-xs font-medium text-primary-600 dark:text-primary-400">{message.replyTo.author?.firstName}</span>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{(message.replyTo.content || '').replace(/<[^>]*>/g, '').substring(0, 60)}</p>
           </div>
@@ -402,7 +420,7 @@ export function MessageBubble({
         {showMenu && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-            <div data-testid="chat-context-menu" ref={menuRef} className={`absolute z-50 ${isOwn ? 'right-0' : 'left-0'} top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[160px]`}>
+            <div data-testid="chat-context-menu" ref={menuRef} className={`absolute z-50 ${isOwn ? 'right-0' : 'left-0'} ${menuFlip ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[160px]`}>
               <button data-testid="chat-ctx-reply" onClick={() => { onReply(); setShowMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                 <Reply className="w-4 h-4" /> Ответить
               </button>

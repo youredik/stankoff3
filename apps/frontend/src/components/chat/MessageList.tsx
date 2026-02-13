@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useLayoutEffect, useState } from 'react';
 import { useMemo } from 'react';
 import { Loader2, ArrowDown } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
@@ -62,6 +62,16 @@ export function MessageList({
   const bottomRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const prevMessagesLenRef = useRef(0);
+  const isInitialLoadRef = useRef(true);
+  const prevConversationIdRef = useRef(conversationId);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  // Reset on conversation change (during render, before effects)
+  if (prevConversationIdRef.current !== conversationId) {
+    isInitialLoadRef.current = true;
+    prevMessagesLenRef.current = 0;
+    prevConversationIdRef.current = conversationId;
+  }
 
   // Compute the latest read time by OTHER participants (for read receipt checkmarks)
   const conversations = useChatStore((s) => s.conversations);
@@ -78,25 +88,38 @@ export function MessageList({
     return maxReadAt;
   }, [conversations, conversationId, currentUserId]);
 
-  // Auto-scroll to bottom on new messages
+  // Initial load: scroll to bottom BEFORE paint (Telegram-style, no animation)
+  useLayoutEffect(() => {
+    if (messages.length > 0 && isInitialLoadRef.current) {
+      const el = containerRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+      isInitialLoadRef.current = false;
+      prevMessagesLenRef.current = messages.length;
+    }
+  }, [messages.length, conversationId]);
+
+  // New messages: smooth scroll only if user is already at bottom
   useEffect(() => {
-    if (messages.length > prevMessagesLenRef.current && isAtBottomRef.current) {
+    if (
+      !isInitialLoadRef.current &&
+      messages.length > prevMessagesLenRef.current &&
+      isAtBottomRef.current
+    ) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
     prevMessagesLenRef.current = messages.length;
   }, [messages.length]);
-
-  // Initial scroll to bottom
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView();
-  }, []);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
 
     // Check if at bottom
-    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    isAtBottomRef.current = atBottom;
+    setShowScrollButton(!atBottom);
 
     // Load more when scrolled to top
     if (el.scrollTop < 100 && hasMore && !loading) {
@@ -104,7 +127,9 @@ export function MessageList({
       onLoadMore();
       // Maintain scroll position after prepending
       requestAnimationFrame(() => {
-        el.scrollTop = el.scrollHeight - prevHeight;
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight - prevHeight;
+        }
       });
     }
   }, [hasMore, loading, onLoadMore]);
@@ -163,7 +188,7 @@ export function MessageList({
       </div>
 
       {/* Scroll to bottom button */}
-      {!isAtBottomRef.current && (
+      {showScrollButton && (
         <button
           onClick={scrollToBottom}
           className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-white dark:bg-gray-700 shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"

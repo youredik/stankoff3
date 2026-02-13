@@ -5,7 +5,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
-import { Send, Paperclip, X, Mic, FileText, Smile } from 'lucide-react';
+import { Send, Paperclip, X, Mic, FileText, Smile, Image, Loader2 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import type { ChatMessage, ChatMessageAttachment } from '@/types';
 import { getSocket } from '@/lib/socket';
@@ -27,6 +27,8 @@ interface ChatInputProps {
 interface PendingFile {
   file: File;
   preview?: string;
+  uploadProgress?: number;
+  uploadStatus?: 'pending' | 'uploading' | 'done' | 'error';
 }
 
 export function ChatInput({
@@ -43,6 +45,7 @@ export function ChatInput({
   const [recordingTime, setRecordingTime] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [clipboardImage, setClipboardImage] = useState<{ blob: Blob; preview: string } | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -134,6 +137,38 @@ export function ChatInput({
     };
   }, []);
 
+  // Check clipboard for images on window focus
+  useEffect(() => {
+    const checkClipboard = async () => {
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const preview = URL.createObjectURL(blob);
+            setClipboardImage(prev => {
+              if (prev) URL.revokeObjectURL(prev.preview);
+              return { blob, preview };
+            });
+            return;
+          }
+        }
+        setClipboardImage(prev => {
+          if (prev) URL.revokeObjectURL(prev.preview);
+          return null;
+        });
+      } catch {
+        // Clipboard API not available or permission denied — ignore silently
+      }
+    };
+    checkClipboard();
+    window.addEventListener('focus', checkClipboard);
+    return () => {
+      window.removeEventListener('focus', checkClipboard);
+    };
+  }, []);
+
   // Close emoji picker on click outside
   useEffect(() => {
     if (!showEmojiPicker) return;
@@ -151,12 +186,15 @@ export function ChatInput({
     editor?.commands.focus();
   }, [editor]);
 
-  const uploadFile = async (file: File | Blob, filename?: string): Promise<{ key: string } | null> => {
+  const uploadFile = async (file: File | Blob, filename?: string, onProgress?: (pct: number) => void): Promise<{ key: string } | null> => {
     const formData = new FormData();
     formData.append('file', file, filename || (file instanceof File ? file.name : 'file'));
     try {
       const res = await apiClient.post<{ key: string; url: string }>('/files/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total && onProgress) onProgress(Math.round((e.loaded * 100) / e.total));
+        },
       });
       return { key: res.data.key };
     } catch {
@@ -175,11 +213,20 @@ export function ChatInput({
 
     if (hasFiles) {
       setUploading(true);
+      // Mark all files as pending upload
+      setPendingFiles(prev => prev.map(f => ({ ...f, uploadStatus: 'pending' as const, uploadProgress: 0 })));
       try {
         const results = await Promise.all(
-          pendingFiles.map(async (pf) => {
-            const res = await uploadFile(pf.file);
-            if (!res) return null;
+          pendingFiles.map(async (pf, index) => {
+            setPendingFiles(prev => prev.map((f, i) => i === index ? { ...f, uploadStatus: 'uploading' as const, uploadProgress: 0 } : f));
+            const res = await uploadFile(pf.file, undefined, (pct) => {
+              setPendingFiles(prev => prev.map((f, i) => i === index ? { ...f, uploadProgress: pct } : f));
+            });
+            if (!res) {
+              setPendingFiles(prev => prev.map((f, i) => i === index ? { ...f, uploadStatus: 'error' as const } : f));
+              return null;
+            }
+            setPendingFiles(prev => prev.map((f, i) => i === index ? { ...f, uploadStatus: 'done' as const, uploadProgress: 100 } : f));
             return {
               id: crypto.randomUUID(),
               name: pf.file.name,
@@ -225,6 +272,19 @@ export function ChatInput({
     });
   }, []);
 
+  const insertClipboardImage = useCallback(() => {
+    if (!clipboardImage) return;
+    const file = new File([clipboardImage.blob], `clipboard-${Date.now()}.png`, { type: clipboardImage.blob.type });
+    addFiles([file]);
+    URL.revokeObjectURL(clipboardImage.preview);
+    setClipboardImage(null);
+  }, [clipboardImage, addFiles]);
+
+  const dismissClipboard = useCallback(() => {
+    if (clipboardImage) URL.revokeObjectURL(clipboardImage.preview);
+    setClipboardImage(null);
+  }, [clipboardImage]);
+
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -238,8 +298,12 @@ export function ChatInput({
     if (mediaFiles.length > 0) {
       e.preventDefault();
       addFiles(mediaFiles);
+      if (clipboardImage) {
+        URL.revokeObjectURL(clipboardImage.preview);
+        setClipboardImage(null);
+      }
     }
-  }, [addFiles]);
+  }, [addFiles, clipboardImage]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
   const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); }, []);
@@ -355,6 +419,22 @@ export function ChatInput({
         </div>
       )}
 
+      {/* Clipboard image suggestion (Telegram-style) */}
+      {clipboardImage && pendingFiles.length === 0 && !uploading && (
+        <div data-testid="chat-clipboard-banner" className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 dark:border-gray-700 bg-primary-50/50 dark:bg-primary-900/10">
+          <img src={clipboardImage.preview} alt="Буфер обмена" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Изображение в буфере обмена</span>
+          </div>
+          <button onClick={insertClipboardImage} className="text-xs font-medium text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 px-2 py-1 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors">
+            Вставить
+          </button>
+          <button onClick={dismissClipboard} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" aria-label="Скрыть">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {replyTo && (
         <div data-testid="chat-reply-preview" className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-700">
           <div className="w-0.5 h-8 bg-primary-500 rounded-full flex-shrink-0" />
@@ -393,13 +473,40 @@ export function ChatInput({
                   </span>
                 </div>
               )}
-              <button
-                onClick={() => removeFile(i)}
-                aria-label="Удалить файл"
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="w-3 h-3" />
-              </button>
+              {/* Upload progress overlay */}
+              {pf.uploadStatus === 'uploading' && (
+                <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                  <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="14" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="2.5" />
+                    <circle cx="18" cy="18" r="14" fill="none" stroke="white" strokeWidth="2.5"
+                      strokeDasharray={`${(pf.uploadProgress || 0) * 0.88} 88`}
+                      strokeLinecap="round" className="transition-[stroke-dasharray] duration-200" />
+                  </svg>
+                  <span className="absolute text-[10px] text-white font-medium">{pf.uploadProgress || 0}%</span>
+                </div>
+              )}
+              {pf.uploadStatus === 'done' && (
+                <div className="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                </div>
+              )}
+              {pf.uploadStatus === 'error' && (
+                <div className="absolute inset-0 bg-red-500/40 rounded-lg flex items-center justify-center">
+                  <X className="w-5 h-5 text-white" />
+                </div>
+              )}
+              {/* Remove button — hide during upload */}
+              {!uploading && (
+                <button
+                  onClick={() => removeFile(i)}
+                  aria-label="Удалить файл"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -465,7 +572,7 @@ export function ChatInput({
 
           {hasContent || pendingFiles.length > 0 ? (
             <button data-testid="chat-send-btn" onClick={handleSend} disabled={uploading} aria-label="Отправить сообщение" className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white transition-colors flex-shrink-0 mb-0.5">
-              <Send className="w-5 h-5" />
+              {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </button>
           ) : (
             <button data-testid="chat-mic-btn" onClick={startRecording} aria-label="Голосовое сообщение" className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5" title="Голосовое сообщение">
