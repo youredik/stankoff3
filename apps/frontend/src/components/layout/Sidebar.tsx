@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import {
   Plus,
@@ -41,6 +41,7 @@ import type { Workspace, MenuSection } from '@/types';
 
 const STORAGE_KEY = 'stankoff-selected-workspace';
 const DIRECTORIES_COLLAPSED_KEY = 'stankoff-directories-collapsed';
+const SIDEBAR_SCROLL_KEY = 'stankoff-sidebar-scroll';
 
 function getDirectoryIcon(systemType?: string | null) {
   switch (systemType) {
@@ -116,6 +117,20 @@ export function Sidebar() {
     const counts = s.unreadCounts;
     return Object.values(counts).reduce((sum, c) => sum + c, 0);
   });
+  // Сохранение позиции скролла сайдбара при навигации
+  const navRef = useRef<HTMLElement>(null);
+  const handleNavScroll = useCallback(() => {
+    if (navRef.current) {
+      sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(navRef.current.scrollTop));
+    }
+  }, []);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+    if (saved) nav.scrollTop = Number(saved);
+  }, []);
+
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [sectionMenuOpen, setSectionMenuOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -599,7 +614,7 @@ export function Sidebar() {
           </button>
         </div>
 
-        <nav className="p-4 flex-1 overflow-y-auto">
+        <nav ref={navRef} onScroll={handleNavScroll} className="p-4 flex-1 overflow-y-auto">
           {/* Create buttons - только для пользователей с правами создания */}
           {(canCreateWorkspace || canCreateSection) && (
             <div className="mb-4 flex gap-2">

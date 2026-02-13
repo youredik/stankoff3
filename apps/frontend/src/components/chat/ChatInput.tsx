@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, Paperclip, X, Mic, FileText } from 'lucide-react';
+import { Send, Paperclip, X, Mic, FileText, Smile } from 'lucide-react';
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import type { ChatMessage, ChatMessageAttachment } from '@/types';
 import { getSocket } from '@/lib/socket';
 import { apiClient } from '@/lib/api/client';
@@ -34,7 +35,9 @@ export function ChatInput({
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -67,11 +70,43 @@ export function ChatInput({
     };
   }, []);
 
+  // Close emoji picker on click outside
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
+
+  const handleEmojiClick = useCallback((emojiData: EmojiClickData) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newContent = content.slice(0, start) + emojiData.emoji + content.slice(end);
+      setContent(newContent);
+      // Set cursor position after emoji
+      requestAnimationFrame(() => {
+        const pos = start + emojiData.emoji.length;
+        textarea.setSelectionRange(pos, pos);
+        textarea.focus();
+      });
+    } else {
+      setContent(prev => prev + emojiData.emoji);
+    }
+  }, [content]);
+
   const uploadFile = async (file: File | Blob, filename?: string): Promise<{ key: string } | null> => {
     const formData = new FormData();
     formData.append('file', file, filename || (file instanceof File ? file.name : 'file'));
     try {
-      const res = await apiClient.post<{ key: string; url: string }>('/files/upload', formData);
+      const res = await apiClient.post<{ key: string; url: string }>('/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return { key: res.data.key };
     } catch {
       return null;
@@ -363,8 +398,33 @@ export function ChatInput({
               onPaste={handlePaste}
               placeholder={isAiChat ? 'Спросите AI ассистента...' : 'Сообщение...'}
               rows={1}
-              className="w-full resize-none bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500 max-h-[200px]"
+              className="w-full resize-none bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-2.5 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500 max-h-[200px]"
             />
+            <div ref={emojiPickerRef} className="absolute right-1 bottom-1">
+              <button
+                data-testid="chat-emoji-btn"
+                onClick={() => setShowEmojiPicker(v => !v)}
+                className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="Эмодзи"
+                aria-label="Выбрать эмодзи"
+                type="button"
+              >
+                <Smile className="w-5 h-5" />
+              </button>
+              {showEmojiPicker && (
+                <div className="absolute bottom-10 right-0 z-50 shadow-xl rounded-xl overflow-hidden">
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                    theme={Theme.AUTO}
+                    width={320}
+                    height={400}
+                    searchPlaceHolder="Поиск эмодзи..."
+                    previewConfig={{ showPreview: false }}
+                    lazyLoadEmojis
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {content.trim() || pendingFiles.length > 0 ? (
