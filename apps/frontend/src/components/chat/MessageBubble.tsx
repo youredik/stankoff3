@@ -2,12 +2,14 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Check, CheckCheck, Reply, Copy, Pencil, Trash2, Pin, SmilePlus, Sparkles } from 'lucide-react';
+import { Check, CheckCheck, Reply, Copy, Pencil, Trash2, Pin, SmilePlus, Sparkles, Download } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { VoicePlayer } from './VoicePlayer';
 import type { ChatMessage, ChatMessageReaction } from '@/types';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
+import { getSignedUrl } from '@/lib/signedUrl';
 
 const AI_BOT_EMAIL = 'ai-assistant@stankoff.ru';
 
@@ -49,12 +51,18 @@ function SystemMessage({ message }: { message: ChatMessage }) {
   );
 }
 
-function ImagePreview({ src, alt }: { src: string; alt: string }) {
+function ImagePreview({ fileKey, alt }: { fileKey: string; alt: string }) {
+  const signedUrl = useSignedUrl(fileKey);
   const [fullscreen, setFullscreen] = useState(false);
+
+  if (!signedUrl) {
+    return <div className="rounded-lg w-[200px] h-[150px] bg-gray-100 dark:bg-gray-700 animate-pulse" />;
+  }
+
   return (
     <>
       <img
-        src={src}
+        src={signedUrl}
         alt={alt}
         className="rounded-lg max-w-full max-h-[300px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
         onClick={() => setFullscreen(true)}
@@ -62,7 +70,7 @@ function ImagePreview({ src, alt }: { src: string; alt: string }) {
       />
       {fullscreen && (
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={() => setFullscreen(false)}>
-          <img src={src} alt={alt} className="max-w-full max-h-full object-contain" />
+          <img src={signedUrl} alt={alt} className="max-w-full max-h-full object-contain" />
         </div>
       )}
     </>
@@ -222,7 +230,7 @@ export function MessageBubble({
 
           {imageAttachments.length > 0 && (
             <div className={`space-y-1.5 ${message.type === 'text' && message.content ? 'mb-1.5' : ''}`}>
-              {imageAttachments.map(att => <ImagePreview key={att.id} src={`/api/files/download/${att.key}`} alt={att.name} />)}
+              {imageAttachments.map(att => <ImagePreview key={att.id} fileKey={att.key} alt={att.name} />)}
             </div>
           )}
 
@@ -242,10 +250,23 @@ export function MessageBubble({
           {fileAttachments.length > 0 && (
             <div className="mt-1.5 space-y-1">
               {fileAttachments.map(att => (
-                <a key={att.id} href={`/api/files/download/${att.key}?name=${encodeURIComponent(att.name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 hover:underline">
+                <button
+                  key={att.id}
+                  onClick={async () => {
+                    const url = await getSignedUrl(att.key);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = att.name;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.click();
+                  }}
+                  className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 hover:underline cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="truncate">{att.name}</span>
                   <span className="text-gray-400 flex-shrink-0">{(att.size / 1024).toFixed(0)} KB</span>
-                </a>
+                </button>
               ))}
             </div>
           )}
@@ -264,8 +285,11 @@ export function MessageBubble({
 
         <ReactionBar reactions={message.reactions || []} messageId={message.id} conversationId={conversationId} isOwn={isOwn} />
 
+        {/* Invisible bridge to keep hover active when moving cursor toward action buttons */}
+        <div className={`absolute top-0 h-10 ${isOwn ? '-left-14 w-14' : '-right-14 w-14'} hidden group-hover:block`} />
+
         {/* Hover actions: reply + reaction */}
-        <div className={`absolute top-0 ${isOwn ? '-left-16' : '-right-16'} hidden group-hover:flex items-start pt-1 gap-0.5`}>
+        <div className={`absolute top-0 ${isOwn ? '-left-14' : '-right-14'} hidden group-hover:flex items-start pt-1 gap-0.5`}>
           <button data-testid="chat-hover-reply" onClick={onReply} className="p-1 rounded-full bg-white dark:bg-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600" title="Ответить">
             <Reply className="w-3.5 h-3.5 text-gray-500" />
           </button>

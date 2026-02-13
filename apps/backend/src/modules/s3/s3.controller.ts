@@ -105,8 +105,18 @@ export class S3Controller {
     };
   }
 
-  @Get('signed-url/:key')
-  async getSignedUrl(@Param('key') key: string) {
+  @Get('signed-url/*path')
+  async getSignedUrl(
+    @Param('path') pathSegments: string | string[],
+  ) {
+    const key = Array.isArray(pathSegments)
+      ? pathSegments.join('/')
+      : pathSegments;
+
+    if (!key) {
+      throw new BadRequestException('Не указан ключ файла');
+    }
+
     const url = await this.s3Service.getSignedUrl(key);
     return { url };
   }

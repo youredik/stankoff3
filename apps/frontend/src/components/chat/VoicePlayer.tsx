@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause } from 'lucide-react';
+import { getSignedUrl } from '@/lib/signedUrl';
 
 interface VoicePlayerProps {
   voiceKey: string;
@@ -19,6 +20,7 @@ export function VoicePlayer({ voiceKey, duration, waveform }: VoicePlayerProps) 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Normalize waveform to 30 bars
@@ -26,8 +28,16 @@ export function VoicePlayer({ voiceKey, duration, waveform }: VoicePlayerProps) 
     ? normalizeWaveform(waveform, 30)
     : Array(30).fill(0.3);
 
+  // Fetch signed URL for voice file
   useEffect(() => {
-    const audio = new Audio(`/api/files/${voiceKey}`);
+    getSignedUrl(voiceKey).then(setAudioUrl).catch(() => {});
+  }, [voiceKey]);
+
+  // Create Audio element once we have the signed URL
+  useEffect(() => {
+    if (!audioUrl) return;
+
+    const audio = new Audio(audioUrl);
     audioRef.current = audio;
 
     audio.addEventListener('timeupdate', () => {
@@ -42,7 +52,7 @@ export function VoicePlayer({ voiceKey, duration, waveform }: VoicePlayerProps) 
       audio.pause();
       audio.src = '';
     };
-  }, [voiceKey]);
+  }, [audioUrl]);
 
   useEffect(() => {
     if (audioRef.current) {
