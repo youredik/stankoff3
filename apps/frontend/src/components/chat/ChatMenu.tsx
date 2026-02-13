@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { LogOut, UserPlus, BellOff, Bell, Edit3, Users, X, Search } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { LogOut, UserPlus, Edit3, Users, X, Search, Check, Pencil } from 'lucide-react';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -26,10 +26,13 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
   const fetchConversations = useChatStore((s) => s.fetchConversations);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState('');
   const [allUsers, setAllUsers] = useState<UserItem[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const conversation = conversations.find((c) => c.id === conversationId);
   if (!conversation) return null;
@@ -82,6 +85,27 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
       // error
     }
   };
+
+  const startEditingName = useCallback(() => {
+    setNameValue(conversation.name || '');
+    setEditingName(true);
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+  }, [conversation.name]);
+
+  const handleRename = useCallback(async () => {
+    const trimmed = nameValue.trim();
+    if (!trimmed || trimmed === conversation.name) {
+      setEditingName(false);
+      return;
+    }
+    try {
+      await chatApi.updateConversation(conversationId, { name: trimmed });
+      fetchConversations();
+    } catch {
+      // error
+    }
+    setEditingName(false);
+  }, [nameValue, conversation.name, conversationId, fetchConversations]);
 
   // Load users for add member
   useEffect(() => {
@@ -160,6 +184,45 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
         ) : (
           /* Main menu */
           <div>
+            {/* Rename group chat */}
+            {canManageMembers && (
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-500 uppercase mb-1.5 block">Название чата</span>
+                {editingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={nameInputRef}
+                      data-testid="chat-menu-name-input"
+                      type="text"
+                      value={nameValue}
+                      onChange={e => setNameValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setEditingName(false); }}
+                      maxLength={100}
+                      placeholder="Введите название..."
+                      className="flex-1 text-sm bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 border-0 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:text-gray-200"
+                    />
+                    <button onClick={handleRename} className="p-1.5 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors" title="Сохранить">
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setEditingName(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 transition-colors" title="Отмена">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    data-testid="chat-menu-rename-btn"
+                    onClick={startEditingName}
+                    className="flex items-center gap-2 w-full text-left group"
+                  >
+                    <span className="text-sm text-gray-900 dark:text-gray-100 truncate flex-1">
+                      {getConversationName(conversation, user?.id)}
+                    </span>
+                    <Pencil className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Participants */}
             <div data-testid="chat-menu-participants" className="px-4 py-2">
               <div className="flex items-center justify-between mb-2">
