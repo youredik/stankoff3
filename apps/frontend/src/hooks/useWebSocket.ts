@@ -423,8 +423,8 @@ export function useWebSocket() {
       useChatStore.getState().onTyping(data.conversationId, data.userId);
     });
 
-    socket.on('chat:read', (data: { conversationId: string; userId: string; lastReadMessageId: string }) => {
-      useChatStore.getState().onReadReceipt(data.conversationId, data.userId, data.lastReadMessageId);
+    socket.on('chat:read', (data: { conversationId: string; userId: string; lastReadMessageId: string; lastReadAt?: string }) => {
+      useChatStore.getState().onReadReceipt(data.conversationId, data.userId, data.lastReadMessageId, data.lastReadAt);
     });
 
     socket.on('chat:conversation:created', (conversation: any) => {

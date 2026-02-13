@@ -30,6 +30,9 @@ export class Conversation {
   @Column({ type: 'varchar', length: 255, nullable: true })
   name: string | null;
 
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  icon: string | null;
+
   @Column({ type: 'uuid', nullable: true })
   entityId: string | null;
 

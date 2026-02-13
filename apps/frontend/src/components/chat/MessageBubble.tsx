@@ -18,6 +18,7 @@ interface MessageBubbleProps {
   isLastInGroup: boolean;
   onReply: () => void;
   conversationId: string;
+  isRead?: boolean;
 }
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
@@ -135,6 +136,7 @@ export function MessageBubble({
   isLastInGroup,
   onReply,
   conversationId,
+  isRead,
 }: MessageBubbleProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
@@ -220,7 +222,7 @@ export function MessageBubble({
 
           {imageAttachments.length > 0 && (
             <div className={`space-y-1.5 ${message.type === 'text' && message.content ? 'mb-1.5' : ''}`}>
-              {imageAttachments.map(att => <ImagePreview key={att.id} src={`/api/files/${att.key}`} alt={att.name} />)}
+              {imageAttachments.map(att => <ImagePreview key={att.id} src={`/api/files/download/${att.key}`} alt={att.name} />)}
             </div>
           )}
 
@@ -240,7 +242,7 @@ export function MessageBubble({
           {fileAttachments.length > 0 && (
             <div className="mt-1.5 space-y-1">
               {fileAttachments.map(att => (
-                <a key={att.id} href={`/api/files/${att.key}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 hover:underline">
+                <a key={att.id} href={`/api/files/download/${att.key}?name=${encodeURIComponent(att.name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 hover:underline">
                   <span className="truncate">{att.name}</span>
                   <span className="text-gray-400 flex-shrink-0">{(att.size / 1024).toFixed(0)} KB</span>
                 </a>
@@ -253,7 +255,10 @@ export function MessageBubble({
           <span className="float-right ml-2 mt-1 flex items-center gap-0.5">
             {message.isEdited && <span data-testid="chat-message-edited" className="text-[10px] text-gray-400 dark:text-gray-500 mr-0.5">ред.</span>}
             <span className={`text-[11px] ${isOwn ? 'text-green-600/60 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`}>{time}</span>
-            {isOwn && <CheckCheck className="w-3.5 h-3.5 text-green-600/60 dark:text-blue-400" />}
+            {isOwn && (isRead
+              ? <CheckCheck className="w-3.5 h-3.5 text-green-600/60 dark:text-blue-400" />
+              : <Check className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+            )}
           </span>
         </div>
 

@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Loader2, ArrowDown } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { DateSeparator } from './DateSeparator';
+import { useChatStore } from '@/store/useChatStore';
 import type { ChatMessage } from '@/types';
 
 interface MessageListProps {
@@ -60,6 +62,21 @@ export function MessageList({
   const bottomRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const prevMessagesLenRef = useRef(0);
+
+  // Compute the latest read time by OTHER participants (for read receipt checkmarks)
+  const conversations = useChatStore((s) => s.conversations);
+  const readByOthersAt = useMemo(() => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv?.participants) return null;
+    let maxReadAt: string | null = null;
+    for (const p of conv.participants) {
+      if (p.userId === currentUserId || p.leftAt) continue;
+      if (p.lastReadAt && (!maxReadAt || p.lastReadAt > maxReadAt)) {
+        maxReadAt = p.lastReadAt;
+      }
+    }
+    return maxReadAt;
+  }, [conversations, conversationId, currentUserId]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -135,6 +152,7 @@ export function MessageList({
                   isLastInGroup={isLastInGroup(msg, next)}
                   onReply={() => onReply(msg)}
                   conversationId={conversationId}
+                  isRead={!!readByOthersAt && msg.createdAt <= readByOthersAt}
                 />
               )}
             </div>
@@ -148,7 +166,7 @@ export function MessageList({
       {!isAtBottomRef.current && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-white dark:bg-gray-700 shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+          className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-white dark:bg-gray-700 shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           <ArrowDown className="w-5 h-5 text-gray-600 dark:text-gray-300" />
         </button>

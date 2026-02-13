@@ -85,7 +85,7 @@ export function RuleBuilder({ rules, allFields, onChange }: RuleBuilderProps) {
             {/* Header */}
             <button
               onClick={() => setExpandedIdx(isExpanded ? null : idx)}
-              className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 text-left"
+              className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
             >
               <typeInfo.icon className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-xs font-medium text-gray-700 dark:text-gray-300">

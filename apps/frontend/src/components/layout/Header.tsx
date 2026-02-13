@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useCallback, Suspense } from 'react';
+import { useState, useCallback, useEffect, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Bell, LayoutGrid, BarChart3, List, Menu, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, MessageSquare, LayoutGrid, BarChart3, List, Menu, LogOut, ChevronDown } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { NotificationPanel } from './NotificationPanel';
 import { GlobalSearch } from './GlobalSearch';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useNotificationStore } from '@/store/useNotificationStore';
+import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
@@ -48,6 +49,15 @@ function HeaderInner() {
   const { user, logout } = useAuthStore();
   const { toggle: toggleSidebar } = useSidebarStore();
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Chat unread counts
+  const chatUnreadCounts = useChatStore((s) => s.unreadCounts);
+  const fetchUnreadCounts = useChatStore((s) => s.fetchUnreadCounts);
+  const totalChatUnread = Object.values(chatUnreadCounts).reduce((sum, c) => sum + c, 0);
+
+  useEffect(() => {
+    fetchUnreadCounts();
+  }, [fetchUnreadCounts]);
 
   const handleLogout = async () => {
     setShowUserMenu(false);
@@ -121,6 +131,23 @@ function HeaderInner() {
           <div className="flex items-center gap-3">
             {/* Theme Toggle */}
             <ThemeToggle />
+
+            {/* Chat */}
+            <button
+              data-testid="header-chat-btn"
+              aria-label="Чат"
+              className={`relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors cursor-pointer ${
+                pathname === '/chat' ? 'text-primary-500' : ''
+              }`}
+              onClick={() => router.push('/chat')}
+            >
+              <MessageSquare className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              {totalChatUnread > 0 && (
+                <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] bg-primary-500 text-white text-[10px] font-semibold flex items-center justify-center rounded-full px-1">
+                  {totalChatUnread > 9 ? '9+' : totalChatUnread}
+                </span>
+              )}
+            </button>
 
             {/* Notifications */}
             <button

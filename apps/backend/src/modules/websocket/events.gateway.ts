@@ -7,6 +7,9 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, IsNull } from 'typeorm';
+import { ConversationParticipant } from '../chat/entities/conversation-participant.entity';
 
 interface AuthenticatedSocket extends Socket {
   data: {
@@ -31,9 +34,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // userId → Set<socketId> (один пользователь может иметь несколько вкладок)
   private onlineUsers = new Map<string, Set<string>>();
 
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    @InjectRepository(ConversationParticipant)
+    private participantRepo: Repository<ConversationParticipant>,
+  ) {}
 
-  handleConnection(client: AuthenticatedSocket) {
+  async handleConnection(client: AuthenticatedSocket) {
     try {
       // Получаем токен из auth или headers
       const token =
@@ -47,6 +54,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
         // Presence tracking
         this.addUserPresence(payload.sub, client.id);
+
+        // Auto-join all chat rooms
+        await this.joinUserChatRooms(client, payload.sub);
       } else {
         // Разрешаем анонимные подключения (для обратной совместимости)
         console.log(`Client connected (anonymous): ${client.id}`);
@@ -65,6 +75,21 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data?.user?.sub;
     if (userId) {
       this.removeUserPresence(userId, client.id);
+    }
+  }
+
+  /** Auto-join user to all their conversation rooms */
+  private async joinUserChatRooms(client: Socket, userId: string) {
+    try {
+      const participants = await this.participantRepo.find({
+        where: { userId, leftAt: IsNull() },
+        select: ['conversationId'],
+      });
+      for (const p of participants) {
+        client.join(`chat:${p.conversationId}`);
+      }
+    } catch {
+      // DB might not be ready yet
     }
   }
 
@@ -128,6 +153,22 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     clients.forEach((client: AuthenticatedSocket) => {
       if (client.data?.user?.sub === userId) {
         client.emit(event, data);
+      }
+    });
+  }
+
+  /** Broadcast to a conversation room (all sockets joined to the room) */
+  emitToConversationRoom(conversationId: string, event: string, data: any) {
+    this.server.to(`chat:${conversationId}`).emit(event, data);
+  }
+
+  /** Join a user's sockets to a conversation room (e.g. after creating/joining a chat) */
+  joinUserToConversation(userId: string, conversationId: string) {
+    const room = `chat:${conversationId}`;
+    const clients = this.server.sockets.sockets;
+    clients.forEach((client: AuthenticatedSocket) => {
+      if (client.data?.user?.sub === userId) {
+        client.join(room);
       }
     });
   }
@@ -216,7 +257,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Обновление токена без разрыва соединения
   @SubscribeMessage('auth:refresh')
-  handleAuthRefresh(client: AuthenticatedSocket, payload: { token: string }): { success: boolean } {
+  async handleAuthRefresh(client: AuthenticatedSocket, payload: { token: string }): Promise<{ success: boolean }> {
     try {
       const oldUserId = client.data?.user?.sub;
       const newPayload = this.jwtService.verify(payload.token);
@@ -229,6 +270,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } else if (!oldUserId && newPayload.sub) {
         this.addUserPresence(newPayload.sub, client.id);
       }
+
+      // Auto-join chat rooms after auth refresh
+      await this.joinUserChatRooms(client, newPayload.sub);
 
       return { success: true };
     } catch {

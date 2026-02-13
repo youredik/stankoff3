@@ -107,6 +107,7 @@ export class ChatService implements OnModuleInit {
     const conversation = this.conversationRepo.create({
       type: dto.type,
       name: dto.name || null,
+      icon: dto.icon || null,
       entityId: dto.entityId || null,
       createdById: userId,
     });
@@ -147,12 +148,36 @@ export class ChatService implements OnModuleInit {
 
     const full = await this.getConversationWithParticipants(saved.id);
 
-    // Notify all participants
+    // Join all participants to the room and notify
     const participantIds = [userId, ...dto.participantIds];
     for (const pid of new Set(participantIds)) {
+      this.eventsGateway.joinUserToConversation(pid, saved.id);
       this.eventsGateway.emitToUser(pid, 'chat:conversation:created', full);
     }
 
+    return full;
+  }
+
+  async updateConversation(conversationId: string, userId: string, dto: { name?: string; icon?: string }) {
+    await this.assertParticipant(conversationId, userId);
+    const conversation = await this.conversationRepo.findOne({ where: { id: conversationId } });
+    if (!conversation) throw new NotFoundException('Чат не найден');
+    if (conversation.type === 'direct') throw new BadRequestException('Нельзя изменить личный чат');
+
+    if (dto.name !== undefined) conversation.name = dto.name;
+    if (dto.icon !== undefined) conversation.icon = dto.icon || null;
+    await this.conversationRepo.save(conversation);
+
+    const full = await this.getConversationWithParticipants(conversationId);
+    if (!full) throw new NotFoundException('Чат не найден');
+    this.emitToConversation(conversationId, 'chat:conversation:updated', {
+      conversationId,
+      name: full.name,
+      icon: full.icon,
+      lastMessageAt: full.lastMessageAt,
+      lastMessagePreview: full.lastMessagePreview,
+      lastMessageAuthorId: full.lastMessageAuthorId,
+    });
     return full;
   }
 
@@ -337,6 +362,7 @@ export class ChatService implements OnModuleInit {
       conversationId,
       userId,
       lastReadMessageId: dto.lastReadMessageId,
+      lastReadAt: participant.lastReadAt.toISOString(),
     });
 
     return { success: true };
@@ -378,6 +404,8 @@ export class ChatService implements OnModuleInit {
         );
       }
       added.push(uid);
+      // Join new participant to the socket room
+      this.eventsGateway.joinUserToConversation(uid, conversationId);
     }
 
     // System message about added users
@@ -734,14 +762,8 @@ export class ChatService implements OnModuleInit {
     return { deleted: testConversations.length };
   }
 
-  private async emitToConversation(conversationId: string, event: string, data: any) {
-    // Get all active participants and emit to each
-    const participants = await this.participantRepo.find({
-      where: { conversationId, leftAt: IsNull() },
-    });
-
-    for (const p of participants) {
-      this.eventsGateway.emitToUser(p.userId, event, data);
-    }
+  private emitToConversation(conversationId: string, event: string, data: any) {
+    // Broadcast via Socket.IO room — all participants auto-join rooms on connect
+    this.eventsGateway.emitToConversationRoom(conversationId, event, data);
   }
 }

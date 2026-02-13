@@ -136,7 +136,7 @@ export function ChatSearchPanel({ conversationId, onClose }: ChatSearchPanelProp
               className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
                 i === selectedIndex
                   ? 'bg-primary-50 dark:bg-primary-900/20'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-750'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
               <div className="flex justify-between items-center mb-0.5">

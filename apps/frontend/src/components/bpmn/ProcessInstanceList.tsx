@@ -94,7 +94,7 @@ export function ProcessInstanceList({
             {/* Header */}
             <div
               onClick={() => setExpandedId(isExpanded ? null : instance.id)}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750"
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <button className="text-gray-400">
                 {isExpanded ? (

@@ -915,6 +915,7 @@ export interface ChatConversation {
   id: string;
   type: ConversationType;
   name: string | null;
+  icon: string | null;
   entityId: string | null;
   workspaceId: string | null;
   createdById: string;

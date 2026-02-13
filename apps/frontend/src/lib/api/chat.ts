@@ -17,11 +17,17 @@ export const chatApi = {
   createConversation: (data: {
     type: 'direct' | 'group' | 'entity' | 'ai_assistant';
     name?: string;
+    icon?: string;
     entityId?: string;
     participantIds: string[];
   }) =>
     apiClient
       .post<ChatConversation>('/chat/conversations', data)
+      .then((r) => r.data),
+
+  updateConversation: (id: string, data: { name?: string; icon?: string }) =>
+    apiClient
+      .patch<ChatConversation>(`/chat/conversations/${id}`, data)
       .then((r) => r.data),
 
   getConversation: (id: string) =>

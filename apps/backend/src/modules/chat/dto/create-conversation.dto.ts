@@ -16,6 +16,10 @@ export class CreateConversationDto {
 
   @IsString()
   @IsOptional()
+  icon?: string;
+
+  @IsString()
+  @IsOptional()
   entityId?: string;
 
   @IsArray()

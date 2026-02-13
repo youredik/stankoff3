@@ -26,6 +26,8 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
   const [mode, setMode] = useState<'direct' | 'group'>('direct');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
+  const [groupIcon, setGroupIcon] = useState('');
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
       const conv = await createConversation({
         type: 'group',
         name: groupName,
+        icon: groupIcon || undefined,
         participantIds: selectedIds,
       });
       fetchMessages(conv.id);
@@ -132,16 +135,40 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
           </button>
         </div>
 
-        {/* Group name */}
+        {/* Group name + icon */}
         {mode === 'group' && (
-          <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-            <input
-              type="text"
-              placeholder="Название группы..."
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 border-0 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:text-gray-200"
-            />
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowIconPicker(!showIconPicker)}
+                className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title="Выбрать иконку"
+              >
+                {groupIcon || <Users className="w-5 h-5 text-gray-400" />}
+              </button>
+              <input
+                type="text"
+                placeholder="Название группы..."
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 border-0 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:text-gray-200"
+              />
+            </div>
+            {showIconPicker && (
+              <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                {['💬', '🏢', '🚀', '💡', '🎯', '📊', '🔧', '📋', '🎨', '📦', '🔥', '⭐', '💎', '🌍', '📱', '🎮', '🎵', '📸', '🏆', '❤️'].map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => { setGroupIcon(groupIcon === emoji ? '' : emoji); setShowIconPicker(false); }}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors ${groupIcon === emoji ? 'bg-primary-100 dark:bg-primary-900/30 ring-1 ring-primary-500' : ''}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -168,7 +195,7 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
                 selectedIds.includes(u.id)
                   ? 'bg-primary-50 dark:bg-primary-900/20'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-750'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
               <UserAvatar

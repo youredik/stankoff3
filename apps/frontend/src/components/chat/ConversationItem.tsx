@@ -43,7 +43,7 @@ export function ConversationItem({
       className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
         isSelected
           ? 'bg-primary-500 text-white'
-          : 'hover:bg-gray-50 dark:hover:bg-gray-750'
+          : 'hover:bg-gray-50 dark:hover:bg-gray-700'
       }`}
     >
       {/* Avatar */}
@@ -59,6 +59,10 @@ export function ConversationItem({
             userId={otherParticipant.userId}
             size="md"
           />
+        ) : conversation.icon ? (
+          <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center text-lg">
+            {conversation.icon}
+          </div>
         ) : (
           <div className="w-8 h-8 bg-primary-200 dark:bg-primary-800 rounded-full flex items-center justify-center">
             <Users className="w-4 h-4 text-primary-600 dark:text-primary-300" />

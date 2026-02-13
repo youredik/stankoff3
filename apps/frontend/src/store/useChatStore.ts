@@ -37,6 +37,7 @@ interface ChatState {
   createConversation: (data: {
     type: 'direct' | 'group' | 'entity' | 'ai_assistant';
     name?: string;
+    icon?: string;
     entityId?: string;
     participantIds: string[];
   }) => Promise<ChatConversation>;
@@ -53,13 +54,15 @@ interface ChatState {
   onMessageEdited: (conversationId: string, message: ChatMessage) => void;
   onMessageDeleted: (conversationId: string, messageId: string) => void;
   onTyping: (conversationId: string, userId: string) => void;
-  onReadReceipt: (conversationId: string, userId: string, lastReadMessageId: string) => void;
+  onReadReceipt: (conversationId: string, userId: string, lastReadMessageId: string, lastReadAt?: string) => void;
   onConversationCreated: (conversation: ChatConversation) => void;
   onConversationUpdated: (data: {
     conversationId: string;
-    lastMessageAt: string;
-    lastMessagePreview: string;
-    lastMessageAuthorId: string;
+    lastMessageAt?: string;
+    lastMessagePreview?: string;
+    lastMessageAuthorId?: string;
+    name?: string | null;
+    icon?: string | null;
   }) => void;
   onReactionUpdated: (conversationId: string, messageId: string, reactions: ChatMessageReaction[]) => void;
   onMessagePinned: (conversationId: string, message: ChatMessage) => void;
@@ -397,7 +400,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  onReadReceipt: (conversationId, _userId, _lastReadMessageId) => {
+  onReadReceipt: (conversationId, userId, lastReadMessageId, lastReadAt) => {
+    // Update participant's lastReadAt in conversation data for read receipt display
+    set((state) => ({
+      conversations: state.conversations.map(c => {
+        if (c.id !== conversationId) return c;
+        return {
+          ...c,
+          participants: (c.participants || []).map(p => {
+            if (p.userId !== userId) return p;
+            return {
+              ...p,
+              lastReadMessageId,
+              lastReadAt: lastReadAt || new Date().toISOString(),
+            };
+          }),
+        };
+      }),
+    }));
     get().fetchUnreadCounts();
   },
 
@@ -415,9 +435,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
           c.id === data.conversationId
             ? {
                 ...c,
-                lastMessageAt: data.lastMessageAt,
-                lastMessagePreview: data.lastMessagePreview,
-                lastMessageAuthorId: data.lastMessageAuthorId,
+                ...(data.lastMessageAt !== undefined && { lastMessageAt: data.lastMessageAt }),
+                ...(data.lastMessagePreview !== undefined && { lastMessagePreview: data.lastMessagePreview }),
+                ...(data.lastMessageAuthorId !== undefined && { lastMessageAuthorId: data.lastMessageAuthorId }),
+                ...(data.name !== undefined && { name: data.name }),
+                ...(data.icon !== undefined && { icon: data.icon }),
               }
             : c,
         )

@@ -5,7 +5,6 @@ import { LogOut, UserPlus, BellOff, Bell, Edit3, Users, X, Search } from 'lucide
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { UserAvatar } from '@/components/ui/UserAvatar';
-import { apiClient } from '@/lib/api/client';
 import { chatApi } from '@/lib/api/chat';
 import { getConversationName } from './ConversationList';
 
@@ -26,6 +25,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
   const conversations = useChatStore((s) => s.conversations);
   const fetchConversations = useChatStore((s) => s.fetchConversations);
   const [showAddMembers, setShowAddMembers] = useState(false);
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [allUsers, setAllUsers] = useState<UserItem[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -73,10 +73,22 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
     }
   };
 
+  const handleUpdateIcon = async (emoji: string) => {
+    try {
+      await chatApi.updateConversation(conversationId, { icon: emoji || '' });
+      fetchConversations();
+      setShowIconPicker(false);
+    } catch {
+      // error
+    }
+  };
+
   // Load users for add member
   useEffect(() => {
     if (showAddMembers && allUsers.length === 0) {
-      apiClient.get<UserItem[]>('/users').then(r => setAllUsers(r.data));
+      import('@/lib/api/client').then(({ apiClient }) =>
+        apiClient.get<UserItem[]>('/users').then(r => setAllUsers(r.data))
+      );
     }
   }, [showAddMembers, allUsers.length]);
 
@@ -131,7 +143,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
                   data-testid="chat-menu-add-user"
                   onClick={() => handleAddMembers(u.id)}
                   disabled={loading}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <UserAvatar firstName={u.firstName} lastName={u.lastName} userId={u.id} size="sm" />
                   <div className="text-left">
@@ -194,6 +206,40 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
                 ))}
               </div>
             </div>
+
+            {/* Icon picker for group/entity chats */}
+            {canManageMembers && (
+              <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium text-gray-500 uppercase">Иконка чата</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowIconPicker(!showIconPicker)}
+                    className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    title="Выбрать иконку"
+                  >
+                    {conversation.icon || <Edit3 className="w-4 h-4 text-gray-400" />}
+                  </button>
+                  <span className="text-xs text-gray-400">{conversation.icon ? 'Нажмите чтобы изменить' : 'Нажмите чтобы выбрать'}</span>
+                </div>
+                {showIconPicker && (
+                  <div className="flex flex-wrap gap-1.5 mt-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    {['💬', '🏢', '🚀', '💡', '🎯', '📊', '🔧', '📋', '🎨', '📦', '🔥', '⭐', '💎', '🌍', '📱', '🎮', '🎵', '📸', '🏆', '❤️'].map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => handleUpdateIcon(conversation.icon === emoji ? '' : emoji)}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center text-base hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors ${conversation.icon === emoji ? 'bg-primary-100 dark:bg-primary-900/30 ring-1 ring-primary-500' : ''}`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="border-t border-gray-100 dark:border-gray-700 py-1">

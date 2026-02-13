@@ -68,6 +68,15 @@ export class ChatController {
     return this.chatService.searchMessages(user.id, query);
   }
 
+  @Patch('conversations/:id')
+  updateConversation(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: { name?: string; icon?: string },
+  ) {
+    return this.chatService.updateConversation(id, user.id, dto);
+  }
+
   @Get('conversations/:id')
   getConversation(
     @CurrentUser() user: User,
