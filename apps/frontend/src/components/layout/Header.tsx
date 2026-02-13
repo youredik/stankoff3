@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 
 export type DashboardView = 'kanban' | 'table' | 'analytics';
 
@@ -20,10 +21,13 @@ function HeaderInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Показываем view toggle только на основной странице workspace (не settings/processes)
+  const { currentWorkspace } = useWorkspaceStore();
+
+  // Показываем view toggle только на основной странице workspace (не settings/processes/системных)
   const isWorkspacePage = pathname.startsWith('/workspace/') &&
     !pathname.includes('/settings') &&
-    !pathname.includes('/processes');
+    !pathname.includes('/processes') &&
+    !currentWorkspace?.isSystem;
 
   const currentView = (searchParams.get('view') as DashboardView) || 'kanban';
 

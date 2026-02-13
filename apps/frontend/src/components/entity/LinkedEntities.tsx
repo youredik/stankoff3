@@ -258,10 +258,10 @@ export function LinkedEntities({
   const sourceEntities = searchQuery.length >= 1 ? searchResults : preloadedEntities;
 
   // Filter entities for add modal
+  // При поиске — не фильтруем по workspace (search API ищет по всем доступным)
   const filteredEntities = sourceEntities.filter((e) => {
     if (e.id === entityId) return false;
     if (linkedEntityIds.includes(e.customId)) return false;
-    if (searchQuery.length >= 1 && selectedWorkspaceId && e.workspaceId !== selectedWorkspaceId) return false;
     return true;
   });
 

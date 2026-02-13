@@ -31,8 +31,11 @@ function WorkspaceContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const workspaceId = params.id as string;
-  const view = (searchParams.get('view') as DashboardView) || 'kanban';
   const { currentWorkspace } = useWorkspaceStore();
+  // Системные workspace (справочники) — всегда табличный вид
+  const view = currentWorkspace?.isSystem
+    ? 'table'
+    : (searchParams.get('view') as DashboardView) || 'kanban';
 
   useWebSocket();
   useEntitySync();

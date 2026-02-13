@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FileText, HelpCircle, Download, Trash2, Calendar, User, Tag } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCan } from '@/hooks/useCan';
@@ -18,6 +19,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function KnowledgeArticleCard({ article }: Props) {
+  const router = useRouter();
   const { user } = useAuthStore();
   const { deleteArticle } = useKnowledgeBaseStore();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -26,7 +28,8 @@ export function KnowledgeArticleCard({ article }: Props) {
   const canDelete = canManageKb || user?.id === article.authorId;
   const isDocument = article.type === 'document';
 
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm('Удалить эту статью? Действие необратимо.')) return;
     setIsDeleting(true);
     try {
@@ -38,14 +41,24 @@ export function KnowledgeArticleCard({ article }: Props) {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!article.fileKey) return;
     const url = `/api/files/download/${article.fileKey}?name=${encodeURIComponent(article.fileName || 'document')}`;
     window.open(url, '_blank');
   };
 
+  const handleCardClick = () => {
+    if (!isDocument) {
+      router.push(`/knowledge-base/${article.id}`);
+    }
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow group">
+    <div
+      onClick={handleCardClick}
+      className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow group ${!isDocument ? 'cursor-pointer hover:border-teal-500/50 dark:hover:border-teal-400/50' : ''}`}
+    >
       {/* Заголовок */}
       <div className="flex items-start gap-3 mb-3">
         <div

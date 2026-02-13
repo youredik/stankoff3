@@ -23,6 +23,10 @@ import {
   BookOpen,
   Shield,
   Mail,
+  Building2,
+  Contact,
+  Package,
+  Database,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
@@ -36,6 +40,16 @@ import { SectionMembersModal } from '@/components/section/SectionMembersModal';
 import type { Workspace, MenuSection } from '@/types';
 
 const STORAGE_KEY = 'stankoff-selected-workspace';
+const DIRECTORIES_COLLAPSED_KEY = 'stankoff-directories-collapsed';
+
+function getDirectoryIcon(systemType?: string | null) {
+  switch (systemType) {
+    case 'counterparties': return Building2;
+    case 'contacts': return Contact;
+    case 'products': return Package;
+    default: return Database;
+  }
+}
 
 // Группировка workspaces по разделам
 interface GroupedWorkspaces {
@@ -56,10 +70,10 @@ function groupWorkspacesBySections(
   // Инициализируем пустые массивы для всех разделов
   sections.forEach((s) => sectionMap.set(s.id, []));
 
-  // Распределяем workspaces по разделам
+  // Распределяем workspaces по разделам (системные workspace исключаем)
   workspaces.forEach((ws) => {
-    // Фильтруем по showInMenu (только если явно false)
     if (ws.showInMenu === false) return;
+    if (ws.isSystem) return; // Системные справочники — в отдельной секции
 
     if (ws.sectionId && sectionMap.has(ws.sectionId)) {
       sectionMap.get(ws.sectionId)!.push(ws);
@@ -118,12 +132,30 @@ export function Sidebar() {
   const canManageUsers = can('global:user:manage');
   const canManageRoles = can('global:role:manage');
 
-  // Группировка workspaces по разделам
+  // Группировка workspaces по разделам (без системных)
   const grouped = useMemo(
     () => groupWorkspacesBySections(workspaces, sections),
     [workspaces, sections]
   );
 
+  // Системные workspace — отдельная секция "Справочники"
+  const systemWorkspaces = useMemo(
+    () => workspaces.filter((ws) => ws.isSystem).sort((a, b) => a.name.localeCompare(b.name)),
+    [workspaces]
+  );
+
+  const [directoriesCollapsed, setDirectoriesCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(DIRECTORIES_COLLAPSED_KEY) === 'true';
+  });
+
+  const toggleDirectoriesCollapsed = () => {
+    setDirectoriesCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(DIRECTORIES_COLLAPSED_KEY, String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchWorkspaces();
@@ -274,9 +306,6 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className={`font-medium truncate text-sm ${workspace.isArchived ? 'text-gray-500' : ''}`}>{workspace.name}</span>
-              {workspace.isSystem && (
-                <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex-shrink-0">СИС</span>
-              )}
               {workspace.isArchived && (
                 <Archive className="w-3 h-3 text-gray-500 flex-shrink-0" />
               )}
@@ -705,6 +734,60 @@ export function Sidebar() {
               </div>
             )}
           </div>
+
+          {/* Справочники — системные workspace */}
+          {systemWorkspaces.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+              <button
+                onClick={toggleDirectoriesCollapsed}
+                className="w-full flex items-center gap-1 px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer"
+              >
+                <span className="p-0.5 text-gray-400">
+                  {directoriesCollapsed ? (
+                    <ChevronRight className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </span>
+                <Database className="w-4 h-4 text-gray-400" />
+                <span className="flex-1 text-sm font-medium text-gray-600 dark:text-gray-400 text-left">
+                  Справочники
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {systemWorkspaces.length}
+                </span>
+              </button>
+              {!directoriesCollapsed && (
+                <div className="ml-4 mt-0.5 space-y-0.5">
+                  {systemWorkspaces.map((ws) => {
+                    const Icon = getDirectoryIcon(ws.systemType);
+                    const isActive = selectedWorkspace === ws.id;
+                    return (
+                      <button
+                        key={ws.id}
+                        onClick={() => {
+                          localStorage.setItem(STORAGE_KEY, ws.id);
+                          router.push(`/workspace/${ws.id}?view=table`);
+                          close();
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded transition-colors cursor-pointer ${
+                          isActive
+                            ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 border border-transparent'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <span className="font-medium truncate text-sm">{ws.name}</span>
+                        {isActive && (
+                          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400 flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Bottom section - только для пользователей с правами администрирования */}
           {(canManageUsers || canManageRoles) && (
