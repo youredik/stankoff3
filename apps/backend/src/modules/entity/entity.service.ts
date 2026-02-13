@@ -766,6 +766,11 @@ export class EntityService {
 
     this.eventsGateway.emitEntityCreated(saved);
 
+    // Email-уведомление при создании заявки с назначенным ответственным
+    if (saved.assigneeId && actorId) {
+      this.notifyAssigneeChange(saved, saved.assigneeId, actorId);
+    }
+
     // Логирование создания
     if (actorId) {
       await this.auditLogService.log(
