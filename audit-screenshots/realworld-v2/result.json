@@ -1,0 +1,14 @@
+{
+  "issues": [],
+  "warnings": [
+    "Created entity not found in kanban (might need scroll)",
+    "No table rows found",
+    "Cleanup failed: (results.items || results || []).filter is not a function"
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+  ]
+}

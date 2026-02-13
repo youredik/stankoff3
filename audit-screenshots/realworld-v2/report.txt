@@ -1,0 +1,16 @@
+📊 ПОЛНЫЙ АУДИТ ПОРТАЛА v2
+
+Console errors: 4
+
+✅ Критических багов не найдено
+
+⚠️ ПРЕДУПРЕЖДЕНИЯ (3):
+1. Created entity not found in kanban (might need scroll)
+2. No table rows found
+3. Cleanup failed: (results.items || results || []).filter is not a function
+
+🖥️ Console (4):
+1. Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+2. Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+3. Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+4. Failed to load resource: the server responded with a status of 500 (Internal Server Error)

@@ -1,0 +1,50 @@
+{
+  "issues": [
+    "Network failures (30): net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4; net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4; net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4; net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4; net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4"
+  ],
+  "warnings": [
+    "Loading spinner still visible after 2s on /login",
+    "8 buttons without accessible text",
+    "8 buttons without accessible text",
+    "9 buttons without accessible text",
+    "8 buttons without accessible text",
+    "8 buttons without accessible text",
+    "8 buttons without accessible text",
+    "8 buttons without accessible text",
+    "8 buttons without accessible text"
+  ],
+  "consoleErrors": [],
+  "networkErrors": [
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace?_rsc=wkrq7",
+    "net::ERR_ABORTED: http://localhost:3000/workspace?_rsc=wkrq7",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace?_rsc=q8f33",
+    "net::ERR_ABORTED: http://localhost:3000/workspace?_rsc=q8f33",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace?_rsc=j9xom",
+    "net::ERR_ABORTED: http://localhost:3000/workspace?_rsc=j9xom",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/b5fb0150-9774-4e4c-ae44-df3d8d46b325?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/739c51f3-7f61-4e62-8460-06be090448c3?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/739c51f3-7f61-4e62-8460-06be090448c3?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/739c51f3-7f61-4e62-8460-06be090448c3?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/739c51f3-7f61-4e62-8460-06be090448c3?_rsc=19xb4",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/739c51f3-7f61-4e62-8460-06be090448c3?_rsc=17fqi",
+    "net::ERR_ABORTED: http://localhost:3000/workspace/739c51f3-7f61-4e62-8460-06be090448c3?_rsc=17fqi"
+  ],
+  "timestamp": "2026-02-12T20:03:53.613Z"
+}
