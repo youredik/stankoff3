@@ -185,9 +185,11 @@ export class EmailConnector extends BaseConnector {
     const entityId = String(variables.entityId || variables.customId || '');
     const entityUrl = variables.entityUrl
       ? String(variables.entityUrl)
-      : variables.entityId
-        ? `${variables.frontendUrl || ''}/dashboard?entity=${variables.entityId}`
-        : '';
+      : variables.entityId && variables.workspaceId
+        ? `${variables.frontendUrl || ''}/workspace/${variables.workspaceId}?entity=${variables.entityId}`
+        : variables.entityId
+          ? `${variables.frontendUrl || ''}/workspace?entity=${variables.entityId}`
+          : '';
 
     switch (template) {
       case 'notification':

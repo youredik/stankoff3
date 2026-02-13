@@ -88,7 +88,7 @@ export class EmailService {
     assignedBy: User,
     frontendUrl: string,
   ): Promise<boolean> {
-    const entityUrl = `${frontendUrl}/dashboard?entity=${entity.id}`;
+    const entityUrl = `${frontendUrl}/workspace/${entity.workspaceId}?entity=${entity.id}`;
 
     return this.send({
       to: assignee.email,
@@ -135,7 +135,7 @@ export class EmailService {
     commentPreview: string,
     frontendUrl: string,
   ): Promise<boolean> {
-    const entityUrl = `${frontendUrl}/dashboard?entity=${entity.id}`;
+    const entityUrl = `${frontendUrl}/workspace/${entity.workspaceId}?entity=${entity.id}`;
 
     return this.send({
       to: recipient.email,
@@ -179,7 +179,7 @@ export class EmailService {
     newStatus: string,
     frontendUrl: string,
   ): Promise<boolean> {
-    const entityUrl = `${frontendUrl}/dashboard?entity=${entity.id}`;
+    const entityUrl = `${frontendUrl}/workspace/${entity.workspaceId}?entity=${entity.id}`;
 
     return this.send({
       to: recipient.email,
@@ -227,7 +227,7 @@ export class EmailService {
     usedPercent: number,
     frontendUrl: string,
   ): Promise<boolean> {
-    const entityUrl = `${frontendUrl}/dashboard?entity=${entity.id}`;
+    const entityUrl = `${frontendUrl}/workspace/${entity.workspaceId}?entity=${entity.id}`;
     const typeLabel = type === 'response' ? 'первого ответа' : 'решения';
 
     return this.send({
@@ -320,7 +320,7 @@ export class EmailService {
     grantedBy: User,
     frontendUrl: string,
   ): Promise<boolean> {
-    const portalUrl = `${frontendUrl}/dashboard`;
+    const portalUrl = `${frontendUrl}/workspace`;
 
     return this.send({
       to: user.email,
@@ -358,7 +358,7 @@ export class EmailService {
     type: 'response' | 'resolution',
     frontendUrl: string,
   ): Promise<boolean> {
-    const entityUrl = `${frontendUrl}/dashboard?entity=${entity.id}`;
+    const entityUrl = `${frontendUrl}/workspace/${entity.workspaceId}?entity=${entity.id}`;
     const typeLabel = type === 'response' ? 'время первого ответа' : 'время решения';
 
     return this.send({

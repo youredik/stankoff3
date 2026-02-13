@@ -13,6 +13,23 @@ function WorkspaceResolver() {
 
   useEffect(() => {
     const resolve = async () => {
+      // Если в URL есть ?entity=, определяем workspace по entity
+      const entityId = new URLSearchParams(window.location.search).get('entity');
+      if (entityId) {
+        try {
+          const res = await fetch(`/api/entities/${entityId}`);
+          if (res.ok) {
+            const entity = await res.json();
+            if (entity.workspaceId) {
+              router.replace(`/workspace/${entity.workspaceId}?entity=${entityId}`);
+              return;
+            }
+          }
+        } catch {
+          // Если не удалось найти entity — продолжаем обычную логику
+        }
+      }
+
       let ws = workspaces;
       if (ws.length === 0) {
         await fetchWorkspaces();
