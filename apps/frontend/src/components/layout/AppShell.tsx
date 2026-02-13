@@ -5,6 +5,7 @@ import { WifiOff } from 'lucide-react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { ToastContainer } from '@/components/ui/ToastContainer';
+import { UserProfileModal } from '@/components/ui/UserProfileModal';
 import { KeyboardShortcutsHelp } from '@/components/ui/KeyboardShortcutsHelp';
 import { useKeyboardShortcuts, type Shortcut } from '@/hooks/useKeyboardShortcuts';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -70,6 +71,7 @@ export function AppShell({ children, mainClassName, mainStyle }: AppShellProps) 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
       <ToastContainer />
+      <UserProfileModal />
 
       {/* Offline banner */}
       {!isOnline && (

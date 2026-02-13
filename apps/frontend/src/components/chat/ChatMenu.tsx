@@ -5,6 +5,7 @@ import { LogOut, UserPlus, Edit3, Users, X, Search, Check, Pencil } from 'lucide
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { useUserProfileStore } from '@/store/useUserProfileStore';
 import { chatApi } from '@/lib/api/chat';
 import { getConversationName } from './ConversationList';
 
@@ -18,10 +19,12 @@ interface UserItem {
   firstName: string;
   lastName: string;
   email: string;
+  avatar?: string | null;
 }
 
 export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
   const { user } = useAuthStore();
+  const openProfile = useUserProfileStore((s) => s.openProfile);
   const conversations = useChatStore((s) => s.conversations);
   const fetchConversations = useChatStore((s) => s.fetchConversations);
   const [showAddMembers, setShowAddMembers] = useState(false);
@@ -169,7 +172,7 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
                   disabled={loading}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <UserAvatar firstName={u.firstName} lastName={u.lastName} userId={u.id} size="sm" />
+                  <UserAvatar firstName={u.firstName} lastName={u.lastName} avatar={u.avatar} userId={u.id} size="sm" />
                   <div className="text-left">
                     <span className="text-sm text-gray-900 dark:text-gray-100">{u.firstName} {u.lastName}</span>
                     <p className="text-xs text-gray-400">{u.email}</p>
@@ -242,14 +245,21 @@ export function ChatMenu({ conversationId, onClose }: ChatMenuProps) {
               <div className="max-h-[180px] overflow-y-auto space-y-0.5">
                 {activeParticipants.map(p => (
                   <div key={p.id} data-testid="chat-menu-participant" className="flex items-center gap-2.5 py-1.5 group">
-                    <UserAvatar
-                      firstName={p.user?.firstName || ''}
-                      lastName={p.user?.lastName || ''}
-                      userId={p.userId}
-                      size="sm"
-                    />
+                    <div className="cursor-pointer" onClick={() => p.user && openProfile(p.user as any)}>
+                      <UserAvatar
+                        firstName={p.user?.firstName || ''}
+                        lastName={p.user?.lastName || ''}
+                        avatar={p.user?.avatar}
+                        userId={p.userId}
+                        size="sm"
+                        clickable={false}
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm text-gray-900 dark:text-gray-100 truncate block">
+                      <span
+                        className="text-sm text-gray-900 dark:text-gray-100 truncate block cursor-pointer hover:underline"
+                        onClick={() => p.user && openProfile(p.user as any)}
+                      >
                         {p.user?.firstName} {p.user?.lastName}
                         {p.userId === user?.id && <span className="text-xs text-gray-400 ml-1">(вы)</span>}
                       </span>

@@ -49,6 +49,7 @@ export function ChatHeader({ conversationId, onSearchClick, onMenuClick, pinnedC
           <UserAvatar
             firstName={otherParticipant.user.firstName}
             lastName={otherParticipant.user.lastName}
+            avatar={otherParticipant.user.avatar}
             userId={otherParticipant.userId}
             size="md"
           />

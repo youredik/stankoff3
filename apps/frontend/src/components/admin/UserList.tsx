@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { useUserProfileStore } from '@/store/useUserProfileStore';
 import { usersApi, type CreateUserData, type UpdateUserData } from '@/lib/api/users';
 import { UserModal, type UserFormData } from './UserModal';
 import type { User } from '@/types';
@@ -20,6 +21,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export function UserList() {
+  const openProfile = useUserProfileStore((s) => s.openProfile);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -149,12 +151,17 @@ export function UserList() {
             {filteredUsers.map((user) => (
               <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
+                  <div
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => openProfile(user)}
+                  >
                     <UserAvatar
                       firstName={user.firstName}
                       lastName={user.lastName}
+                      avatar={user.avatar}
                       userId={user.id}
                       size="lg"
+                      clickable={false}
                     />
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       {user.firstName} {user.lastName}

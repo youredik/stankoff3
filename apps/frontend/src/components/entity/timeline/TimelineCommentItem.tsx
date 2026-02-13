@@ -1,7 +1,10 @@
+'use client';
+
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { useUserProfileStore } from '@/store/useUserProfileStore';
 import type { Comment, Attachment } from '@/types';
 
 interface TimelineCommentItemProps {
@@ -10,17 +13,26 @@ interface TimelineCommentItemProps {
 }
 
 export function TimelineCommentItem({ comment, allAttachments }: TimelineCommentItemProps) {
+  const openProfile = useUserProfileStore((s) => s.openProfile);
+
   return (
     <div className="flex gap-3 items-start">
-      <UserAvatar
-        firstName={comment.author.firstName}
-        lastName={comment.author.lastName}
-        userId={comment.author.id}
-        size="md"
-      />
+      <div className="cursor-pointer" onClick={() => openProfile(comment.author as any)}>
+        <UserAvatar
+          firstName={comment.author.firstName}
+          lastName={comment.author.lastName}
+          avatar={comment.author.avatar}
+          userId={comment.author.id}
+          size="md"
+          clickable={false}
+        />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-200">
+          <span
+            className="text-sm font-medium text-gray-900 dark:text-gray-200 cursor-pointer hover:underline"
+            onClick={() => openProfile(comment.author as any)}
+          >
             {comment.author.firstName} {comment.author.lastName}
           </span>
           <span className="text-xs text-gray-500">

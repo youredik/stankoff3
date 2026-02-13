@@ -35,6 +35,11 @@ export async function getSignedUrl(key: string): Promise<string> {
   return promise;
 }
 
+/** Инвалидирует кэш для конкретного ключа (для принудительного обновления) */
+export function invalidateSignedUrl(key: string): void {
+  cache.delete(key);
+}
+
 /** Prefetch signed URLs for multiple keys (e.g. all attachments in a message) */
 export function prefetchSignedUrls(keys: string[]): void {
   for (const key of keys) {

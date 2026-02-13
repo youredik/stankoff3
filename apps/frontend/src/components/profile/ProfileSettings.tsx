@@ -7,43 +7,13 @@ import { useThemeStore, type Theme } from '@/store/useThemeStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { AvatarCropModal } from './AvatarCropModal';
 import { authApi } from '@/lib/api/auth';
 import { filesApi } from '@/lib/api/files';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5 MB
-const AVATAR_OUTPUT_SIZE = 400; // px — квадрат 400x400
-
-/** Кропает изображение в квадрат по центру через Canvas API */
-async function cropToSquare(file: File): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const size = Math.min(img.width, img.height);
-      const canvas = document.createElement('canvas');
-      canvas.width = AVATAR_OUTPUT_SIZE;
-      canvas.height = AVATAR_OUTPUT_SIZE;
-      const ctx = canvas.getContext('2d')!;
-
-      // Crop по центру и ресайз до AVATAR_OUTPUT_SIZE
-      const sx = (img.width - size) / 2;
-      const sy = (img.height - size) / 2;
-      ctx.drawImage(img, sx, sy, size, size, 0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE);
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return reject(new Error('Canvas toBlob failed'));
-          resolve(new File([blob], file.name.replace(/\.\w+$/, '.webp'), { type: 'image/webp' }));
-        },
-        'image/webp',
-        0.85,
-      );
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(file);
-  });
-}
+const MAX_AVATAR_SIZE = 15 * 1024 * 1024; // 15 MB
 
 export function ProfileSettings() {
   const { user } = useAuthStore();
@@ -63,6 +33,7 @@ export function ProfileSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
   const handleSave = useCallback(async () => {
@@ -95,7 +66,7 @@ export function ProfileSettings() {
     }
   }, [firstName, lastName, department, user]);
 
-  const handleAvatarSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -110,27 +81,30 @@ export function ProfileSettings() {
 
     // Валидация размера
     if (file.size > MAX_AVATAR_SIZE) {
-      setAvatarError('Максимальный размер — 5 МБ');
+      setAvatarError('Максимальный размер — 15 МБ');
       return;
     }
 
     setAvatarError(null);
+    // Открываем кроп-модалку вместо мгновенной загрузки
+    setCropFile(file);
+  }, []);
+
+  const handleCroppedAvatar = useCallback(async (croppedFile: File) => {
+    setCropFile(null);
 
     // Мгновенный preview
-    const previewUrl = URL.createObjectURL(file);
+    const previewUrl = URL.createObjectURL(croppedFile);
     setAvatarPreview(previewUrl);
 
     try {
       setAvatarUploading(true);
 
-      // Crop в квадрат + конвертация в WebP
-      const cropped = await cropToSquare(file);
-
       // Загрузка на S3
-      const uploaded = await filesApi.upload(cropped);
+      const uploaded = await filesApi.upload(croppedFile);
 
-      // Обновление профиля
-      const updated = await authApi.updateProfile({ avatar: uploaded.url });
+      // Обновление профиля — сохраняем S3 key (не presigned URL, который истекает)
+      const updated = await authApi.updateProfile({ avatar: uploaded.key });
       useAuthStore.setState({ user: { ...user!, ...updated } });
 
       // Очистка preview — теперь используем реальный URL
@@ -207,6 +181,7 @@ export function ProfileSettings() {
                 email={user.email}
                 avatar={displayAvatar}
                 size="xl"
+                clickable={false}
               />
               {/* Overlay при наведении */}
               <button
@@ -386,6 +361,15 @@ export function ProfileSettings() {
           <InfoRow label="ID" value={user.id} mono />
         </div>
       </Section>
+
+      {/* Кроп-модалка аватара */}
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          onCrop={handleCroppedAvatar}
+          onClose={() => setCropFile(null)}
+        />
+      )}
     </div>
   );
 }

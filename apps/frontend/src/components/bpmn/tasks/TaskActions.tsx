@@ -204,6 +204,7 @@ function DelegateModal({ users, isLoading, onDelegate, onClose }: DelegateModalP
                     <UserAvatar
                       firstName={user.firstName}
                       lastName={user.lastName}
+                      avatar={user.avatar}
                       userId={user.id}
                       size="md"
                     />

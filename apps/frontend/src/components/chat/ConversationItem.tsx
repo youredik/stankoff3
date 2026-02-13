@@ -56,6 +56,7 @@ export function ConversationItem({
           <UserAvatar
             firstName={otherParticipant.user.firstName}
             lastName={otherParticipant.user.lastName}
+            avatar={otherParticipant.user.avatar}
             userId={otherParticipant.userId}
             size="md"
           />

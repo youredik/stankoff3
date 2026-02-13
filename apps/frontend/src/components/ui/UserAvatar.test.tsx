@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { UserAvatar } from './UserAvatar';
 
 vi.mock('@/store/usePresenceStore', () => ({
   usePresenceStore: vi.fn(),
 }));
+
+vi.mock('@/hooks/useSignedUrl', () => ({
+  useSignedUrl: vi.fn(() => null),
+}));
+
+vi.mock('lucide-react', () => ({ X: () => null }));
 
 import { usePresenceStore } from '@/store/usePresenceStore';
 
@@ -154,6 +160,33 @@ describe('UserAvatar', () => {
         <UserAvatar firstName="И" lastName="П" className="my-custom" />,
       );
       expect(container.firstElementChild?.classList.contains('my-custom')).toBe(true);
+    });
+  });
+
+  describe('lazy loading', () => {
+    it('должен иметь loading="lazy" на img', () => {
+      render(<UserAvatar firstName="И" lastName="П" avatar="https://example.com/photo.jpg" />);
+      const img = screen.getByRole('img');
+      expect(img.getAttribute('loading')).toBe('lazy');
+    });
+  });
+
+  describe('clickable prop', () => {
+    it('должен рендериться с clickable prop', () => {
+      const { container } = render(
+        <UserAvatar firstName="И" lastName="П" avatar="https://example.com/photo.jpg" clickable={true} />,
+      );
+      expect(container.firstElementChild?.classList.contains('cursor-pointer')).toBe(true);
+    });
+
+    it('не должен показывать превью при clickable={false}', () => {
+      const { container } = render(
+        <UserAvatar firstName="И" lastName="П" avatar="https://example.com/photo.jpg" size="lg" clickable={false} />,
+      );
+      const avatar = container.firstElementChild!;
+      fireEvent.click(avatar);
+      // Fullscreen preview не должен появиться
+      expect(container.querySelector('.fixed')).toBeNull();
     });
   });
 });

@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Link2, Calendar } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { useUserProfileStore } from '@/store/useUserProfileStore';
 import type { Entity } from '@/types';
 import { useEntityNavigation } from '@/hooks/useEntityNavigation';
 import { SlaTimer } from '@/components/sla/SlaTimer';
@@ -18,6 +19,7 @@ interface KanbanCardProps {
 
 export function KanbanCard({ entity, isDragging = false, canEdit = true }: KanbanCardProps) {
   const { openEntity } = useEntityNavigation();
+  const openProfile = useUserProfileStore((s) => s.openProfile);
   const {
     attributes,
     listeners,
@@ -101,12 +103,17 @@ export function KanbanCard({ entity, isDragging = false, canEdit = true }: Kanba
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {entity.assignee ? (
-            <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              onClick={(e) => { e.stopPropagation(); openProfile(entity.assignee!); }}
+            >
               <UserAvatar
                 firstName={entity.assignee.firstName}
                 lastName={entity.assignee.lastName}
+                avatar={entity.assignee.avatar}
                 userId={entity.assignee.id}
                 size="sm"
+                clickable={false}
               />
               <span className="text-xs text-gray-400">
                 {entity.assignee.firstName} {entity.assignee.lastName[0]}.

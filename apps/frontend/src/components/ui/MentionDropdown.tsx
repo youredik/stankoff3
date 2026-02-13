@@ -63,6 +63,7 @@ export function MentionDropdown({ items, selectedIndex, clientRect, onSelect }: 
           <UserAvatar
             firstName={user.firstName}
             lastName={user.lastName}
+            avatar={user.avatar}
             userId={user.id}
             size="xs"
           />

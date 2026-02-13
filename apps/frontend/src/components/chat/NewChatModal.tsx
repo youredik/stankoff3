@@ -16,6 +16,7 @@ interface UserItem {
   firstName: string;
   lastName: string;
   email: string;
+  avatar?: string | null;
 }
 
 export function NewChatModal({ onClose }: NewChatModalProps) {
@@ -201,6 +202,7 @@ export function NewChatModal({ onClose }: NewChatModalProps) {
               <UserAvatar
                 firstName={u.firstName}
                 lastName={u.lastName}
+                avatar={u.avatar}
                 userId={u.id}
                 size="md"
               />

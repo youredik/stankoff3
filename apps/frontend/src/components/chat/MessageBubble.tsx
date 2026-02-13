@@ -8,6 +8,7 @@ import { VoicePlayer } from './VoicePlayer';
 import type { ChatMessage, ChatMessageReaction } from '@/types';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useUserProfileStore } from '@/store/useUserProfileStore';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { getSignedUrl } from '@/lib/signedUrl';
 
@@ -238,6 +239,7 @@ export function MessageBubble({
   const menuRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
   const { editMessage, deleteMessage, toggleReaction, pinMessage, unpinMessage } = useChatStore();
+  const openProfile = useUserProfileStore((s) => s.openProfile);
 
   if (message.type === 'system') return <SystemMessage message={message} />;
 
@@ -299,7 +301,9 @@ export function MessageBubble({
                 <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
             ) : (
-              <UserAvatar firstName={message.author.firstName} lastName={message.author.lastName} userId={message.authorId} size="sm" />
+              <div className="cursor-pointer" onClick={() => message.author && openProfile(message.author as any)}>
+                <UserAvatar firstName={message.author.firstName} lastName={message.author.lastName} avatar={message.author.avatar} userId={message.authorId} size="sm" clickable={false} />
+              </div>
             )
           )}
         </div>
@@ -317,7 +321,10 @@ export function MessageBubble({
           {message.isPinned && <Pin data-testid="chat-message-pin-icon" className="absolute -top-1 -right-1 w-3 h-3 text-primary-500 rotate-45" />}
 
           {showName && message.author && (
-            <div className={`text-xs font-medium mb-0.5 ${isAiBot ? 'text-violet-600 dark:text-violet-400' : 'text-primary-600 dark:text-primary-400'}`}>
+            <div
+              className={`text-xs font-medium mb-0.5 ${isAiBot ? 'text-violet-600 dark:text-violet-400' : 'text-primary-600 dark:text-primary-400 cursor-pointer hover:underline'}`}
+              onClick={!isAiBot ? () => openProfile(message.author as any) : undefined}
+            >
               {isAiBot ? 'AI Ассистент' : `${message.author.firstName} ${message.author.lastName}`}
             </div>
           )}

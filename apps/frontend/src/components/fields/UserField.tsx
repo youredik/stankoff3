@@ -21,14 +21,14 @@ const getUserSearchText = (u: User) => `${u.firstName} ${u.lastName} ${u.email |
 
 const renderUserOption = (u: User) => (
   <span className="flex items-center gap-2">
-    <UserAvatar firstName={u.firstName} lastName={u.lastName} size="xs" />
+    <UserAvatar firstName={u.firstName} lastName={u.lastName} avatar={u.avatar} size="xs" />
     <span>{u.firstName} {u.lastName}</span>
   </span>
 );
 
 const renderUserSelected = (u: User) => (
   <span className="flex items-center gap-2 truncate">
-    <UserAvatar firstName={u.firstName} lastName={u.lastName} size="xs" />
+    <UserAvatar firstName={u.firstName} lastName={u.lastName} avatar={u.avatar} size="xs" />
     <span className="truncate">{u.firstName} {u.lastName}</span>
   </span>
 );
@@ -53,7 +53,7 @@ function UserRenderer({ field, value, users, canEdit, onUpdate }: Parameters<Fie
             if (!u) return null;
             return (
               <div key={id} className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                <UserAvatar firstName={u.firstName} lastName={u.lastName} size="xs" showOnline={isUserOnline(id)} />
+                <UserAvatar firstName={u.firstName} lastName={u.lastName} avatar={u.avatar} size="xs" showOnline={isUserOnline(id)} />
                 <span className="text-xs text-gray-700 dark:text-gray-300">{u.firstName} {u.lastName}</span>
               </div>
             );
@@ -65,7 +65,7 @@ function UserRenderer({ field, value, users, canEdit, onUpdate }: Parameters<Fie
     const selectedUser = users.find((u) => u.id === value);
     return selectedUser ? (
       <div className="flex items-center gap-2">
-        <UserAvatar firstName={selectedUser.firstName} lastName={selectedUser.lastName} showOnline={isUserOnline(selectedUser.id)} />
+        <UserAvatar firstName={selectedUser.firstName} lastName={selectedUser.lastName} avatar={selectedUser.avatar} showOnline={isUserOnline(selectedUser.id)} />
         <span className="text-sm text-gray-700 dark:text-gray-300">
           {selectedUser.firstName} {selectedUser.lastName}
         </span>
@@ -87,7 +87,7 @@ function UserRenderer({ field, value, users, canEdit, onUpdate }: Parameters<Fie
         renderOption={renderUserOption}
         renderSelectedMultiTag={(u, onRemove) => (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full text-xs">
-            <UserAvatar firstName={u.firstName} lastName={u.lastName} size="xs" />
+            <UserAvatar firstName={u.firstName} lastName={u.lastName} avatar={u.avatar} size="xs" />
             {u.firstName} {u.lastName}
             <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(); }} className="hover:opacity-70">
               <X className="w-3 h-3" />
@@ -131,7 +131,7 @@ function UserForm({ field, value, users, onChange }: Parameters<FieldRenderer['F
         renderOption={renderUserOption}
         renderSelectedMultiTag={(u, onRemove) => (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full text-xs">
-            <UserAvatar firstName={u.firstName} lastName={u.lastName} size="xs" />
+            <UserAvatar firstName={u.firstName} lastName={u.lastName} avatar={u.avatar} size="xs" />
             {u.firstName} {u.lastName}
             <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(); }} className="hover:opacity-70">
               <X className="w-3 h-3" />
@@ -195,7 +195,7 @@ function UserFilter({ field, filterValue, users, toggleMultiSelect, facetData }:
           disabled={!!isDisabled}
           className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
         />
-        <UserAvatar firstName={user.firstName} lastName={user.lastName} size="xs" />
+        <UserAvatar firstName={user.firstName} lastName={user.lastName} avatar={user.avatar} size="xs" />
         <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
           {user.firstName} {user.lastName}
         </span>
