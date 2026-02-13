@@ -10,8 +10,8 @@ import { ChatPage } from '@/components/chat/ChatPage';
 function ChatContent() {
   const router = useRouter();
   return (
-    <AppShell>
-      <div className="px-6 pt-4 pb-2">
+    <AppShell mainClassName="!overflow-y-hidden flex flex-col">
+      <div className="px-6 pt-4 pb-2 flex-shrink-0">
         <Breadcrumbs items={[
           { ...createHomeBreadcrumb(), onClick: () => router.push('/workspace') },
           { label: 'Чат' },

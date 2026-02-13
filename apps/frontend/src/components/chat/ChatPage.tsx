@@ -28,7 +28,7 @@ export function ChatPage() {
   }, [searchParams, selectConversation]);
 
   return (
-    <div data-testid="chat-page" className="flex h-[calc(100vh-57px)] bg-gray-100 dark:bg-gray-900">
+    <div data-testid="chat-page" className="flex flex-1 min-h-0 bg-gray-100 dark:bg-gray-900">
       {/* Conversation list - Telegram left panel */}
       <div className="w-[380px] flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <ConversationList />
