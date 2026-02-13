@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Check, CheckCheck, Reply, Copy, Pencil, Trash2, Pin, SmilePlus, Sparkles, Download } from 'lucide-react';
+import { Check, CheckCheck, Reply, Copy, Pencil, Trash2, Pin, SmilePlus, Sparkles, Download, Play, X as XIcon } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { VoicePlayer } from './VoicePlayer';
 import type { ChatMessage, ChatMessageReaction } from '@/types';
@@ -55,6 +55,13 @@ function ImagePreview({ fileKey, alt }: { fileKey: string; alt: string }) {
   const signedUrl = useSignedUrl(fileKey);
   const [fullscreen, setFullscreen] = useState(false);
 
+  useEffect(() => {
+    if (!fullscreen) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [fullscreen]);
+
   if (!signedUrl) {
     return <div className="rounded-lg w-[200px] h-[150px] bg-gray-100 dark:bg-gray-700 animate-pulse" />;
   }
@@ -69,8 +76,85 @@ function ImagePreview({ fileKey, alt }: { fileKey: string; alt: string }) {
         loading="lazy"
       />
       {fullscreen && (
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={() => setFullscreen(false)}>
-          <img src={signedUrl} alt={alt} className="max-w-full max-h-full object-contain" />
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setFullscreen(false)}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setFullscreen(false); }}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            aria-label="Закрыть"
+          >
+            <XIcon className="w-6 h-6" />
+          </button>
+          <img
+            src={signedUrl}
+            alt={alt}
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function VideoPreview({ fileKey, name }: { fileKey: string; name: string }) {
+  const signedUrl = useSignedUrl(fileKey);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const fullVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [fullscreen]);
+
+  if (!signedUrl) {
+    return <div className="rounded-lg w-[260px] h-[180px] bg-gray-100 dark:bg-gray-700 animate-pulse" />;
+  }
+
+  return (
+    <>
+      <div className="relative rounded-lg overflow-hidden max-w-[320px] cursor-pointer group" onClick={() => setFullscreen(true)}>
+        <video
+          ref={videoRef}
+          src={signedUrl}
+          className="w-full max-h-[300px] object-contain bg-black rounded-lg"
+          preload="metadata"
+          muted
+          playsInline
+          onMouseEnter={() => { videoRef.current?.play(); setPlaying(true); }}
+          onMouseLeave={() => { videoRef.current?.pause(); if (videoRef.current) videoRef.current.currentTime = 0; setPlaying(false); }}
+        />
+        {!playing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+            <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm">
+              <Play className="w-6 h-6 text-white ml-0.5" />
+            </div>
+          </div>
+        )}
+        <div className="absolute bottom-2 left-2 text-[10px] text-white bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm">
+          {name}
+        </div>
+      </div>
+      {fullscreen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setFullscreen(false)}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setFullscreen(false); }}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-10"
+            aria-label="Закрыть"
+          >
+            <XIcon className="w-6 h-6" />
+          </button>
+          <video
+            ref={fullVideoRef}
+            src={signedUrl}
+            controls
+            autoPlay
+            className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </>
@@ -180,7 +264,8 @@ export function MessageBubble({
   }, [message.content]);
 
   const imageAttachments = message.attachments?.filter(a => a.mimeType.startsWith('image/')) || [];
-  const fileAttachments = message.attachments?.filter(a => !a.mimeType.startsWith('image/')) || [];
+  const videoAttachments = message.attachments?.filter(a => a.mimeType.startsWith('video/')) || [];
+  const fileAttachments = message.attachments?.filter(a => !a.mimeType.startsWith('image/') && !a.mimeType.startsWith('video/')) || [];
 
   return (
     <div
@@ -226,6 +311,12 @@ export function MessageBubble({
           {imageAttachments.length > 0 && (
             <div className={`space-y-1.5 ${message.type === 'text' && message.content ? 'mb-1.5' : ''}`}>
               {imageAttachments.map(att => <ImagePreview key={att.id} fileKey={att.key} alt={att.name} />)}
+            </div>
+          )}
+
+          {videoAttachments.length > 0 && (
+            <div className={`space-y-1.5 ${message.type === 'text' && message.content ? 'mb-1.5' : ''}`}>
+              {videoAttachments.map(att => <VideoPreview key={att.id} fileKey={att.key} name={att.name} />)}
             </div>
           )}
 

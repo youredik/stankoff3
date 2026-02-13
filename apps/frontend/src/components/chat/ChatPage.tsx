@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useChatStore } from '@/store/useChatStore';
 import { ConversationList } from './ConversationList';
 import { ChatView } from './ChatView';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ArrowLeft } from 'lucide-react';
 
 export function ChatPage() {
   const searchParams = useSearchParams();
@@ -29,15 +29,26 @@ export function ChatPage() {
 
   return (
     <div data-testid="chat-page" className="flex flex-1 min-h-0 bg-gray-100 dark:bg-gray-900">
-      {/* Conversation list - Telegram left panel */}
-      <div className="w-[380px] flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      {/* Conversation list — hidden on mobile when chat is open */}
+      <div className={`w-full sm:w-[380px] sm:flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${selectedConversationId ? 'hidden sm:block' : ''}`}>
         <ConversationList />
       </div>
 
-      {/* Chat view - Telegram right panel */}
-      <div className="flex-1 flex flex-col">
+      {/* Chat view — hidden on mobile when no chat is selected */}
+      <div className={`flex-1 flex flex-col ${selectedConversationId ? '' : 'hidden sm:flex'}`}>
         {selectedConversationId ? (
-          <ChatView conversationId={selectedConversationId} />
+          <>
+            {/* Mobile back button */}
+            <button
+              onClick={() => selectConversation(null as unknown as string)}
+              className="sm:hidden flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+              aria-label="Назад к списку"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Назад
+            </button>
+            <ChatView conversationId={selectedConversationId} />
+          </>
         ) : (
           <div data-testid="chat-empty-state" className="flex-1 flex items-center justify-center bg-[#E8EFFA] dark:bg-gray-900">
             <div className="text-center">

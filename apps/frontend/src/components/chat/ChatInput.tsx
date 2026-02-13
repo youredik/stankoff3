@@ -212,7 +212,7 @@ export function ChatInput({
   const addFiles = useCallback((files: FileList | File[]) => {
     const newPending: PendingFile[] = Array.from(files).map(file => ({
       file,
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+      preview: file.type.startsWith('image/') || file.type.startsWith('video/') ? URL.createObjectURL(file) : undefined,
     }));
     setPendingFiles(prev => [...prev, ...newPending]);
   }, []);
@@ -228,16 +228,16 @@ export function ChatInput({
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-    const imageFiles: File[] = [];
+    const mediaFiles: File[] = [];
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith('image/')) {
+      if (items[i].type.startsWith('image/') || items[i].type.startsWith('video/')) {
         const file = items[i].getAsFile();
-        if (file) imageFiles.push(file);
+        if (file) mediaFiles.push(file);
       }
     }
-    if (imageFiles.length > 0) {
+    if (mediaFiles.length > 0) {
       e.preventDefault();
-      addFiles(imageFiles);
+      addFiles(mediaFiles);
     }
   }, [addFiles]);
 
@@ -375,8 +375,15 @@ export function ChatInput({
       {pendingFiles.length > 0 && (
         <div data-testid="chat-pending-files" className="flex gap-2 px-4 py-2 overflow-x-auto border-b border-gray-100 dark:border-gray-700">
           {pendingFiles.map((pf, i) => (
-            <div key={i} className="relative flex-shrink-0 group">
-              {pf.preview ? (
+            <div key={`${pf.file.name}-${pf.file.size}-${i}`} className="relative flex-shrink-0 group">
+              {pf.preview && pf.file.type.startsWith('video/') ? (
+                <div className="relative w-16 h-16">
+                  <video src={pf.preview} className="w-16 h-16 object-cover rounded-lg" muted preload="metadata" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+                    <div className="w-6 h-6 rounded-full bg-white/80 flex items-center justify-center"><span className="text-[10px] ml-0.5">▶</span></div>
+                  </div>
+                </div>
+              ) : pf.preview ? (
                 <img src={pf.preview} alt={pf.file.name} className="w-16 h-16 object-cover rounded-lg" />
               ) : (
                 <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-gray-700 flex flex-col items-center justify-center">
@@ -461,7 +468,7 @@ export function ChatInput({
               <Send className="w-5 h-5" />
             </button>
           ) : (
-            <button data-testid="chat-mic-btn" onClick={startRecording} className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5" title="Голосовое сообщение">
+            <button data-testid="chat-mic-btn" onClick={startRecording} aria-label="Голосовое сообщение" className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5" title="Голосовое сообщение">
               <Mic className="w-5 h-5" />
             </button>
           )}

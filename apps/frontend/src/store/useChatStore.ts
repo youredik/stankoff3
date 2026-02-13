@@ -117,13 +117,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!firstMessage) return;
 
     const page = await chatApi.getMessages(conversationId, firstMessage.id);
-    set((s) => ({
-      messages: {
-        ...s.messages,
-        [conversationId]: [...page.messages, ...(s.messages[conversationId] || [])],
-      },
-      hasMore: { ...s.hasMore, [conversationId]: page.hasMore },
-    }));
+    set((s) => {
+      const current = s.messages[conversationId] || [];
+      const existingIds = new Set(current.map((m) => m.id));
+      const newMessages = page.messages.filter((m) => !existingIds.has(m.id));
+      return {
+        messages: {
+          ...s.messages,
+          [conversationId]: [...newMessages, ...current],
+        },
+        hasMore: { ...s.hasMore, [conversationId]: page.hasMore },
+      };
+    });
   },
 
   sendMessage: async (conversationId, data) => {
@@ -180,7 +185,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   createConversation: async (data) => {
     const conversation = await chatApi.createConversation(data);
     set((state) => ({
-      conversations: [conversation, ...state.conversations],
+      conversations: [conversation, ...state.conversations.filter((c) => c.id !== conversation.id)],
       selectedConversationId: conversation.id,
     }));
     return conversation;
@@ -201,7 +206,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         participantIds: [],
       });
       set((s) => ({
-        conversations: [conversation, ...s.conversations],
+        conversations: [conversation, ...s.conversations.filter((c) => c.id !== conversation.id)],
         selectedConversationId: conversation.id,
       }));
       return conversation;
