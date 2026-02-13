@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Breadcrumbs, createHomeBreadcrumb } from '@/components/ui/Breadcrumbs';
-import { useWebSocket } from '@/hooks/useWebSocket';
 import { useEntitySync } from '@/hooks/useEntitySync';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import type { DashboardView } from '@/components/layout/Header';
@@ -37,7 +36,6 @@ function WorkspaceContent() {
     ? 'table'
     : (searchParams.get('view') as DashboardView) || 'kanban';
 
-  useWebSocket();
   useEntitySync();
 
   if (typeof window !== 'undefined') {

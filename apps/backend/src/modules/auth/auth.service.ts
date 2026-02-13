@@ -9,6 +9,7 @@ import { KeycloakService } from './keycloak.service';
 import { KeycloakUserInfo } from './interfaces/keycloak-user.interface';
 import { RoleService } from '../rbac/role.service';
 import { LEGACY_ROLE_MAPPING } from '../rbac/system-roles';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 export interface TokensResponse {
   accessToken: string;
@@ -67,6 +68,15 @@ export class AuthService {
 
   async getProfile(userId: string): Promise<User | null> {
     return this.userService.findOne(userId);
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<User> {
+    return this.userService.update(userId, {
+      ...(dto.firstName !== undefined && { firstName: dto.firstName }),
+      ...(dto.lastName !== undefined && { lastName: dto.lastName }),
+      ...(dto.department !== undefined && { department: dto.department }),
+      ...(dto.avatar !== undefined && { avatar: dto.avatar }),
+    });
   }
 
   // ==================== Keycloak SSO ====================

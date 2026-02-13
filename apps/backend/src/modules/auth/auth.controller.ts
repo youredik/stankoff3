@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
+  Body,
   UseGuards,
   Request,
   Res,
@@ -16,6 +18,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../user/user.entity';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 const ID_TOKEN_COOKIE = 'keycloak_id_token';
@@ -101,6 +104,17 @@ export class AuthController {
   async me(@CurrentUser() user: User) {
     const { password: _password, ...userWithoutPassword } = user;
     return userWithoutPassword;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  async updateProfile(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    const updated = await this.authService.updateProfile(user.id, dto);
+    const { password: _password, ...result } = updated;
+    return result;
   }
 
   // ==================== Keycloak SSO Endpoints ====================

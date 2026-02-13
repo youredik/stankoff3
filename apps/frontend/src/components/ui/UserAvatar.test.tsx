@@ -70,6 +70,31 @@ describe('UserAvatar', () => {
       const circle = container.querySelector('.w-9.h-9');
       expect(circle).toBeTruthy();
     });
+
+    it('должен рендерить xl (w-20 h-20)', () => {
+      const { container } = render(<UserAvatar firstName="И" lastName="П" size="xl" />);
+      const circle = container.querySelector('.w-20.h-20');
+      expect(circle).toBeTruthy();
+    });
+  });
+
+  describe('аватар изображение', () => {
+    it('должен показывать img при наличии avatar', () => {
+      render(<UserAvatar firstName="И" lastName="П" avatar="https://example.com/photo.jpg" />);
+      const img = screen.getByRole('img');
+      expect(img).toBeTruthy();
+      expect(img.getAttribute('src')).toBe('https://example.com/photo.jpg');
+    });
+
+    it('должен fallback на инициалы если avatar не указан', () => {
+      render(<UserAvatar firstName="И" lastName="П" />);
+      expect(screen.getByText('ИП')).toBeTruthy();
+    });
+
+    it('должен fallback на инициалы если avatar null', () => {
+      render(<UserAvatar firstName="И" lastName="П" avatar={null} />);
+      expect(screen.getByText('ИП')).toBeTruthy();
+    });
   });
 
   describe('индикатор онлайн-статуса', () => {

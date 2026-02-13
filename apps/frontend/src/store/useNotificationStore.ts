@@ -28,10 +28,32 @@ const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   ai_suggestion: 'AI подсказка',
 };
 
+// Звуковое уведомление через Web Audio API (880Hz sine wave, 300ms)
+export function playNotificationSound() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+    setTimeout(() => ctx.close(), 500);
+  } catch {
+    // Audio not available
+  }
+}
+
 interface NotificationStore {
   notifications: AppNotification[];
   browserNotificationsEnabled: boolean;
+  soundEnabled: boolean;
   setBrowserNotificationsEnabled: (enabled: boolean) => void;
+  setSoundEnabled: (enabled: boolean) => void;
   addNotification: (data: {
     text: string;
     type?: NotificationType;
@@ -48,9 +70,14 @@ export const useNotificationStore = create<NotificationStore>()(
     (set, get) => ({
       notifications: [],
       browserNotificationsEnabled: false,
+      soundEnabled: true,
 
       setBrowserNotificationsEnabled: (enabled: boolean) => {
         set({ browserNotificationsEnabled: enabled });
+      },
+
+      setSoundEnabled: (enabled: boolean) => {
+        set({ soundEnabled: enabled });
       },
 
       addNotification: (data) => {
@@ -65,14 +92,21 @@ export const useNotificationStore = create<NotificationStore>()(
           urgent: data.urgent,
         };
 
-        // Показываем браузерное уведомление если включено
         const state = get();
+        const isUnfocused = typeof document !== 'undefined' && !document.hasFocus();
+
+        // Push-уведомление браузера (показывается только если вкладка не в фокусе)
         if (state.browserNotificationsEnabled) {
           const title = data.type ? NOTIFICATION_TITLES[data.type] : 'Stankoff';
           browserNotifications.show(title, {
             body: data.text,
             tag: data.entityId || notification.id,
           });
+        }
+
+        // Звук при неактивной вкладке
+        if (state.soundEnabled && isUnfocused) {
+          playNotificationSound();
         }
 
         set((state) => ({
@@ -98,6 +132,7 @@ export const useNotificationStore = create<NotificationStore>()(
       name: 'notification-settings',
       partialize: (state) => ({
         browserNotificationsEnabled: state.browserNotificationsEnabled,
+        soundEnabled: state.soundEnabled,
       }),
     }
   )

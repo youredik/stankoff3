@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { WifiOff } from 'lucide-react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -8,6 +8,9 @@ import { ToastContainer } from '@/components/ui/ToastContainer';
 import { KeyboardShortcutsHelp } from '@/components/ui/KeyboardShortcutsHelp';
 import { useKeyboardShortcuts, type Shortcut } from '@/hooks/useKeyboardShortcuts';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useNotificationStore } from '@/store/useNotificationStore';
+import { browserNotifications } from '@/hooks/useBrowserNotifications';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -24,6 +27,31 @@ interface AppShellProps {
 export function AppShell({ children, mainClassName, mainStyle }: AppShellProps) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const isOnline = useOnlineStatus();
+
+  // Глобальный WebSocket — работает на всех страницах с AppShell
+  useWebSocket();
+
+  // Badge в document.title с количеством непрочитанных
+  const unreadCount = useNotificationStore((s) => s.notifications.filter((n) => !n.read).length);
+  useEffect(() => {
+    const baseTitle = 'Stankoff Portal';
+    document.title = unreadCount > 0 ? `(${unreadCount}) ${baseTitle}` : baseTitle;
+  }, [unreadCount]);
+
+  // Авто-запрос разрешения на push-уведомления при первом визите
+  useEffect(() => {
+    if (!browserNotifications.isSupported || browserNotifications.permission !== 'default') return;
+    const store = useNotificationStore.getState();
+    if (store.browserNotificationsEnabled) return;
+
+    const timer = setTimeout(async () => {
+      const granted = await browserNotifications.requestPermission();
+      if (granted) {
+        useNotificationStore.getState().setBrowserNotificationsEnabled(true);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const shortcuts: Shortcut[] = useMemo(
     () => [

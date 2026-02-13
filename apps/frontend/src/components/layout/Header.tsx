@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Bell, MessageSquare, LayoutGrid, BarChart3, List, Menu, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, MessageSquare, LayoutGrid, BarChart3, List, Menu, LogOut, ChevronDown, Settings } from 'lucide-react';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { NotificationPanel } from './NotificationPanel';
 import { GlobalSearch } from './GlobalSearch';
@@ -180,6 +180,7 @@ function HeaderInner() {
                   firstName={user?.firstName}
                   lastName={user?.lastName}
                   email={user?.email}
+                  avatar={user?.avatar}
                   size="md"
                   showOnline={false}
                 />
@@ -201,6 +202,13 @@ function HeaderInner() {
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{getFullName()}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                     </div>
+                    <button
+                      onClick={() => { setShowUserMenu(false); router.push('/profile'); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors text-left"
+                    >
+                      <Settings className="w-4 h-4 flex-shrink-0" />
+                      Профиль
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"

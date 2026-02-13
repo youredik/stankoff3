@@ -100,6 +100,12 @@ function LoginPageContent() {
     fetchProfile();
   }, [accessTokenParam, router]);
 
+  // Проверяем auth состояние: без checkAuth() isLoading навсегда true в чистом браузере
+  useEffect(() => {
+    if (accessTokenParam) return; // access_token обрабатывается отдельно выше
+    useAuthStore.getState().checkAuth();
+  }, [accessTokenParam]);
+
   // Проверяем dev mode при загрузке
   useEffect(() => {
     authApi.getDevUsers()

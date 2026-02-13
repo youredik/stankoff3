@@ -12,26 +12,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { usePermissionStore } from '@/store/usePermissionStore';
 import { initSocket, destroySocket, getSocket } from '@/lib/socket';
 import { browserNotifications } from '@/hooks/useBrowserNotifications';
-
-// Звуковое уведомление через Web Audio API
-function playNotificationSound() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.3);
-    setTimeout(() => ctx.close(), 500);
-  } catch {
-    // Audio not available
-  }
-}
+import { playNotificationSound } from '@/store/useNotificationStore';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -393,7 +374,6 @@ export function useWebSocket() {
         type: 'mention',
         entityId: data.entityId,
       });
-      playNotificationSound();
     });
 
     // RBAC: permissions изменились — перезагружаем

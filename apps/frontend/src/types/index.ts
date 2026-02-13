@@ -266,6 +266,7 @@ export interface User {
   department?: string;
   role: UserRole;
   isActive: boolean;
+  createdAt?: string;
 }
 
 export type UserRole = 'admin' | 'manager' | 'employee';

@@ -33,6 +33,16 @@ export const authApi = {
     return data;
   },
 
+  updateProfile: async (profileData: {
+    firstName?: string;
+    lastName?: string;
+    department?: string;
+    avatar?: string | null;
+  }): Promise<User> => {
+    const { data } = await apiClient.patch<User>('/auth/me', profileData);
+    return data;
+  },
+
   getKeycloakLoginUrl: (): string => {
     // В браузере используем относительный путь для работы через rewrites
     return '/api/auth/keycloak/login';
