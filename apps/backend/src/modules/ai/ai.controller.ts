@@ -199,7 +199,7 @@ export class AiController {
    *
    * POST /api/ai/search
    *
-   * Результаты включают ссылки на legacy систему (https://www.stankoff.ru)
+   * Результаты включают ссылки на legacy систему (https://workspace.stankoff.ru)
    * для источников типа 'legacy_request'.
    */
   @Post('search')

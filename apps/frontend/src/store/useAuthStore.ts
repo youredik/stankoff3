@@ -17,6 +17,15 @@ function getTokenExpiryMs(token: string): number | null {
   }
 }
 
+/**
+ * Проверяет, истёк ли токен (с запасом 10 сек на задержку сети)
+ */
+function isTokenExpired(token: string): boolean {
+  const expiryMs = getTokenExpiryMs(token);
+  if (!expiryMs) return true;
+  return expiryMs <= Date.now() + 10_000;
+}
+
 // Глобальный таймер — вне store чтобы не сериализовался
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -35,14 +44,20 @@ function scheduleProactiveRefresh(token: string, doRefresh: () => Promise<boolea
 
   const now = Date.now();
   const ttl = expiryMs - now;
+
+  if (ttl <= 0) {
+    // Токен уже истёк — обновляем немедленно
+    doRefresh();
+    return;
+  }
+
   // Обновляем за 60 секунд до истечения (минимум 10 сек)
   const refreshIn = Math.max(ttl - 60_000, 10_000);
 
   refreshTimer = setTimeout(async () => {
-    const success = await doRefresh();
-    if (!success) {
-      console.log('[AuthStore] Proactive refresh failed, session expired');
-    }
+    await doRefresh();
+    // При неудаче doRefresh() сам устанавливает isAuthenticated: false,
+    // AuthProvider обнаружит это и сделает redirect на /login
   }, refreshIn);
 }
 
@@ -122,50 +137,44 @@ export const useAuthStore = create<AuthState & AuthActions>()(
   },
 
   checkAuth: async () => {
-    if (get().isAuthenticated && get().user) {
-      // Даже если уже авторизован — планируем refresh по текущему токену
-      const token = get().accessToken;
-      if (token) {
-        scheduleProactiveRefresh(token, get().refreshTokens);
-      }
-      set({ isLoading: false });
+    const { accessToken, user } = get();
+
+    // Быстрый путь: валидный не-истёкший токен в памяти + данные пользователя
+    if (accessToken && user && !isTokenExpired(accessToken)) {
+      scheduleProactiveRefresh(accessToken, get().refreshTokens);
+      set({ isAuthenticated: true, isLoading: false });
       return;
     }
 
+    // Нужна аутентификация: нет токена, токен истёк, или нет данных пользователя
     set({ isLoading: true });
-    try {
-      const user = await authApi.me();
-      set({
-        user,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-      const token = get().accessToken;
-      if (token) {
-        scheduleProactiveRefresh(token, get().refreshTokens);
+
+    // Если токен есть (может быть ещё валидный) — пробуем /auth/me
+    if (accessToken && !isTokenExpired(accessToken)) {
+      try {
+        const freshUser = await authApi.me();
+        set({ user: freshUser, isAuthenticated: true, isLoading: false });
+        scheduleProactiveRefresh(accessToken, get().refreshTokens);
+        return;
+      } catch {
+        // Токен отклонён сервером — пробуем refresh
       }
-    } catch {
-      const refreshed = await get().refreshTokens();
-      if (refreshed) {
-        try {
-          const user = await authApi.me();
-          set({
-            user,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-          return;
-        } catch {
-          // Не удалось получить профиль
-        }
-      }
-      set({
-        user: null,
-        accessToken: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
     }
+
+    // Silent refresh через httpOnly cookie
+    const refreshed = await get().refreshTokens();
+    if (refreshed) {
+      try {
+        const freshUser = await authApi.me();
+        set({ user: freshUser, isAuthenticated: true, isLoading: false });
+        return;
+      } catch {
+        // Refresh прошёл, но профиль не удалось получить
+      }
+    }
+
+    // Ничего не сработало — не авторизован
+    set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
   },
 
   setAccessToken: (token: string | null) => {
@@ -184,15 +193,17 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        accessToken: state.accessToken,
+        // Персистим ТОЛЬКО user (как hint для UI во время загрузки).
+        // accessToken и isAuthenticated НЕ персистятся:
+        // - accessToken: защита от XSS (не хранится в localStorage)
+        // - isAuthenticated: предотвращает race condition (permissions не загружаются
+        //   до того как checkAuth подтвердит авторизацию через silent refresh)
         user: state.user,
-        isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state?.accessToken) {
+        // После гидрации всегда нужна проверка auth (токен в памяти отсутствует)
+        if (state) {
           state.isLoading = true;
-        } else {
-          state!.isLoading = false;
         }
       },
     }

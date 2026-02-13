@@ -47,11 +47,10 @@ function RelationSearchDropdown({
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const data = await entitiesApi.search(query, 20);
+        const data = await entitiesApi.search(query, 20, relatedWorkspaceId || undefined);
         if (!cancelled) {
           setResults(
             data.filter((r) => {
-              if (relatedWorkspaceId && r.workspaceId !== relatedWorkspaceId) return false;
               if (excludeIds.includes(r.customId) || excludeIds.includes(r.id)) return false;
               return true;
             }),
@@ -284,11 +283,10 @@ function RelationForm({ field, value, onChange }: Parameters<FieldRenderer['Form
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const data = await entitiesApi.search(query, 20);
+        const data = await entitiesApi.search(query, 20, field.relatedWorkspaceId || undefined);
         if (!cancelled) {
           setResults(
             data.filter((r) => {
-              if (field.relatedWorkspaceId && r.workspaceId !== field.relatedWorkspaceId) return false;
               if (ids.includes(r.customId) || ids.includes(r.id)) return false;
               return true;
             }),

@@ -826,5 +826,5 @@ npm run test -- --testPathPattern="legacy"
 | Legacy код (PHP) | `/Users/ed/dev/stankoff/stankoff` | Локальная копия исходников |
 | Legacy БД (MariaDB) | `185.186.143.38:3306` | Доступ только с IP препрода |
 | Препрод сервер | `51.250.117.178` | SSH: `youredik@...` |
-| Legacy CRM (веб) | `https://www.stankoff.ru/crm/` | Рабочая CRM |
+| Legacy CRM (веб) | `https://workspace.stankoff.ru/crm/` | Рабочая CRM |
 | Дампы БД (устарели) | `dump/stankoff.sql` в legacy проекте | Не использовать для разработки! |

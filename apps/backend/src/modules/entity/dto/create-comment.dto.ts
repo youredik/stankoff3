@@ -27,6 +27,11 @@ export class CreateCommentDto {
   content: string;
 
   @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  mentionedUserIds?: string[];
+
+  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AttachmentDto)
   @IsOptional()

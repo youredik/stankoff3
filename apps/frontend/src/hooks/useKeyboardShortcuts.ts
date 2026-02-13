@@ -34,8 +34,8 @@ export function useKeyboardShortcuts(shortcuts: Shortcut[]) {
 
         if (!keyMatch || !metaMatch || !ctrlMatch || !shiftMatch) continue;
 
-        // Простые буквы без модификаторов — не срабатывают в input
-        if (!s.meta && !s.ctrl && !s.shift && isInputFocused()) continue;
+        // Без meta/ctrl — не срабатывают в input (shift не считается модификатором для ввода)
+        if (!s.meta && !s.ctrl && isInputFocused()) continue;
 
         e.preventDefault();
         s.action();

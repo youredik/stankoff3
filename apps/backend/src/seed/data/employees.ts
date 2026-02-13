@@ -62,7 +62,7 @@ export const EMPLOYEES: SeedEmployee[] = [
 
   // ═══ IT отдел (2) ═══
   { legacyId: 148, email: 'youredik@gmail.com', firstName: 'Эдуард', lastName: 'Сарваров', departmentKey: 'it', role: UserRole.ADMIN },
-  { legacyId: null, email: 'korshunovsm@yandex.ru', firstName: 'Сергей', lastName: 'Коршунов', departmentKey: 'it', role: UserRole.ADMIN, specialty: 'Продукт-менеджер' },
+  { legacyId: null, email: 's.korshunov88@ya.ru', firstName: 'Сергей', lastName: 'Коршунов', departmentKey: 'it', role: UserRole.ADMIN, specialty: 'Продукт-менеджер' },
 
   // ═══ Отдел продаж (29) ═══
   { legacyId: 1, email: 'grachev@stankoff.ru', firstName: 'Максим', lastName: 'Грачев', departmentKey: 'sales', role: UserRole.MANAGER, specialty: 'Ведущий специалист по фрезерным и лазерным станкам с ЧПУ' },

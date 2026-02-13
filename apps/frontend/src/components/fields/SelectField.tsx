@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { X, Search, Plus, Check, ChevronDown } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { X, ChevronDown } from 'lucide-react';
 import type { SelectFieldConfig, FieldOption } from '@/types';
 import type { FieldRenderer } from './types';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useFilterableList } from '@/hooks/useFilterableList';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 
 const PRESET_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280', '#06B6D4'];
 
@@ -43,28 +44,21 @@ function useCascadedOptions(field: { options?: FieldOption[]; config?: any }, al
   }, [options, config?.cascadeFrom, allData]);
 }
 
+const getOptionSearchText = (opt: FieldOption) => opt.label;
+
+const renderSelectOption = (opt: FieldOption) => (
+  <span className="flex items-center gap-2">
+    {opt.color && <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: opt.color }} />}
+    <span>{opt.label}</span>
+  </span>
+);
+
 function SelectRenderer({ field, value, canEdit, onUpdate, allData }: Parameters<FieldRenderer['Renderer']>[0]) {
   const config = field.config as SelectFieldConfig | undefined;
   const isMulti = config?.multiSelect ?? false;
-  const searchable = config?.searchable ?? false;
   const allowCreate = config?.allowCreate ?? false;
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const cascadedOptions = useCascadedOptions(field, allData);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handle = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-        setSearchTerm('');
-      }
-    };
-    document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
-  }, [isOpen]);
 
   if (!field.options) return null;
 
@@ -73,42 +67,6 @@ function SelectRenderer({ field, value, canEdit, onUpdate, allData }: Parameters
     : [];
 
   const selectedOption = !isMulti ? cascadedOptions.find((o) => o.id === value) : null;
-
-  const filteredOptions = useMemo(() => {
-    if (!searchTerm) return cascadedOptions;
-    const lower = searchTerm.toLowerCase();
-    return cascadedOptions.filter((o) => o.label.toLowerCase().includes(lower));
-  }, [cascadedOptions, searchTerm]);
-
-  const canCreateNew = allowCreate && searchTerm.trim() &&
-    !cascadedOptions.some((o) => o.label.toLowerCase() === searchTerm.trim().toLowerCase());
-
-  const handleCreateOption = () => {
-    const { currentWorkspace, updateField: wsUpdateField } = useWorkspaceStore.getState();
-    if (!currentWorkspace) return;
-
-    const newOpt: FieldOption = {
-      id: `opt-${Date.now()}`,
-      label: searchTerm.trim(),
-      color: PRESET_COLORS[(field.options?.length || 0) % PRESET_COLORS.length],
-    };
-
-    for (const section of currentWorkspace.sections) {
-      const f = section.fields.find((f) => f.id === field.id);
-      if (f) {
-        wsUpdateField(section.id, field.id, { options: [...(field.options || []), newOpt] });
-        break;
-      }
-    }
-
-    if (isMulti) {
-      onUpdate([...selectedIds, newOpt.id]);
-    } else {
-      onUpdate(newOpt.id);
-      setIsOpen(false);
-    }
-    setSearchTerm('');
-  };
 
   if (!canEdit) {
     if (isMulti) {
@@ -133,117 +91,46 @@ function SelectRenderer({ field, value, canEdit, onUpdate, allData }: Parameters
     );
   }
 
-  if (isMulti || searchable || allowCreate) {
-    const toggleOption = (optId: string) => {
-      if (isMulti) {
-        const newIds = selectedIds.includes(optId)
-          ? selectedIds.filter((id) => id !== optId)
-          : [...selectedIds, optId];
-        onUpdate(newIds);
-      } else {
-        onUpdate(optId);
-        setIsOpen(false);
-        setSearchTerm('');
-      }
+  const handleCreateOption = (searchTerm: string) => {
+    const { currentWorkspace, updateField: wsUpdateField } = useWorkspaceStore.getState();
+    if (!currentWorkspace) return;
+
+    const newOpt: FieldOption = {
+      id: `opt-${Date.now()}`,
+      label: searchTerm,
+      color: PRESET_COLORS[(field.options?.length || 0) % PRESET_COLORS.length],
     };
 
-    return (
-      <div className="relative" ref={dropdownRef}>
-        <div
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 cursor-pointer min-h-[32px] flex flex-wrap gap-1 items-center"
-        >
-          {isMulti && selectedIds.length > 0 ? (
-            selectedIds.map((id) => {
-              const opt = field.options?.find((o) => o.id === id);
-              if (!opt) return null;
-              return <OptionBadge key={id} label={opt.label} color={opt.color} onRemove={() => toggleOption(id)} />;
-            })
-          ) : selectedOption ? (
-            <OptionBadge label={selectedOption.label} color={selectedOption.color} />
-          ) : (
-            <span className="text-gray-400 dark:text-gray-500">Не выбрано</span>
-          )}
-        </div>
+    for (const section of currentWorkspace.sections) {
+      const f = section.fields.find((f) => f.id === field.id);
+      if (f) {
+        wsUpdateField(section.id, field.id, { options: [...(field.options || []), newOpt] });
+        break;
+      }
+    }
 
-        {isOpen && (
-          <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-            {(searchable || allowCreate) && (
-              <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-1.5 px-2 py-1 border border-gray-200 dark:border-gray-600 rounded">
-                  <Search className="w-3.5 h-3.5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Поиск..."
-                    className="flex-1 text-sm bg-transparent focus:outline-none dark:text-gray-200"
-                    autoFocus
-                  />
-                </div>
-              </div>
-            )}
-            {!isMulti && (
-              <button
-                onClick={() => { onUpdate(null); setIsOpen(false); }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
-                Не выбрано
-              </button>
-            )}
-            {filteredOptions.map((opt) => {
-              const isSelected = isMulti ? selectedIds.includes(opt.id) : value === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  onClick={() => toggleOption(opt.id)}
-                  className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                    isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : ''
-                  }`}
-                >
-                  {isMulti && (
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                      isSelected ? 'bg-primary-600 border-primary-600' : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                      {isSelected && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                  )}
-                  {opt.color && <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: opt.color }} />}
-                  <span className="text-gray-700 dark:text-gray-300">{opt.label}</span>
-                </button>
-              );
-            })}
-            {filteredOptions.length === 0 && !canCreateNew && (
-              <div className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">Ничего не найдено</div>
-            )}
-            {canCreateNew && (
-              <button
-                onClick={handleCreateOption}
-                className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 border-t border-gray-200 dark:border-gray-700"
-              >
-                <Plus className="w-4 h-4" />
-                Создать «{searchTerm.trim()}»
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
+    if (isMulti) {
+      onUpdate([...selectedIds, newOpt.id]);
+    } else {
+      onUpdate(newOpt.id);
+    }
+  };
 
   return (
-    <select
-      value={value || ''}
-      onChange={(e) => onUpdate(e.target.value || null)}
-      className="w-full border border-gray-200 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500"
-    >
-      <option value="">Не выбрано</option>
-      {cascadedOptions.map((opt) => (
-        <option key={opt.id} value={opt.id}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <SearchableSelect
+      options={cascadedOptions}
+      value={isMulti ? selectedIds : (value || null)}
+      onChange={(v) => onUpdate(v)}
+      multi={isMulti}
+      getSearchText={getOptionSearchText}
+      renderOption={renderSelectOption}
+      renderSelectedSingle={(opt) => <OptionBadge label={opt.label} color={opt.color} />}
+      renderSelectedMultiTag={(opt, onRemove) => <OptionBadge label={opt.label} color={opt.color} onRemove={onRemove} />}
+      allowCreate={allowCreate}
+      onCreateOption={handleCreateOption}
+      emptyLabel="Не выбрано"
+      placeholder="Не выбрано"
+    />
   );
 }
 
@@ -254,44 +141,20 @@ function SelectForm({ field, value, onChange, allData }: Parameters<FieldRendere
 
   if (!field.options) return null;
 
-  if (isMulti) {
-    const selectedIds: string[] = Array.isArray(value) ? value : value ? [value] : [];
-    return (
-      <div className="space-y-1">
-        {cascadedOptions.map((opt) => (
-          <label key={opt.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(opt.id)}
-              onChange={() => {
-                const newIds = selectedIds.includes(opt.id)
-                  ? selectedIds.filter((id) => id !== opt.id)
-                  : [...selectedIds, opt.id];
-                onChange(newIds);
-              }}
-              className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-            />
-            {opt.color && <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: opt.color }} />}
-            <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
-          </label>
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <select
-      value={value || ''}
-      onChange={(e) => onChange(e.target.value || null)}
-      className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-    >
-      <option value="">Не выбрано</option>
-      {cascadedOptions.map((opt) => (
-        <option key={opt.id} value={opt.id}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <SearchableSelect
+      options={cascadedOptions}
+      value={isMulti ? (Array.isArray(value) ? value : value ? [value] : []) : (value || null)}
+      onChange={(v) => onChange(v)}
+      multi={isMulti}
+      getSearchText={getOptionSearchText}
+      renderOption={renderSelectOption}
+      renderSelectedSingle={(opt) => <OptionBadge label={opt.label} color={opt.color} />}
+      renderSelectedMultiTag={(opt, onRemove) => <OptionBadge label={opt.label} color={opt.color} onRemove={onRemove} />}
+      emptyLabel="Не выбрано"
+      placeholder="Не выбрано"
+      showEmptyOption={!isMulti}
+    />
   );
 }
 
@@ -318,13 +181,13 @@ function SelectFilter({ field, filterValue, toggleMultiSelect, allFilterValues, 
   }, [field.options, config?.cascadeFrom, allFilterValues]);
 
   const selectedIds = useMemo(() => filterValue || [], [filterValue]);
-  const getOptionSearchText = useCallback((o: FieldOption) => o.label, []);
+  const getOptionSearch = useCallback((o: FieldOption) => o.label, []);
   const getOptionId = useCallback((o: FieldOption) => o.id, []);
 
   const list = useFilterableList({
     items: visibleOptions,
     selectedIds,
-    getSearchText: getOptionSearchText,
+    getSearchText: getOptionSearch,
     getId: getOptionId,
   });
 

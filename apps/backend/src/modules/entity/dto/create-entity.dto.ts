@@ -8,7 +8,8 @@ export class CreateEntityDto {
   title: string;
 
   @IsString()
-  status: string;
+  @IsOptional()
+  status?: string;
 
   @IsString()
   @IsOptional()
@@ -17,6 +18,10 @@ export class CreateEntityDto {
   @IsString()
   @IsOptional()
   assigneeId?: string;
+
+  @IsString()
+  @IsOptional()
+  creatorId?: string;
 
   @IsObject()
   @IsOptional()

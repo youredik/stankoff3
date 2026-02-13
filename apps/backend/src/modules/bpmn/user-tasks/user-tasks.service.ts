@@ -18,6 +18,7 @@ import { UserGroup } from '../entities/user-group.entity';
 import { FormDefinition } from '../entities/form-definition.entity';
 import { BpmnWorkersService } from '../bpmn-workers.service';
 import { EventsGateway } from '../../websocket/events.gateway';
+import { extractMentionedUserIds } from '../../../common/utils/parse-mentions';
 
 export interface TaskFilter {
   workspaceId?: string;
@@ -507,13 +508,44 @@ export class UserTasksService {
   ): Promise<UserTaskComment> {
     const task = await this.findOne(taskId);
 
+    // Parse mentioned user IDs from HTML content
+    const mentionedUserIds = extractMentionedUserIds(content);
+
     const comment = this.commentRepository.create({
       taskId: task.id,
       userId,
       content,
+      mentionedUserIds,
     });
 
-    return this.commentRepository.save(comment);
+    const saved = await this.commentRepository.save(comment);
+
+    // Load with user relation for response and notifications
+    const withUser = await this.commentRepository.findOne({
+      where: { id: saved.id },
+      relations: ['user'],
+    });
+
+    // Send mention notifications
+    if (mentionedUserIds.length > 0 && withUser?.user) {
+      const authorName = `${withUser.user.firstName} ${withUser.user.lastName}`;
+      const preview = content.replace(/<[^>]*>/g, '').substring(0, 100);
+
+      for (const mentionedUserId of mentionedUserIds) {
+        if (mentionedUserId !== userId) {
+          this.eventsGateway.emitToUser(mentionedUserId, 'mention:created', {
+            type: 'task_comment',
+            taskId,
+            commentId: saved.id,
+            authorId: userId,
+            authorName,
+            preview,
+          });
+        }
+      }
+    }
+
+    return withUser || saved;
   }
 
   async getComments(taskId: string): Promise<UserTaskComment[]> {

@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { TextareaFieldConfig } from '@/types';
 import type { FieldRenderer } from './types';
 import { RichTextEditor, RichTextView } from './RichTextEditor';
+import { useEntityStore } from '@/store/useEntityStore';
 
 function TextareaRenderer({ field, value, canEdit, onUpdate }: Parameters<FieldRenderer['Renderer']>[0]) {
   const [isEditing, setIsEditing] = useState(false);
@@ -38,6 +39,8 @@ function TextareaRenderer({ field, value, canEdit, onUpdate }: Parameters<FieldR
     }
   };
 
+  const { users: mentionUsers } = useEntityStore();
+
   // Rich text mode (Tiptap)
   if (isMarkdown) {
     if (!canEdit) {
@@ -51,6 +54,7 @@ function TextareaRenderer({ field, value, canEdit, onUpdate }: Parameters<FieldR
             value={editValue}
             onChange={setEditValue}
             placeholder={field.description || 'Введите текст...'}
+            users={mentionUsers}
           />
           <div className="flex gap-2 mt-2">
             <button
@@ -153,6 +157,7 @@ function TextareaForm({ field, value, onChange }: Parameters<FieldRenderer['Form
   const config = field.config as TextareaFieldConfig | undefined;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMarkdown = config?.markdown ?? false;
+  const { users: mentionUsers } = useEntityStore();
 
   useEffect(() => {
     if (config?.autoResize && textareaRef.current) {
@@ -167,6 +172,7 @@ function TextareaForm({ field, value, onChange }: Parameters<FieldRenderer['Form
         value={value || ''}
         onChange={onChange}
         placeholder={field.description || 'Введите текст...'}
+        users={mentionUsers}
       />
     );
   }

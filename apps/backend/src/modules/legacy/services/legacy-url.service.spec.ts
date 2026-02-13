@@ -15,47 +15,47 @@ describe('LegacyUrlService', () => {
   describe('URL генерация', () => {
     it('должен генерировать URL заявки по hash', () => {
       expect(service.getRequestUrl('abc123def456ghi789jkl012mno345')).toBe(
-        'https://www.stankoff.ru/request/view/abc123def456ghi789jkl012mno345',
+        'https://workspace.stankoff.ru/request/view/abc123def456ghi789jkl012mno345',
       );
     });
 
     it('должен возвращать fallback URL заявки при отсутствии hash', () => {
-      expect(service.getRequestUrl(null)).toBe('https://www.stankoff.ru/request/list');
-      expect(service.getRequestUrl(undefined)).toBe('https://www.stankoff.ru/request/list');
-      expect(service.getRequestUrl('')).toBe('https://www.stankoff.ru/request/list');
+      expect(service.getRequestUrl(null)).toBe('https://workspace.stankoff.ru/request/list');
+      expect(service.getRequestUrl(undefined)).toBe('https://workspace.stankoff.ru/request/list');
+      expect(service.getRequestUrl('')).toBe('https://workspace.stankoff.ru/request/list');
     });
 
     it('должен генерировать URL сделки', () => {
-      expect(service.getDealUrl(456)).toBe('https://www.stankoff.ru/deal/view/456');
+      expect(service.getDealUrl(456)).toBe('https://workspace.stankoff.ru/deal/view/456');
     });
 
     it('должен генерировать URL клиента', () => {
-      expect(service.getCustomerUrl(789)).toBe('https://www.stankoff.ru/client/view/789');
+      expect(service.getCustomerUrl(789)).toBe('https://workspace.stankoff.ru/client/view/789');
     });
 
     it('должен генерировать URL контрагента', () => {
-      expect(service.getCounterpartyUrl(100)).toBe('https://www.stankoff.ru/commerce/counterparty/view/100');
+      expect(service.getCounterpartyUrl(100)).toBe('https://workspace.stankoff.ru/commerce/counterparty/view/100');
     });
 
     it('должен генерировать URL товара по URI', () => {
-      expect(service.getProductUrl('stanok-cnc-500')).toBe('https://www.stankoff.ru/blog/product/stanok-cnc-500');
+      expect(service.getProductUrl('stanok-cnc-500')).toBe('https://workspace.stankoff.ru/blog/product/stanok-cnc-500');
     });
 
     it('должен возвращать fallback URL товара при отсутствии URI', () => {
-      expect(service.getProductUrl(null)).toBe('https://www.stankoff.ru/blog');
-      expect(service.getProductUrl(undefined)).toBe('https://www.stankoff.ru/blog');
+      expect(service.getProductUrl(null)).toBe('https://workspace.stankoff.ru/blog');
+      expect(service.getProductUrl(undefined)).toBe('https://workspace.stankoff.ru/blog');
     });
 
     it('должен генерировать URL категории по URI', () => {
-      expect(service.getCategoryUrl('tokarnye-stanki')).toBe('https://www.stankoff.ru/blog/tokarnye-stanki');
+      expect(service.getCategoryUrl('tokarnye-stanki')).toBe('https://workspace.stankoff.ru/blog/tokarnye-stanki');
     });
 
     it('должен возвращать fallback URL категории при отсутствии URI', () => {
-      expect(service.getCategoryUrl(null)).toBe('https://www.stankoff.ru/blog');
+      expect(service.getCategoryUrl(null)).toBe('https://workspace.stankoff.ru/blog');
     });
 
     it('должен генерировать URL менеджера', () => {
-      expect(service.getManagerUrl(10)).toBe('https://www.stankoff.ru/admin/settings/employees/10');
+      expect(service.getManagerUrl(10)).toBe('https://workspace.stankoff.ru/admin/settings/employees/10');
     });
   });
 
@@ -63,14 +63,14 @@ describe('LegacyUrlService', () => {
     it('должен возвращать только URL заявки если нет связанных сущностей', () => {
       const urls = service.getRequestRelatedUrls({ requestHash: 'testhash123' });
 
-      expect(urls.request).toBe('https://www.stankoff.ru/request/view/testhash123');
+      expect(urls.request).toBe('https://workspace.stankoff.ru/request/view/testhash123');
       expect(Object.keys(urls)).toHaveLength(1);
     });
 
     it('должен возвращать fallback при отсутствии hash', () => {
       const urls = service.getRequestRelatedUrls({ requestId: 123 });
 
-      expect(urls.request).toBe('https://www.stankoff.ru/request/list');
+      expect(urls.request).toBe('https://workspace.stankoff.ru/request/list');
     });
 
     it('должен возвращать все связанные URL', () => {
@@ -83,11 +83,11 @@ describe('LegacyUrlService', () => {
         counterpartyId: 100,
       });
 
-      expect(urls.request).toBe('https://www.stankoff.ru/request/view/testhash123');
-      expect(urls.customer).toBe('https://www.stankoff.ru/client/view/456');
-      expect(urls.manager).toBe('https://www.stankoff.ru/admin/settings/employees/10');
-      expect(urls.deal).toBe('https://www.stankoff.ru/deal/view/789');
-      expect(urls.counterparty).toBe('https://www.stankoff.ru/commerce/counterparty/view/100');
+      expect(urls.request).toBe('https://workspace.stankoff.ru/request/view/testhash123');
+      expect(urls.customer).toBe('https://workspace.stankoff.ru/client/view/456');
+      expect(urls.manager).toBe('https://workspace.stankoff.ru/admin/settings/employees/10');
+      expect(urls.deal).toBe('https://workspace.stankoff.ru/deal/view/789');
+      expect(urls.counterparty).toBe('https://workspace.stankoff.ru/commerce/counterparty/view/100');
     });
 
     it('должен игнорировать null значения', () => {
@@ -106,14 +106,14 @@ describe('LegacyUrlService', () => {
   describe('formatLinksForAI', () => {
     it('должен форматировать ссылки в markdown', () => {
       const urls = {
-        request: 'https://www.stankoff.ru/request/view/abc123',
-        customer: 'https://www.stankoff.ru/client/view/456',
+        request: 'https://workspace.stankoff.ru/request/view/abc123',
+        customer: 'https://workspace.stankoff.ru/client/view/456',
       };
 
       const formatted = service.formatLinksForAI(urls);
 
-      expect(formatted).toContain('[Заявка в CRM](https://www.stankoff.ru/request/view/abc123)');
-      expect(formatted).toContain('[Карточка клиента](https://www.stankoff.ru/client/view/456)');
+      expect(formatted).toContain('[Заявка в CRM](https://workspace.stankoff.ru/request/view/abc123)');
+      expect(formatted).toContain('[Карточка клиента](https://workspace.stankoff.ru/client/view/456)');
     });
   });
 
@@ -135,8 +135,8 @@ describe('LegacyUrlService', () => {
 
       expect(context.links).toHaveLength(2); // request + customer
       expect(context.links[0].label).toBe('Проблема с оборудованием');
-      expect(context.links[0].url).toBe('https://www.stankoff.ru/request/view/abc123def456ghi789jkl012mno345');
-      expect(context.links[1].url).toBe('https://www.stankoff.ru/client/view/456');
+      expect(context.links[0].url).toBe('https://workspace.stankoff.ru/request/view/abc123def456ghi789jkl012mno345');
+      expect(context.links[1].url).toBe('https://workspace.stankoff.ru/client/view/456');
       expect(context.markdown).toContain('**Связанные материалы:**');
     });
 
@@ -153,7 +153,7 @@ describe('LegacyUrlService', () => {
 
       const context = service.createAIContext(sources);
 
-      expect(context.links[0].url).toBe('https://www.stankoff.ru/request/list');
+      expect(context.links[0].url).toBe('https://workspace.stankoff.ru/request/list');
     });
 
     it('должен вернуть пустой контекст для не-legacy источников', () => {

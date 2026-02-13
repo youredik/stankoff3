@@ -272,14 +272,14 @@ describe('EntityController', () => {
         workspaces: new Map([['ws-1', { name: 'Test', icon: '📁' }]]),
       });
 
-      const result = await controller.search('test', '10', mockUser);
+      const result = await controller.search('test', '10', undefined as any, mockUser);
 
       expect(result.results).toHaveLength(1);
       expect(result.results[0].workspaceName).toBe('Test');
     });
 
     it('должен вернуть пустой массив для короткого запроса', async () => {
-      const result = await controller.search('a', '10', mockUser);
+      const result = await controller.search('a', '10', undefined as any, mockUser);
 
       expect(result.results).toEqual([]);
     });
@@ -287,7 +287,7 @@ describe('EntityController', () => {
     it('должен вернуть пустой массив если нет доступных workspaces', async () => {
       workspaceService.getAccessibleWorkspaces.mockResolvedValue([]);
 
-      const result = await controller.search('test', '10', mockUser);
+      const result = await controller.search('test', '10', undefined as any, mockUser);
 
       expect(result.results).toEqual([]);
     });

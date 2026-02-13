@@ -195,6 +195,9 @@ export class UserTaskComment {
   @Column({ type: 'text' })
   content: string;
 
+  @Column('jsonb', { default: [] })
+  mentionedUserIds: string[];
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

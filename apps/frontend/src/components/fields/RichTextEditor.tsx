@@ -1,9 +1,15 @@
 'use client';
 
+import { useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Bold, Italic, Strikethrough, Link as LinkIcon, List, ListOrdered } from 'lucide-react';
+import { MentionDropdown } from '@/components/ui/MentionDropdown';
+import { createMentionSuggestion, type MentionSuggestionState } from '@/lib/tiptap/mention-suggestion';
+import { extractMentionIds } from '@/lib/tiptap/parse-mentions';
+import type { User } from '@/types';
 
 interface RichTextEditorProps {
   value: string;
@@ -11,6 +17,8 @@ interface RichTextEditorProps {
   placeholder?: string;
   editable?: boolean;
   className?: string;
+  users?: User[];
+  onMentionedUserIds?: (ids: string[]) => void;
 }
 
 function ToolbarButton({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -29,15 +37,36 @@ function ToolbarButton({ active, onClick, children }: { active?: boolean; onClic
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder, editable = true, className }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder, editable = true, className, users, onMentionedUserIds }: RichTextEditorProps) {
+  const [mentionState, setMentionState] = useState<MentionSuggestionState | null>(null);
+  const selectedIndexRef = useRef(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const extensions = [
+    StarterKit.configure({
+      link: { openOnClick: false },
+    }),
+    Placeholder.configure({ placeholder: placeholder || 'Введите текст...' }),
+  ];
+
+  if (users && users.length > 0) {
+    extensions.push(
+      Mention.configure({
+        HTMLAttributes: {
+          class: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/40 rounded px-0.5',
+        },
+        suggestion: createMentionSuggestion(users, {
+          onStateChange: setMentionState,
+          onSelectedIndexChange: (idx) => { selectedIndexRef.current = idx; setSelectedIndex(idx); },
+          getSelectedIndex: () => selectedIndexRef.current,
+        }),
+      }) as any,
+    );
+  }
+
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        link: { openOnClick: false },
-      }),
-      Placeholder.configure({ placeholder: placeholder || 'Введите текст...' }),
-    ],
+    extensions,
     content: value || '',
     editable,
     editorProps: {
@@ -47,7 +76,11 @@ export function RichTextEditor({ value, onChange, placeholder, editable = true, 
     },
     onUpdate: ({ editor: e }) => {
       const html = e.getHTML();
-      onChange(html === '<p></p>' ? '' : html);
+      const cleaned = html === '<p></p>' ? '' : html;
+      onChange(cleaned);
+      if (onMentionedUserIds && cleaned) {
+        onMentionedUserIds(extractMentionIds(cleaned));
+      }
     },
   });
 
@@ -84,9 +117,25 @@ export function RichTextEditor({ value, onChange, placeholder, editable = true, 
           <ToolbarButton active={editor.isActive('link')} onClick={addLink}>
             <LinkIcon className="w-3.5 h-3.5" />
           </ToolbarButton>
+          {users && users.length > 0 && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">@ — упоминание</span>
+          )}
         </div>
       )}
       <EditorContent editor={editor} />
+      {mentionState && (
+        <MentionDropdown
+          items={mentionState.items}
+          selectedIndex={selectedIndex}
+          clientRect={mentionState.clientRect}
+          onSelect={(u) => {
+            mentionState.command({
+              id: u.id,
+              label: `${u.firstName} ${u.lastName}`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -96,7 +145,7 @@ export function RichTextView({ html }: { html: string }) {
   if (!html) return <span className="text-gray-400 dark:text-gray-500 text-sm">—</span>;
   return (
     <div
-      className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
+      className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 [&_[data-type=mention]]:text-primary-600 [&_[data-type=mention]]:dark:text-primary-400 [&_[data-type=mention]]:bg-primary-50 [&_[data-type=mention]]:dark:bg-primary-900/40 [&_[data-type=mention]]:rounded [&_[data-type=mention]]:px-0.5 [&_[data-type=mention]]:font-medium"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

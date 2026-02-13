@@ -129,13 +129,13 @@ describe('RagIndexerService', () => {
 
     const mockLegacyUrlService = {
       getRequestUrl: jest.fn((hash?: string | null, id?: number) =>
-        hash ? `https://www.stankoff.ru/request/view/${hash}` : `https://www.stankoff.ru/request/list`,
+        hash ? `https://workspace.stankoff.ru/request/view/${hash}` : `https://workspace.stankoff.ru/request/list`,
       ),
       getCounterpartyUrl: jest.fn((id: number) =>
-        `https://www.stankoff.ru/commerce/counterparty/view/${id}`,
+        `https://workspace.stankoff.ru/commerce/counterparty/view/${id}`,
       ),
       getDealUrl: jest.fn((id: number) =>
-        `https://www.stankoff.ru/deal/view/${id}`,
+        `https://workspace.stankoff.ru/deal/view/${id}`,
       ),
     };
 
@@ -266,7 +266,7 @@ describe('RagIndexerService', () => {
             customerId: 100,
             answersCount: 3,
             requestHash: 'testhash1abcdefghijklmnopqrst',
-            legacyUrl: 'https://www.stankoff.ru/request/view/testhash1abcdefghijklmnopqrst',
+            legacyUrl: 'https://workspace.stankoff.ru/request/view/testhash1abcdefghijklmnopqrst',
           }),
         }),
       );
@@ -629,7 +629,7 @@ describe('RagIndexerService', () => {
             counterpartyId: 200,
             counterpartyName: 'ООО Рога и Копыта',
             counterpartyInn: '7701234567',
-            counterpartyUrl: 'https://www.stankoff.ru/commerce/counterparty/view/200',
+            counterpartyUrl: 'https://workspace.stankoff.ru/commerce/counterparty/view/200',
           }),
         }),
       );
@@ -647,7 +647,7 @@ describe('RagIndexerService', () => {
                 id: 500,
                 name: 'Поставка оборудования',
                 sum: 1500000,
-                url: 'https://www.stankoff.ru/deal/view/500',
+                url: 'https://workspace.stankoff.ru/deal/view/500',
               }),
             ]),
           }),

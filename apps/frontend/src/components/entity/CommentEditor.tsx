@@ -2,12 +2,10 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { UserAvatar } from '@/components/ui/UserAvatar';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { Editor } from '@tiptap/react';
-import { createPortal } from 'react-dom';
 import {
   Bold,
   Italic,
@@ -23,6 +21,8 @@ import {
 } from 'lucide-react';
 import { filesApi } from '@/lib/api/files';
 import { aiApi } from '@/lib/api/ai';
+import { MentionDropdown } from '@/components/ui/MentionDropdown';
+import { createMentionSuggestion, type MentionSuggestionState } from '@/lib/tiptap/mention-suggestion';
 import type { User, UploadedAttachment } from '@/types';
 
 interface CommentEditorProps {
@@ -47,11 +47,7 @@ function isVideoMimeType(mimeType: string): boolean {
 }
 
 export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: CommentEditorProps) {
-  const [mentionState, setMentionState] = useState<{
-    items: User[];
-    clientRect: () => DOMRect | null;
-    command: (props: { id: string; label: string }) => void;
-  } | null>(null);
+  const [mentionState, setMentionState] = useState<MentionSuggestionState | null>(null);
   const selectedIndexRef = useRef(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
@@ -75,81 +71,14 @@ export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: Comm
         HTMLAttributes: {
           class: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/40 rounded px-0.5',
         },
-        suggestion: {
-          items: ({ query }) =>
-            users
-              .filter((u) =>
-                `${u.firstName} ${u.lastName}`
-                  .toLowerCase()
-                  .includes(query.toLowerCase())
-              )
-              .slice(0, 5),
-          render: () => {
-            let current: any = null;
-            return {
-              onStart: (props: any) => {
-                current = props;
-                selectedIndexRef.current = 0;
-                setSelectedIndex(0);
-                setMentionState({
-                  items: props.items,
-                  clientRect: props.clientRect,
-                  command: props.command,
-                });
-              },
-              onUpdate: (props: any) => {
-                current = props;
-                selectedIndexRef.current = 0;
-                setSelectedIndex(0);
-                setMentionState({
-                  items: props.items,
-                  clientRect: props.clientRect,
-                  command: props.command,
-                });
-              },
-              onExit: () => {
-                current = null;
-                setMentionState(null);
-              },
-              onKeyDown: ({ event }: { event: KeyboardEvent }) => {
-                if (!current) return false;
-                if (event.key === 'ArrowDown') {
-                  event.preventDefault();
-                  const next = Math.min(
-                    selectedIndexRef.current + 1,
-                    current.items.length - 1
-                  );
-                  selectedIndexRef.current = next;
-                  setSelectedIndex(next);
-                  return true;
-                }
-                if (event.key === 'ArrowUp') {
-                  event.preventDefault();
-                  const prev = Math.max(selectedIndexRef.current - 1, 0);
-                  selectedIndexRef.current = prev;
-                  setSelectedIndex(prev);
-                  return true;
-                }
-                if (event.key === 'Enter' || event.key === 'Tab') {
-                  event.preventDefault();
-                  const item = current.items[selectedIndexRef.current];
-                  if (item) {
-                    current.command({
-                      id: item.id,
-                      label: `${item.firstName} ${item.lastName}`,
-                    });
-                  }
-                  return true;
-                }
-                if (event.key === 'Escape') {
-                  setMentionState(null);
-                  return true;
-                }
-                return false;
-              },
-            };
+        suggestion: createMentionSuggestion(users, {
+          onStateChange: setMentionState,
+          onSelectedIndexChange: (idx) => {
+            selectedIndexRef.current = idx;
+            setSelectedIndex(idx);
           },
-        },
+          getSelectedIndex: () => selectedIndexRef.current,
+        }),
       }),
     ],
     editorProps: {
@@ -221,10 +150,8 @@ export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: Comm
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (err) {
       console.error('Upload failed:', err);
-      // Could show an error toast here
     } finally {
       setUploading(false);
-      // Reset input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -234,51 +161,6 @@ export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: Comm
   const handleRemoveAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
-
-  // @mention dropdown via portal
-  const mentionDropdown =
-    mentionState &&
-    mentionState.items.length > 0 &&
-    typeof document !== 'undefined' &&
-    (() => {
-      const rect = mentionState.clientRect?.();
-      if (!rect) return null;
-      return createPortal(
-        <div
-          className="fixed z-[100] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 w-52"
-          style={{ top: rect.bottom + 4, left: rect.left }}
-        >
-          {mentionState.items.map((user, i) => (
-            <button
-              key={user.id}
-              className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 ${
-                i === selectedIndex
-                  ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-              }`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                mentionState.command({
-                  id: user.id,
-                  label: `${user.firstName} ${user.lastName}`,
-                });
-              }}
-            >
-              <UserAvatar
-                firstName={user.firstName}
-                lastName={user.lastName}
-                userId={user.id}
-                size="xs"
-              />
-              <span>
-                {user.firstName} {user.lastName}
-              </span>
-            </button>
-          ))}
-        </div>,
-        document.body
-      );
-    })();
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500 bg-white dark:bg-gray-800">
@@ -449,7 +331,19 @@ export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: Comm
         </button>
       </div>
 
-      {mentionDropdown}
+      {mentionState && (
+        <MentionDropdown
+          items={mentionState.items}
+          selectedIndex={selectedIndex}
+          clientRect={mentionState.clientRect}
+          onSelect={(user) => {
+            mentionState.command({
+              id: user.id,
+              label: `${user.firstName} ${user.lastName}`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

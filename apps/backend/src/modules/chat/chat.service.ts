@@ -21,6 +21,7 @@ import { EditMessageDto } from './dto/edit-message.dto';
 import { MarkReadDto } from './dto/mark-read.dto';
 import { MessagesQueryDto } from './dto/messages-query.dto';
 import type { ChatAgentService } from '../ai/services/chat-agent.service';
+import { extractMentionedUserIds } from '../../common/utils/parse-mentions';
 
 @Injectable()
 export class ChatService implements OnModuleInit {
@@ -252,6 +253,11 @@ export class ChatService implements OnModuleInit {
   async sendMessage(conversationId: string, userId: string, dto: SendMessageDto) {
     await this.assertParticipant(conversationId, userId);
 
+    // Merge mention IDs from DTO and HTML parsing
+    const parsedMentions = dto.content ? extractMentionedUserIds(dto.content) : [];
+    const dtoMentions = dto.mentionedUserIds || [];
+    const allMentionIds = [...new Set([...dtoMentions, ...parsedMentions])];
+
     const message = this.messageRepo.create({
       conversationId,
       authorId: userId,
@@ -262,7 +268,7 @@ export class ChatService implements OnModuleInit {
       voiceKey: dto.voiceKey || null,
       voiceDuration: dto.voiceDuration ?? null,
       voiceWaveform: dto.voiceWaveform || null,
-      mentionedUserIds: dto.mentionedUserIds || [],
+      mentionedUserIds: allMentionIds,
     });
 
     const saved = await this.messageRepo.save(message);
@@ -297,6 +303,26 @@ export class ChatService implements OnModuleInit {
       lastMessagePreview: preview,
       lastMessageAuthorId: userId,
     });
+
+    // Send mention notifications to mentioned users (except author)
+    if (allMentionIds.length > 0 && full) {
+      const authorName = full.author
+        ? `${full.author.firstName} ${full.author.lastName}`
+        : 'Пользователь';
+
+      for (const mentionedUserId of allMentionIds) {
+        if (mentionedUserId !== userId) {
+          this.eventsGateway.emitToUser(mentionedUserId, 'mention:created', {
+            type: 'chat_message',
+            conversationId,
+            messageId: saved.id,
+            authorId: userId,
+            authorName,
+            preview,
+          });
+        }
+      }
+    }
 
     // AI Chat Agent: если сообщение в ai_assistant чате и автор НЕ бот — запросить ответ бота
     this.triggerAiBotResponse(conversationId, userId, dto.content || '').catch(() => {});

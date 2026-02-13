@@ -10,9 +10,16 @@ export interface LogoutResponse {
   keycloakLogoutUrl?: string;
 }
 
+const REFRESH_TIMEOUT = 10_000; // 10 секунд на refresh (не должен зависать)
+
 export const authApi = {
   refresh: async (): Promise<RefreshResponse> => {
-    const { data } = await apiClient.post<RefreshResponse>('/auth/refresh');
+    // Не передаём body — refresh token читается из httpOnly cookie
+    const { data } = await apiClient<RefreshResponse>({
+      method: 'POST',
+      url: '/auth/refresh',
+      timeout: REFRESH_TIMEOUT,
+    });
     return data;
   },
 

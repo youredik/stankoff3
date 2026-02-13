@@ -379,6 +379,23 @@ export function useWebSocket() {
       });
     });
 
+    // @mention: кто-то упомянул текущего пользователя
+    socket.on('mention:created', (data: {
+      type: 'entity_comment' | 'chat_message' | 'task_comment';
+      entityId?: string;
+      conversationId?: string;
+      taskId?: string;
+      authorName: string;
+      preview: string;
+    }) => {
+      useNotificationStore.getState().addNotification({
+        text: `${data.authorName} упомянул вас: «${data.preview}»`,
+        type: 'mention',
+        entityId: data.entityId,
+      });
+      playNotificationSound();
+    });
+
     // RBAC: permissions изменились — перезагружаем
     socket.on('rbac:permissions:changed', () => {
       usePermissionStore.getState().fetchPermissions();

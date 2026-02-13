@@ -176,7 +176,7 @@ export function LinkedEntities({
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await entitiesApi.search(searchQuery, 20);
+        const results = await entitiesApi.search(searchQuery, 20, selectedWorkspaceId || undefined);
         if (!cancelled) {
           setSearchResults(
             results.map((r) => ({
@@ -197,7 +197,7 @@ export function LinkedEntities({
       if (!cancelled) setSearching(false);
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [showAddModal, searchQuery]);
+  }, [showAddModal, searchQuery, selectedWorkspaceId]);
 
   // Получить customId текущей заявки из store
   const currentCustomId = useEntityStore((s) => s.selectedEntity?.customId);

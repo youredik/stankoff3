@@ -111,7 +111,7 @@ describe('LegacyMigrationService', () => {
           provide: LegacyUrlService,
           useValue: {
             getRequestUrl: jest.fn((hash?: string | null, id?: number) =>
-              hash ? `https://www.stankoff.ru/request/view/${hash}` : `https://www.stankoff.ru/request/list`,
+              hash ? `https://workspace.stankoff.ru/request/view/${hash}` : `https://workspace.stankoff.ru/request/list`,
             ),
           },
         },
@@ -800,7 +800,7 @@ describe('LegacyMigrationService', () => {
             provide: LegacyUrlService,
             useValue: {
               getRequestUrl: jest.fn((hash?: string | null, id?: number) =>
-                hash ? `https://www.stankoff.ru/request/view/${hash}` : `https://www.stankoff.ru/request/list`,
+                hash ? `https://workspace.stankoff.ru/request/view/${hash}` : `https://workspace.stankoff.ru/request/list`,
               ),
             },
           },

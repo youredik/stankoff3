@@ -169,7 +169,7 @@ export const legacyApi = {
 
 // ==================== URL Helpers ====================
 
-const LEGACY_BASE_URL = 'https://www.stankoff.ru';
+const LEGACY_BASE_URL = 'https://workspace.stankoff.ru';
 
 /**
  * Генераторы URL для Legacy CRM

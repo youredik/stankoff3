@@ -703,11 +703,22 @@ export class EntityService {
         throw new NotFoundException(`Workspace ${dto.workspaceId} not found`);
       }
 
+      // Резолв дефолтного статуса из конфигурации workspace
+      // Если статус не передан или не существует среди статусов этого workspace —
+      // используем первый статус из конфига (защита от race condition на фронте)
+      const rawStatus = dto.status || 'new';
+      const resolvedStatus = this.resolveStatusFromSections(rawStatus, workspace.sections);
+      if (resolvedStatus !== rawStatus) {
+        this.logger.warn(
+          `Entity status "${rawStatus}" is invalid for workspace ${dto.workspaceId}, using default "${resolvedStatus}"`,
+        );
+      }
+
       // Валидация data по полям workspace
-      if (dto.data && workspace.sections) {
-        this.fieldValidationService.validateEntityData(dto.data, workspace.sections);
-        // Пересчёт computed полей
-        dto.data = this.formulaEvaluatorService.computeFields(dto.data, workspace.sections);
+      let resolvedData = dto.data || {};
+      if (resolvedData && workspace.sections) {
+        this.fieldValidationService.validateEntityData(resolvedData, workspace.sections);
+        resolvedData = this.formulaEvaluatorService.computeFields(resolvedData, workspace.sections);
       }
 
       // Получаем или создаём глобальный счётчик с блокировкой
@@ -738,11 +749,17 @@ export class EntityService {
       // Генерируем customId с prefix workspace и глобальным номером
       const customId = `${workspace.prefix}-${counter.value}`;
 
-      // Создаём entity с сгенерированным customId
-      const entity = manager.create(WorkspaceEntity, {
-        ...dto,
-        customId,
-      });
+      // Создаём entity с прямым присвоением свойств
+      // (manager.create + spread DTO ненадёжен: INSERT может использовать старые значения DTO)
+      const entity = new WorkspaceEntity();
+      entity.workspaceId = dto.workspaceId;
+      entity.title = dto.title;
+      entity.status = resolvedStatus;
+      entity.priority = dto.priority as string;
+      entity.assigneeId = dto.assigneeId ?? null;
+      entity.creatorId = dto.creatorId || actorId || null;
+      entity.data = resolvedData;
+      entity.customId = customId;
 
       return manager.save(WorkspaceEntity, entity);
     });
@@ -916,12 +933,27 @@ export class EntityService {
     const current = await this.findOne(id);
     const oldStatus = current.status;
 
-    await this.entityRepository.update(id, { status });
+    // Валидация статуса против конфигурации workspace.
+    // Если запрошенный статус невалиден — сохраняем текущий (не меняем).
+    const resolvedStatus = await this.resolveValidStatus(status, current.workspaceId);
+    if (resolvedStatus !== status) {
+      this.logger.warn(
+        `updateStatus: status "${status}" is invalid for workspace ${current.workspaceId}, keeping current "${oldStatus}"`,
+      );
+      return current;
+    }
+
+    // Если статус совпадает с текущим — ничего не делаем
+    if (resolvedStatus === oldStatus) {
+      return current;
+    }
+
+    await this.entityRepository.update(id, { status: resolvedStatus });
     const updated = await this.findOne(id);
-    this.eventsGateway.emitStatusChanged({ id, status, entity: updated });
+    this.eventsGateway.emitStatusChanged({ id, status: resolvedStatus, entity: updated });
 
     // Логирование изменения статуса
-    if (actorId && oldStatus !== status) {
+    if (actorId && oldStatus !== resolvedStatus) {
       await this.auditLogService.log(
         AuditActionType.ENTITY_STATUS_CHANGED,
         current.workspaceId,
@@ -929,24 +961,14 @@ export class EntityService {
         {
           description: 'Изменён статус',
           oldValues: { status: oldStatus },
-          newValues: { status },
+          newValues: { status: resolvedStatus },
           changedFields: ['status'],
         },
         id,
       );
 
-      // Email уведомление исполнителю об изменении статуса
-      if (updated.assigneeId && updated.assigneeId !== actorId) {
-        const [assignee, changedBy] = await Promise.all([
-          this.userRepository.findOne({ where: { id: updated.assigneeId } }),
-          actorId ? this.userRepository.findOne({ where: { id: actorId } }) : null,
-        ]);
-        if (assignee && changedBy) {
-          this.emailService.sendStatusChangeNotification(
-            assignee, updated, changedBy, oldStatus, status, this.frontendUrl,
-          ).catch(() => {}); // Не блокируем при ошибке
-        }
-      }
+      // Email уведомления об изменении статуса — assignee + creator (кроме актора)
+      this.notifyStatusChange(updated, actorId, oldStatus, resolvedStatus);
 
       // Автоматизация: триггер ON_STATUS_CHANGE
       try {
@@ -968,7 +990,7 @@ export class EntityService {
               entityId: id,
               workspaceId: current.workspaceId,
               oldStatus,
-              newStatus: status,
+              newStatus: resolvedStatus,
               title: updated.title,
               priority: updated.priority,
               assigneeId: updated.assigneeId,
@@ -983,7 +1005,7 @@ export class EntityService {
 
       // SLA: отмечаем закрытие при переходе в финальный статус
       const closedStatuses = ['closed', 'done', 'resolved', 'cancelled', 'completed'];
-      if (closedStatuses.includes(status.toLowerCase())) {
+      if (closedStatuses.includes(resolvedStatus.toLowerCase())) {
         try {
           await this.slaService.recordResolution('entity', id);
           this.logger.log(`SLA resolution recorded for entity ${id}`);
@@ -1033,17 +1055,8 @@ export class EntityService {
       }
 
       // Email уведомление новому исполнителю
-      if (assigneeId && actorId && assigneeId !== actorId) {
-        const [assignee, assignedBy] = await Promise.all([
-          this.userRepository.findOne({ where: { id: assigneeId } }),
-          this.userRepository.findOne({ where: { id: actorId } }),
-        ]);
-        if (assignee && assignedBy) {
-          this.emailService.sendAssignmentNotification(
-            assignee, updated, assignedBy, this.frontendUrl,
-          ).catch(() => {}); // Не блокируем при ошибке
-        }
-      }
+      // Email уведомления о назначении — новый assignee + creator (кроме актора)
+      this.notifyAssigneeChange(updated, assigneeId, actorId);
 
       // Автоматизация: триггер ON_ASSIGN
       try {
@@ -1227,6 +1240,103 @@ export class EntityService {
     return { imported, errors };
   }
 
+  // ==================== Email Notifications ====================
+
+  /**
+   * Собирает уникальных получателей уведомления (assignee + creator), исключая актора.
+   */
+  private async getNotificationRecipients(
+    entity: WorkspaceEntity,
+    actorId?: string,
+  ): Promise<{ recipients: User[]; actor: User | null }> {
+    const recipientIds = new Set<string>();
+    if (entity.assigneeId && entity.assigneeId !== actorId) {
+      recipientIds.add(entity.assigneeId);
+    }
+    if (entity.creatorId && entity.creatorId !== actorId) {
+      recipientIds.add(entity.creatorId);
+    }
+
+    if (recipientIds.size === 0 && !actorId) {
+      return { recipients: [], actor: null };
+    }
+
+    const idsToLoad = [...recipientIds];
+    if (actorId) idsToLoad.push(actorId);
+
+    const users = await Promise.all(
+      idsToLoad.map((id) => this.userRepository.findOne({ where: { id } })),
+    );
+
+    const userMap = new Map<string, User>();
+    for (const u of users) {
+      if (u) userMap.set(u.id, u);
+    }
+
+    const recipients = [...recipientIds]
+      .map((id) => userMap.get(id))
+      .filter((u): u is User => !!u);
+
+    const actor = actorId ? userMap.get(actorId) || null : null;
+
+    return { recipients, actor };
+  }
+
+  private async notifyStatusChange(
+    entity: WorkspaceEntity,
+    actorId: string | undefined,
+    oldStatus: string,
+    newStatus: string,
+  ): Promise<void> {
+    try {
+      const { recipients, actor } = await this.getNotificationRecipients(entity, actorId);
+      if (!recipients.length || !actor) return;
+
+      for (const recipient of recipients) {
+        this.emailService
+          .sendStatusChangeNotification(recipient, entity, actor, oldStatus, newStatus, this.frontendUrl)
+          .catch((err) => this.logger.error(`Ошибка email статуса ${entity.customId} → ${recipient.email}: ${err.message}`));
+      }
+    } catch (err) {
+      this.logger.error(`notifyStatusChange error: ${err.message}`);
+    }
+  }
+
+  private async notifyAssigneeChange(
+    entity: WorkspaceEntity,
+    newAssigneeId: string | null,
+    actorId?: string,
+  ): Promise<void> {
+    if (!newAssigneeId || !actorId) return;
+
+    try {
+      const assignedBy = await this.userRepository.findOne({ where: { id: actorId } });
+      if (!assignedBy) return;
+
+      // Уведомляем нового исполнителя (если это не сам актор)
+      if (newAssigneeId !== actorId) {
+        const assignee = await this.userRepository.findOne({ where: { id: newAssigneeId } });
+        if (assignee) {
+          this.emailService
+            .sendAssignmentNotification(assignee, entity, assignedBy, this.frontendUrl)
+            .catch((err) => this.logger.error(`Ошибка email назначения ${entity.customId} → ${assignee.email}: ${err.message}`));
+        }
+      }
+
+      // Уведомляем создателя (если он отличается от актора и нового исполнителя)
+      if (entity.creatorId && entity.creatorId !== actorId && entity.creatorId !== newAssigneeId) {
+        const creator = await this.userRepository.findOne({ where: { id: entity.creatorId } });
+        if (creator) {
+          this.emailService
+            .sendAssignmentNotification(creator, entity, assignedBy, this.frontendUrl)
+            .catch((err) => this.logger.error(`Ошибка email назначения (creator) ${entity.customId} → ${creator.email}: ${err.message}`));
+        }
+      }
+    } catch (err) {
+      this.logger.error(`notifyAssigneeChange error: ${err.message}`);
+    }
+  }
+
   private parseCsvLine(line: string): string[] {
     const result: string[] = [];
     let current = '';
@@ -1253,5 +1363,47 @@ export class EntityService {
     result.push(current);
 
     return result;
+  }
+
+  /**
+   * Валидирует статус против конфигурации workspace.
+   * Если статус невалиден — возвращает первый статус из конфига workspace.
+   * Если конфиг отсутствует — возвращает исходный статус без изменений.
+   */
+  private async resolveValidStatus(status: string, workspaceId: string): Promise<string> {
+    const workspace = await this.workspaceRepository.findOne({
+      where: { id: workspaceId },
+    });
+    return this.resolveStatusFromSections(status, workspace?.sections);
+  }
+
+  /**
+   * Чистая логика валидации статуса по секциям workspace (без DB запроса).
+   */
+  private resolveStatusFromSections(status: string, sections?: any[]): string {
+    if (!sections || !Array.isArray(sections)) {
+      return status;
+    }
+
+    const validStatuses = new Set<string>();
+    let defaultStatus: string | undefined;
+    for (const section of sections) {
+      if (!section.fields) continue;
+      const statusField = section.fields.find((f: any) => f.type === 'status');
+      if (statusField?.options?.length) {
+        for (const opt of statusField.options) {
+          validStatuses.add(opt.id);
+        }
+        if (!defaultStatus) {
+          defaultStatus = statusField.options[0].id;
+        }
+      }
+    }
+
+    if (validStatuses.size === 0 || validStatuses.has(status)) {
+      return status;
+    }
+
+    return defaultStatus || status;
   }
 }

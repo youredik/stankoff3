@@ -1,14 +1,22 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Mention from '@tiptap/extension-mention';
+import Placeholder from '@tiptap/extension-placeholder';
 import { Send, Paperclip, X, Mic, FileText, Smile } from 'lucide-react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import type { ChatMessage, ChatMessageAttachment } from '@/types';
 import { getSocket } from '@/lib/socket';
 import { apiClient } from '@/lib/api/client';
+import { useEntityStore } from '@/store/useEntityStore';
+import { MentionDropdown } from '@/components/ui/MentionDropdown';
+import { createMentionSuggestion, type MentionSuggestionState } from '@/lib/tiptap/mention-suggestion';
+import { extractMentionIds } from '@/lib/tiptap/parse-mentions';
 
 interface ChatInputProps {
-  onSend: (content: string, attachments?: ChatMessageAttachment[]) => void;
+  onSend: (content: string, attachments?: ChatMessageAttachment[], mentionedUserIds?: string[]) => void;
   onSendVoice: (voiceKey: string, duration: number, waveform: number[]) => void;
   replyTo: ChatMessage | null;
   onCancelReply: () => void;
@@ -29,14 +37,12 @@ export function ChatInput({
   conversationId,
   isAiChat,
 }: ChatInputProps) {
-  const [content, setContent] = useState('');
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,19 +54,77 @@ export function ChatInput({
   const streamRef = useRef<MediaStream | null>(null);
   const recordingStartRef = useRef(0);
 
-  // Auto-resize textarea
+  // Mention state
+  const [mentionState, setMentionState] = useState<MentionSuggestionState | null>(null);
+  const selectedIndexRef = useRef(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const users = useEntityStore((s) => s.users);
+  const fetchUsers = useEntityStore((s) => s.fetchUsers);
+
+  // Ensure users are loaded
   useEffect(() => {
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = '0';
-      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
-    }
-  }, [content]);
+    if (users.length === 0) fetchUsers();
+  }, [users.length, fetchUsers]);
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+        link: { openOnClick: false },
+      }),
+      Placeholder.configure({
+        placeholder: isAiChat ? 'Спросите AI ассистента...' : 'Сообщение...',
+      }),
+      Mention.configure({
+        HTMLAttributes: {
+          class: 'text-primary-500 dark:text-primary-400 font-medium',
+        },
+        suggestion: createMentionSuggestion(users, {
+          onStateChange: setMentionState,
+          onSelectedIndexChange: (idx) => {
+            selectedIndexRef.current = idx;
+            setSelectedIndex(idx);
+          },
+          getSelectedIndex: () => selectedIndexRef.current,
+        }),
+      }),
+    ],
+    editorProps: {
+      attributes: {
+        class: 'w-full resize-none bg-transparent px-4 py-2.5 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:outline-none max-h-[200px] overflow-y-auto [&>p]:m-0',
+      },
+      handleKeyDown: (_view, event) => {
+        // Enter without Shift = send
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          handleSend();
+          return true;
+        }
+        return false;
+      },
+    },
+    onUpdate: () => {
+      // Typing indicator
+      if (typingTimeoutRef.current) return;
+      const socket = getSocket();
+      if (socket?.connected) {
+        socket.emit('chat:typing', { conversationId });
+      }
+      typingTimeoutRef.current = setTimeout(() => {
+        typingTimeoutRef.current = null;
+      }, 2000);
+    },
+  });
 
   // Focus on mount and when replying
   useEffect(() => {
-    textareaRef.current?.focus();
-  }, [replyTo]);
+    editor?.commands.focus();
+  }, [replyTo, editor]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -83,22 +147,9 @@ export function ChatInput({
   }, [showEmojiPicker]);
 
   const handleEmojiClick = useCallback((emojiData: EmojiClickData) => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const newContent = content.slice(0, start) + emojiData.emoji + content.slice(end);
-      setContent(newContent);
-      // Set cursor position after emoji
-      requestAnimationFrame(() => {
-        const pos = start + emojiData.emoji.length;
-        textarea.setSelectionRange(pos, pos);
-        textarea.focus();
-      });
-    } else {
-      setContent(prev => prev + emojiData.emoji);
-    }
-  }, [content]);
+    editor?.commands.insertContent(emojiData.emoji);
+    editor?.commands.focus();
+  }, [editor]);
 
   const uploadFile = async (file: File | Blob, filename?: string): Promise<{ key: string } | null> => {
     const formData = new FormData();
@@ -114,7 +165,9 @@ export function ChatInput({
   };
 
   const handleSend = useCallback(async () => {
-    const hasContent = content.trim().length > 0;
+    const html = editor?.getHTML() || '';
+    const text = editor?.getText() || '';
+    const hasContent = text.trim().length > 0;
     const hasFiles = pendingFiles.length > 0;
     if (!hasContent && !hasFiles) return;
 
@@ -142,39 +195,17 @@ export function ChatInput({
       }
     }
 
-    onSend(content, attachments.length > 0 ? attachments : undefined);
-    setContent('');
+    const mentionedUserIds = extractMentionIds(html);
+    onSend(
+      html,
+      attachments.length > 0 ? attachments : undefined,
+      mentionedUserIds.length > 0 ? mentionedUserIds : undefined,
+    );
+    editor?.commands.clearContent();
     pendingFiles.forEach(pf => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
     setPendingFiles([]);
-    textareaRef.current?.focus();
-  }, [content, pendingFiles, onSend]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend],
-  );
-
-  // Emit typing indicator via socket
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setContent(e.target.value);
-
-      if (typingTimeoutRef.current) return;
-      const socket = getSocket();
-      if (socket?.connected) {
-        socket.emit('chat:typing', { conversationId });
-      }
-      typingTimeoutRef.current = setTimeout(() => {
-        typingTimeoutRef.current = null;
-      }, 2000);
-    },
-    [conversationId],
-  );
+    editor?.commands.focus();
+  }, [editor, pendingFiles, onSend]);
 
   // ─── File handling ─────────────────────────────────────────
 
@@ -309,6 +340,8 @@ export function ChatInput({
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const hasContent = editor ? !editor.isEmpty : false;
+
   return (
     <div
       data-testid="chat-input" className={`bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 ${isDragOver ? 'ring-2 ring-primary-500 ring-inset' : ''}`}
@@ -379,7 +412,7 @@ export function ChatInput({
           </button>
         </div>
       ) : (
-        <div className="flex items-end gap-2 px-4 py-3">
+        <div className="flex items-end gap-2 px-4 py-3" onPaste={handlePaste}>
           <button
             data-testid="chat-attach-btn" onClick={() => fileInputRef.current?.click()}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5"
@@ -390,16 +423,12 @@ export function ChatInput({
           <input ref={fileInputRef} data-testid="chat-file-input" type="file" multiple className="hidden" onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,audio/*" />
 
           <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef} data-testid="chat-input-textarea"
-              value={content}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={isAiChat ? 'Спросите AI ассистента...' : 'Сообщение...'}
-              rows={1}
-              className="w-full resize-none bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-2.5 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500 max-h-[200px]"
-            />
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl focus-within:ring-1 focus-within:ring-primary-500">
+              <EditorContent
+                editor={editor}
+                data-testid="chat-input-textarea"
+              />
+            </div>
             <div ref={emojiPickerRef} className="absolute right-1 bottom-1">
               <button
                 data-testid="chat-emoji-btn"
@@ -427,7 +456,7 @@ export function ChatInput({
             </div>
           </div>
 
-          {content.trim() || pendingFiles.length > 0 ? (
+          {hasContent || pendingFiles.length > 0 ? (
             <button data-testid="chat-send-btn" onClick={handleSend} disabled={uploading} aria-label="Отправить сообщение" className="p-2.5 rounded-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white transition-colors flex-shrink-0 mb-0.5">
               <Send className="w-5 h-5" />
             </button>
@@ -437,6 +466,20 @@ export function ChatInput({
             </button>
           )}
         </div>
+      )}
+
+      {mentionState && (
+        <MentionDropdown
+          items={mentionState.items}
+          selectedIndex={selectedIndex}
+          clientRect={mentionState.clientRect}
+          onSelect={(user) => {
+            mentionState.command({
+              id: user.id,
+              label: `${user.firstName} ${user.lastName}`,
+            });
+          }}
+        />
       )}
     </div>
   );

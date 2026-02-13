@@ -105,6 +105,7 @@ export class EntityController {
   async search(
     @Query('q') query: string,
     @Query('limit') limit: string,
+    @Query('workspaceId') workspaceId: string | undefined,
     @CurrentUser() user: User,
   ) {
     if (!query || query.length < 2) {
@@ -114,7 +115,12 @@ export class EntityController {
     // Получаем доступные пользователю workspaces
     const accessibleWorkspaces =
       await this.workspaceService.getAccessibleWorkspaces(user.id, user.role);
-    const workspaceIds = accessibleWorkspaces.map((ws) => ws.id);
+    let workspaceIds = accessibleWorkspaces.map((ws) => ws.id);
+
+    // Если указан конкретный workspace — фильтруем (только если он доступен)
+    if (workspaceId) {
+      workspaceIds = workspaceIds.filter((id) => id === workspaceId);
+    }
 
     if (workspaceIds.length === 0) {
       return { results: [] };

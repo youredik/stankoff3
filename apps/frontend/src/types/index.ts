@@ -241,6 +241,8 @@ export interface Entity {
   priority?: 'low' | 'medium' | 'high';
   assignee?: User;
   assigneeId?: string;
+  creatorId?: string;
+  creator?: User;
   data: Record<string, any>;
   linkedEntityIds?: string[];
   comments?: Comment[];

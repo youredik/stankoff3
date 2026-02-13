@@ -311,6 +311,11 @@ export class TriggersService {
         creatorId: context.userId || context.createdById,
         triggeredBy: context.userId || context.createdById,
         triggerType: context.triggerType,
+        // Передаём статус entity как initialStatus для BPMN процессов
+        initialStatus: context.status,
+        title: context.title,
+        priority: context.priority,
+        customId: context.customId,
       };
     }
 

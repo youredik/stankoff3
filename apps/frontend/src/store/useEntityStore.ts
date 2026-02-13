@@ -518,8 +518,11 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
   createEntity: async (data) => {
     try {
       const workspace = useWorkspaceStore.getState().currentWorkspace;
-      let initialStatus = 'new';
-      if (workspace?.sections) {
+
+      // Определяем начальный статус только если currentWorkspace соответствует целевому workspace.
+      // Иначе не отправляем статус — backend сам подставит дефолтный из конфига workspace.
+      let initialStatus: string | undefined;
+      if (workspace?.id === data.workspaceId && workspace.sections) {
         for (const section of workspace.sections) {
           const statusField = section.fields.find((f) => f.type === 'status');
           if (statusField?.options && statusField.options.length > 0) {
@@ -529,24 +532,29 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         }
       }
 
-      const entity = await entitiesApi.create({
+      const payload: Record<string, any> = {
         workspaceId: data.workspaceId,
         title: data.title,
-        status: initialStatus,
         priority: data.priority,
         assigneeId: data.assigneeId,
         data: data.data || {},
-      } as any);
+      };
+      if (initialStatus) {
+        payload.status = initialStatus;
+      }
 
-      // Add to kanban column
+      const entity = await entitiesApi.create(payload as any);
+
+      // Add to kanban column — используем статус из ответа сервера (он всегда корректный)
+      const entityStatus = entity.status;
       const { kanbanColumns } = get();
-      const col = kanbanColumns[initialStatus];
+      const col = kanbanColumns[entityStatus];
       if (col) {
         const exists = col.items.find((e) => e.id === entity.id);
         if (!exists) {
           const updatedColumns = {
             ...kanbanColumns,
-            [initialStatus]: {
+            [entityStatus]: {
               ...col,
               items: [entity, ...col.items],
               total: col.total + 1,
@@ -562,7 +570,7 @@ export const useEntityStore = create<EntityStore>((set, get) => ({
         // Column didn't exist yet (e.g., workspace just configured)
         const updatedColumns = {
           ...kanbanColumns,
-          [initialStatus]: {
+          [entityStatus]: {
             items: [entity],
             total: 1,
             hasMore: false,

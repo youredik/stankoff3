@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -17,10 +17,17 @@ import {
   Loader2,
   Send,
 } from 'lucide-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Mention from '@tiptap/extension-mention';
+import Placeholder from '@tiptap/extension-placeholder';
 import type { UserTask, UserTaskComment, User as UserType } from '@/types';
 import type { FormSubmitResult, FormSchema as BpmnFormSchema } from '@bpmn-io/form-js';
 import { tasksApi } from '@/lib/api/tasks';
 import { TaskActions } from './TaskActions';
+import { MentionDropdown } from '@/components/ui/MentionDropdown';
+import { createMentionSuggestion, type MentionSuggestionState } from '@/lib/tiptap/mention-suggestion';
+import { useEntityStore } from '@/store/useEntityStore';
 
 // Dynamic import to avoid SSR issues with form-js
 const FormViewer = dynamic(
@@ -63,8 +70,35 @@ export function TaskDetail({
   const [activeTab, setActiveTab] = useState<'form' | 'comments' | 'history'>('form');
   const [comments, setComments] = useState<UserTaskComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
-  const [newComment, setNewComment] = useState('');
   const [isSendingComment, setIsSendingComment] = useState(false);
+  const [mentionState, setMentionState] = useState<MentionSuggestionState | null>(null);
+  const selectedIndexRef = useRef(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const { users: storeUsers } = useEntityStore();
+  const mentionUsers = users.length > 0 ? users : storeUsers;
+
+  const commentEditor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({ heading: false, blockquote: false, codeBlock: false, horizontalRule: false }),
+      Placeholder.configure({ placeholder: 'Написать комментарий… (@ — упоминание)' }),
+      Mention.configure({
+        HTMLAttributes: {
+          class: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/40 rounded px-0.5',
+        },
+        suggestion: createMentionSuggestion(mentionUsers, {
+          onStateChange: setMentionState,
+          onSelectedIndexChange: (idx) => { selectedIndexRef.current = idx; setSelectedIndex(idx); },
+          getSelectedIndex: () => selectedIndexRef.current,
+        }),
+      }),
+    ],
+    editorProps: {
+      attributes: {
+        class: 'min-h-[40px] max-h-[120px] overflow-y-auto px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none',
+      },
+    },
+  });
 
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'completed';
 
@@ -95,12 +129,19 @@ export function TaskDetail({
   };
 
   const handleSendComment = async () => {
-    if (!newComment.trim()) return;
+    if (!commentEditor || commentEditor.isEmpty) return;
+    const html = commentEditor.getHTML();
+    const mentionRegex = /data-type="mention"[^>]*data-id="([^"]+)"/g;
+    const mentionIds: string[] = [];
+    let m;
+    while ((m = mentionRegex.exec(html)) !== null) {
+      if (!mentionIds.includes(m[1])) mentionIds.push(m[1]);
+    }
     setIsSendingComment(true);
     try {
-      const comment = await tasksApi.addComment(task.id, newComment);
+      const comment = await tasksApi.addComment(task.id, html, mentionIds.length > 0 ? mentionIds : undefined);
       setComments((prev) => [...prev, comment]);
-      setNewComment('');
+      commentEditor.commands.clearContent();
     } catch (err) {
       console.error('Failed to send comment:', err);
     } finally {
@@ -324,35 +365,46 @@ export function TaskDetail({
                           })}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                        {comment.content}
-                      </p>
+                      <div
+                        className="text-sm text-gray-700 dark:text-gray-300 prose prose-sm dark:prose-invert max-w-none [&_[data-type=mention]]:text-primary-600 [&_[data-type=mention]]:dark:text-primary-400 [&_[data-type=mention]]:bg-primary-50 [&_[data-type=mention]]:dark:bg-primary-900/40 [&_[data-type=mention]]:rounded [&_[data-type=mention]]:px-0.5 [&_[data-type=mention]]:font-medium"
+                        dangerouslySetInnerHTML={{ __html: comment.content }}
+                      />
                     </div>
                   ))}
                 </div>
               )}
 
               {/* New comment input */}
-              <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <input
-                  type="text"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendComment()}
-                  placeholder="Написать комментарий..."
-                  className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-                <button
-                  onClick={handleSendComment}
-                  disabled={!newComment.trim() || isSendingComment}
-                  className="px-3 py-2 text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {isSendingComment ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </button>
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500 overflow-hidden">
+                    <EditorContent editor={commentEditor} />
+                  </div>
+                  <button
+                    onClick={handleSendComment}
+                    disabled={!commentEditor || commentEditor.isEmpty || isSendingComment}
+                    className="px-3 py-2 text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                  >
+                    {isSendingComment ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                {mentionState && (
+                  <MentionDropdown
+                    items={mentionState.items}
+                    selectedIndex={selectedIndex}
+                    clientRect={mentionState.clientRect}
+                    onSelect={(u) => {
+                      mentionState.command({
+                        id: u.id,
+                        label: `${u.firstName} ${u.lastName}`,
+                      });
+                    }}
+                  />
+                )}
               </div>
             </div>
           )}

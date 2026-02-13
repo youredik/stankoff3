@@ -19,16 +19,12 @@ function AuthProviderInner({ children }: AuthProviderProps) {
 
   // Ждём восстановления из localStorage (Zustand persist)
   useEffect(() => {
-    // Проверяем сразу, если уже hydrated
     if (useAuthStore.persist.hasHydrated()) {
-      console.log('[AuthProvider] Already hydrated');
       setHydrated(true);
       return;
     }
 
-    // Подписываемся на завершение hydration
     const unsubFinishHydration = useAuthStore.persist.onFinishHydration(() => {
-      console.log('[AuthProvider] Hydration finished, token:', useAuthStore.getState().accessToken ? 'present' : 'null');
       setHydrated(true);
     });
 
@@ -93,15 +89,9 @@ function AuthProviderInner({ children }: AuthProviderProps) {
       fetchProfile();
     } else {
       setAuthChecked(true);
-      // Если есть сохранённый токен в localStorage - проверяем его валидность
-      const savedToken = useAuthStore.getState().accessToken;
-      if (savedToken) {
-        // Токен есть - проверяем что он ещё действителен
-        checkAuth();
-      } else {
-        // Нет токена - не авторизован
-        useAuthStore.setState({ isLoading: false, isAuthenticated: false });
-      }
+      // Всегда проверяем авторизацию: checkAuth сделает silent refresh если токен
+      // отсутствует в памяти (не персистится в localStorage для защиты от XSS)
+      checkAuth();
     }
   }, [hydrated, accessTokenParam, checkAuth, authChecked]);
 
@@ -114,11 +104,12 @@ function AuthProviderInner({ children }: AuthProviderProps) {
     }
   }, [isAuthenticated]);
 
-  // Редирект на логин если не авторизован
+  // Редирект на логин если не авторизован (с сохранением returnUrl)
   useEffect(() => {
     // Не редиректим если в URL есть access_token (обрабатывается выше)
     if (!isLoading && !ssoProcessing && !isAuthenticated && pathname !== '/login' && !accessTokenParam) {
-      router.push('/login');
+      const returnUrl = encodeURIComponent(pathname + (window.location.search || ''));
+      router.push(`/login?returnUrl=${returnUrl}`);
     }
   }, [isLoading, ssoProcessing, isAuthenticated, pathname, router, accessTokenParam]);
 

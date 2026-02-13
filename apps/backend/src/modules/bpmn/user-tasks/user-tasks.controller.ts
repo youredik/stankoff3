@@ -82,6 +82,11 @@ class BatchDelegateDto {
 class AddCommentDto {
   @IsString()
   content: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  mentionedUserIds?: string[];
 }
 
 @Controller('bpmn/tasks')

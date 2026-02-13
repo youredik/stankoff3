@@ -96,6 +96,7 @@ describe('UserTasksService', () => {
             create: jest.fn(),
             save: jest.fn(),
             find: jest.fn(),
+            findOne: jest.fn(),
           },
         },
         {
@@ -122,6 +123,7 @@ describe('UserTasksService', () => {
           useValue: {
             emitTaskCreated: jest.fn(),
             emitTaskUpdated: jest.fn(),
+            emitToUser: jest.fn(),
           },
         },
         {
@@ -379,9 +381,10 @@ describe('UserTasksService', () => {
   describe('addComment', () => {
     it('должен добавлять комментарий к задаче', async () => {
       taskRepository.findOne.mockResolvedValue(mockTask);
-      const mockComment = { id: 'comment-1', taskId: 'task-1', userId: 'user-1', content: 'Test' };
-      commentRepository.create.mockReturnValue(mockComment as UserTaskComment);
-      commentRepository.save.mockResolvedValue(mockComment as UserTaskComment);
+      const mockComment = { id: 'comment-1', taskId: 'task-1', userId: 'user-1', content: 'Test', mentionedUserIds: [] };
+      commentRepository.create.mockReturnValue(mockComment as unknown as UserTaskComment);
+      commentRepository.save.mockResolvedValue(mockComment as unknown as UserTaskComment);
+      commentRepository.findOne.mockResolvedValue({ ...mockComment, user: { firstName: 'Test', lastName: 'User' } } as any);
 
       const result = await service.addComment('task-1', 'user-1', 'Test');
 
@@ -390,7 +393,49 @@ describe('UserTasksService', () => {
         taskId: 'task-1',
         userId: 'user-1',
         content: 'Test',
+        mentionedUserIds: [],
       });
+    });
+
+    it('должен парсить mentions из HTML и отправлять уведомления', async () => {
+      taskRepository.findOne.mockResolvedValue(mockTask);
+      const mentionId = '550e8400-e29b-41d4-a716-446655440000';
+      const htmlContent = `<p>Hello <span data-type="mention" data-id="${mentionId}">@John</span></p>`;
+      const mockComment = { id: 'comment-1', taskId: 'task-1', userId: 'user-1', content: htmlContent, mentionedUserIds: [mentionId] };
+      commentRepository.create.mockReturnValue(mockComment as unknown as UserTaskComment);
+      commentRepository.save.mockResolvedValue(mockComment as unknown as UserTaskComment);
+      commentRepository.findOne.mockResolvedValue({
+        ...mockComment,
+        user: { firstName: 'Test', lastName: 'User' },
+      } as any);
+
+      await service.addComment('task-1', 'user-1', htmlContent);
+
+      expect(commentRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ mentionedUserIds: [mentionId] }),
+      );
+      expect(eventsGateway.emitToUser).toHaveBeenCalledWith(
+        mentionId,
+        'mention:created',
+        expect.objectContaining({ type: 'task_comment', taskId: 'task-1' }),
+      );
+    });
+
+    it('не должен отправлять уведомление автору', async () => {
+      taskRepository.findOne.mockResolvedValue(mockTask);
+      const authorId = 'user-1';
+      const htmlContent = `<p><span data-type="mention" data-id="${authorId}">@Self</span></p>`;
+      const mockComment = { id: 'c1', taskId: 'task-1', userId: authorId, content: htmlContent, mentionedUserIds: [authorId] };
+      commentRepository.create.mockReturnValue(mockComment as unknown as UserTaskComment);
+      commentRepository.save.mockResolvedValue(mockComment as unknown as UserTaskComment);
+      commentRepository.findOne.mockResolvedValue({
+        ...mockComment,
+        user: { firstName: 'Test', lastName: 'User' },
+      } as any);
+
+      await service.addComment('task-1', authorId, htmlContent);
+
+      expect(eventsGateway.emitToUser).not.toHaveBeenCalled();
     });
   });
 

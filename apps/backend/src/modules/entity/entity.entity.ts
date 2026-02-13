@@ -49,6 +49,13 @@ export class WorkspaceEntity {
   @Index('idx_entities_assignee')
   assigneeId: string | null;
 
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'creatorId' })
+  creator: User;
+
+  @Column({ nullable: true })
+  creatorId: string | null;
+
   @Column('jsonb', { default: {} })
   data: Record<string, any>;
 

@@ -95,8 +95,8 @@ export const tasksApi = {
       .get<UserTaskComment[]>(`/bpmn/tasks/${taskId}/comments`)
       .then((r) => r.data),
 
-  addComment: (taskId: string, content: string) =>
+  addComment: (taskId: string, content: string, mentionedUserIds?: string[]) =>
     apiClient
-      .post<UserTaskComment>(`/bpmn/tasks/${taskId}/comments`, { content })
+      .post<UserTaskComment>(`/bpmn/tasks/${taskId}/comments`, { content, mentionedUserIds })
       .then((r) => r.data),
 };

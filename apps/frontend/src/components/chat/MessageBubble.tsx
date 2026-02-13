@@ -174,15 +174,10 @@ export function MessageBubble({
   const textContent = (message.content || '').replace(/<[^>]*>/g, '');
   const firstUrl = message.type === 'text' ? textContent.match(URL_REGEX)?.[0] : undefined;
 
-  // Render content with highlighted @mentions
+  // Render content — Tiptap mention tags have data-type="mention" with proper styling
   const renderContent = useCallback(() => {
-    if (!message.content) return '';
-    let html = message.content;
-    if (message.mentionedUserIds?.length > 0) {
-      html = html.replace(/@(\S+)/g, '<span class="text-primary-500 font-medium">@$1</span>');
-    }
-    return html;
-  }, [message.content, message.mentionedUserIds]);
+    return message.content || '';
+  }, [message.content]);
 
   const imageAttachments = message.attachments?.filter(a => a.mimeType.startsWith('image/')) || [];
   const fileAttachments = message.attachments?.filter(a => !a.mimeType.startsWith('image/')) || [];
@@ -242,7 +237,7 @@ export function MessageBubble({
                   <button onClick={handleSaveEdit} className="text-xs text-primary-500 hover:text-primary-600">OK</button>
                 </div>
               ) : (
-                <div className="text-sm text-gray-900 dark:text-gray-100 break-words [&>p]:m-0" dangerouslySetInnerHTML={{ __html: renderContent() }} />
+                <div className="text-sm text-gray-900 dark:text-gray-100 break-words [&>p]:m-0 [&_[data-type=mention]]:text-primary-500 [&_[data-type=mention]]:font-medium" dangerouslySetInnerHTML={{ __html: renderContent() }} />
               )}
             </>
           )}

@@ -8,22 +8,28 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { UserService } from '../user/user.service';
 import { Public } from './decorators/public.decorator';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 дней
+const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 дней (как в auth.controller.ts)
 
 @Controller('auth/dev')
 export class DevAuthController {
   private readonly logger = new Logger(DevAuthController.name);
+  private readonly isSecure: boolean;
 
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || '';
+    this.isSecure = frontendUrl.startsWith('https://');
+  }
 
   private assertDevMode(): void {
     if (process.env.NODE_ENV === 'production') {
@@ -75,7 +81,7 @@ export class DevAuthController {
 
     res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
       httpOnly: true,
-      secure: false,
+      secure: this.isSecure,
       sameSite: 'lax',
       maxAge: COOKIE_MAX_AGE,
       path: '/api',

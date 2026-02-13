@@ -107,7 +107,7 @@ const GLOBAL_ARTICLES: SeedKnowledgeArticle[] = [
 [Должность], ООО «Станкофф»
 Тел.: +7 (843) XXX-XX-XX
 Email: [имя]@stankoff.ru
-www.stankoff.ru
+workspace.stankoff.ru
 
 ## Запрещено
 

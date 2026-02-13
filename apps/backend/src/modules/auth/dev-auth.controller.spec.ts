@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { UserService } from '../user/user.service';
 
 // Mock KeycloakService module before importing DevAuthController/AuthService
@@ -66,11 +67,19 @@ describe('DevAuthController', () => {
       findByEmail: jest.fn(),
     };
 
+    const mockConfigService = {
+      get: jest.fn((key: string) => {
+        if (key === 'FRONTEND_URL') return 'http://localhost:3000';
+        return undefined;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DevAuthController],
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: UserService, useValue: mockUserService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 

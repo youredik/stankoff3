@@ -64,12 +64,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
   }, [currentMessages, conversationId, user, markAsRead]);
 
   const handleSend = useCallback(
-    async (content: string, attachments?: any[]) => {
-      if (!content.trim() && (!attachments || attachments.length === 0)) return;
+    async (content: string, attachments?: any[], mentionedUserIds?: string[]) => {
+      const text = content.replace(/<[^>]*>/g, '').trim();
+      if (!text && (!attachments || attachments.length === 0)) return;
       await sendMessage(conversationId, {
         content,
         replyToId: replyToMessage?.id,
         attachments,
+        mentionedUserIds,
       });
     },
     [conversationId, sendMessage, replyToMessage],

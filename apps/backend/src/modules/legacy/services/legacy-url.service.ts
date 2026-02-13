@@ -7,7 +7,7 @@ import { Injectable } from '@nestjs/common';
  */
 @Injectable()
 export class LegacyUrlService {
-  private readonly baseUrl = 'https://www.stankoff.ru';
+  private readonly baseUrl = 'https://workspace.stankoff.ru';
 
   /**
    * URL заявки (обращения в техподдержку)

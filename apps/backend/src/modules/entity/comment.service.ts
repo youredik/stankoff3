@@ -12,6 +12,7 @@ import { TriggersService } from '../bpmn/triggers/triggers.service';
 import { TriggerType as BpmnTriggerType } from '../bpmn/entities/process-trigger.entity';
 import { BpmnService } from '../bpmn/bpmn.service';
 import { SlaService } from '../sla/sla.service';
+import { extractMentionedUserIds } from '../../common/utils/parse-mentions';
 
 // Response attachment type with signed URLs
 export interface AttachmentWithUrls {
@@ -101,10 +102,14 @@ export class CommentService {
     dto: CreateCommentDto,
     authorId: string,
   ): Promise<CommentWithUrls> {
+    // Parse mentioned user IDs from HTML content
+    const mentionedUserIds = extractMentionedUserIds(dto.content);
+
     const comment = this.commentRepository.create({
       entityId,
       authorId,
       content: dto.content,
+      mentionedUserIds,
       attachments: dto.attachments || [],
     });
     const saved = await this.commentRepository.save(comment);
@@ -140,6 +145,27 @@ export class CommentService {
     };
 
     this.eventsGateway.emitCommentCreated(result);
+
+    // Send mention notifications to mentioned users (except author)
+    if (mentionedUserIds.length > 0) {
+      const authorName = withAuthor!.author
+        ? `${withAuthor!.author.firstName} ${withAuthor!.author.lastName}`
+        : 'Пользователь';
+      const preview = dto.content.replace(/<[^>]*>/g, '').substring(0, 100);
+
+      for (const userId of mentionedUserIds) {
+        if (userId !== authorId) {
+          this.eventsGateway.emitToUser(userId, 'mention:created', {
+            type: 'entity_comment',
+            entityId,
+            commentId: saved.id,
+            authorId,
+            authorName,
+            preview,
+          });
+        }
+      }
+    }
 
     // Логирование создания комментария
     const entity = await this.entityRepository.findOne({ where: { id: entityId } });

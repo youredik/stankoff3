@@ -139,10 +139,10 @@ export const entitiesApi = {
 
   remove: (id: string) => apiClient.delete(`/entities/${id}`),
 
-  search: (query: string, limit = 10) =>
+  search: (query: string, limit = 10, workspaceId?: string) =>
     apiClient
       .get<{ results: SearchResult[] }>('/entities/search', {
-        params: { q: query, limit },
+        params: { q: query, limit, ...(workspaceId && { workspaceId }) },
       })
       .then((r) => r.data.results),
 

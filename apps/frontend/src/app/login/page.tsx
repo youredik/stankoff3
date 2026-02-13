@@ -4,7 +4,6 @@ import { useEffect, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, User as UserIcon, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { setAuthInterceptors } from '@/lib/api/client';
 import { authApi, DevUser } from '@/lib/api/auth';
 
 const roleBadgeColors: Record<string, string> = {
@@ -66,13 +65,6 @@ function LoginPageContent() {
   const [devLoginLoading, setDevLoginLoading] = useState<string | null>(null);
   const [redirectLoopDetected, setRedirectLoopDetected] = useState(false);
 
-  // Устанавливаем interceptors при монтировании
-  useEffect(() => {
-    setAuthInterceptors(
-      () => useAuthStore.getState().accessToken,
-      () => useAuthStore.getState().refreshTokens(),
-    );
-  }, []);
 
   // Fallback: если login page получил access_token (например, через ошибочный redirect),
   // обрабатываем его здесь — так же как AuthProvider

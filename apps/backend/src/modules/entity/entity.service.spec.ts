@@ -64,6 +64,8 @@ describe('EntityService', () => {
     priority: 'medium',
     assigneeId: null,
     assignee: undefined,
+    creatorId: null,
+    creator: undefined,
     data: {},
     linkedEntityIds: [],
     comments: [],
@@ -333,10 +335,13 @@ describe('EntityService', () => {
     });
 
     it('должен отправить email исполнителю при изменении статуса', async () => {
+      const mockUser2 = { ...mockUser, id: 'user-2', email: 'user2@example.com' } as User;
       const entityWithAssignee = { ...mockEntity, assigneeId: 'user-2', status: 'new' };
       entityRepo.findOne.mockResolvedValue(entityWithAssignee);
       entityRepo.update.mockResolvedValue({ affected: 1 } as any);
-      userRepo.findOne.mockResolvedValue(mockUser);
+      userRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.id === 'user-2' ? mockUser2 : mockUser),
+      );
       automationService.executeRules.mockResolvedValue(undefined);
 
       await service.updateStatus('entity-1', 'done', 'user-1');
@@ -344,8 +349,23 @@ describe('EntityService', () => {
       expect(emailService.sendStatusChangeNotification).toHaveBeenCalled();
     });
 
-    it('не должен отправлять email если исполнитель сам изменил статус', async () => {
-      const entityWithAssignee = { ...mockEntity, assigneeId: 'user-1' };
+    it('должен отправить email создателю при изменении статуса', async () => {
+      const mockUser2 = { ...mockUser, id: 'user-2', email: 'user2@example.com' } as User;
+      const entityWithCreator = { ...mockEntity, assigneeId: null, creatorId: 'user-2', status: 'new' };
+      entityRepo.findOne.mockResolvedValue(entityWithCreator);
+      entityRepo.update.mockResolvedValue({ affected: 1 } as any);
+      userRepo.findOne.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.id === 'user-2' ? mockUser2 : mockUser),
+      );
+      automationService.executeRules.mockResolvedValue(undefined);
+
+      await service.updateStatus('entity-1', 'done', 'user-1');
+
+      expect(emailService.sendStatusChangeNotification).toHaveBeenCalled();
+    });
+
+    it('не должен отправлять email если исполнитель сам изменил статус и нет создателя', async () => {
+      const entityWithAssignee = { ...mockEntity, assigneeId: 'user-1', creatorId: null };
       entityRepo.findOne.mockResolvedValue(entityWithAssignee);
       entityRepo.update.mockResolvedValue({ affected: 1 } as any);
       automationService.executeRules.mockResolvedValue(undefined);

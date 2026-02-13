@@ -5,12 +5,12 @@
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
     </bpmn:startEvent>
 
-    <bpmn:serviceTask id="Task_SetNew" name="Статус: Новая">
+    <bpmn:serviceTask id="Task_SetNew" name="Статус: Начальный">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="update-entity-status" />
         <zeebe:ioMapping>
           <zeebe:input source="= entityId" target="entityId" />
-          <zeebe:input source="= &quot;new&quot;" target="newStatus" />
+          <zeebe:input source="= if initialStatus != null then initialStatus else &quot;new&quot;" target="newStatus" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1</bpmn:incoming>
