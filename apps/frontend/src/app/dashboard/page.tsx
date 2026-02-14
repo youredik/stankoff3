@@ -16,6 +16,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { AuthProvider } from '@/components/auth/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import { apiClient } from '@/lib/api/client';
 
@@ -55,7 +56,7 @@ interface DashboardData {
   loading: boolean;
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [data, setData] = useState<DashboardData>({
@@ -593,5 +594,13 @@ export default function DashboardPage() {
       </div>
     </div>
     </AppShell>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthProvider>
+      <DashboardContent />
+    </AuthProvider>
   );
 }

@@ -103,9 +103,16 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         }
         processQueue(new Error('Refresh failed'), null);
+        // Сессия истекла — редиректим на логин (безопасная проверка среды)
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
         return Promise.reject(error);
       } catch (refreshError) {
         processQueue(refreshError as Error, null);
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

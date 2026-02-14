@@ -39,6 +39,7 @@ import { entitiesApi } from '@/lib/api/entities';
 import { useTaskStore } from '@/store/useTaskStore';
 import { useChatStore } from '@/store/useChatStore';
 import { usePermissionCan } from '@/store/usePermissionStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { ImportModal } from '@/components/workspace/ImportModal';
 import { SectionMembersModal } from '@/components/section/SectionMembersModal';
 import type { Workspace, MenuSection } from '@/types';
@@ -110,6 +111,7 @@ export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   // На страницах /workspace/[id]/* — берём ID из URL; на других страницах — пусто
   const selectedWorkspace = (params?.id as string) || '';
   const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace, duplicateWorkspace, archiveWorkspace } =
@@ -180,9 +182,10 @@ export function Sidebar() {
   const [crmCounts, setCrmCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchWorkspaces();
     fetchSections();
-  }, [fetchWorkspaces, fetchSections]);
+  }, [isAuthenticated, fetchWorkspaces, fetchSections]);
 
   // Загружаем counts для CRM workspace
   useEffect(() => {
@@ -193,8 +196,9 @@ export function Sidebar() {
 
   // Начальная загрузка; дальнейшие обновления через WebSocket (task:created / task:updated)
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchInboxCount();
-  }, [fetchInboxCount]);
+  }, [isAuthenticated, fetchInboxCount]);
 
   // Закрытие выпадающих меню при клике снаружи
   useEffect(() => {

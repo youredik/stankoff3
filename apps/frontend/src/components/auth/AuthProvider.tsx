@@ -116,10 +116,10 @@ function AuthProviderInner({ children }: AuthProviderProps) {
   // Показываем загрузку пока ждём hydration, проверяем авторизацию или обрабатываем SSO
   if (!hydrated || isLoading || ssoProcessing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">{ssoProcessing ? 'Авторизация через SSO...' : 'Загрузка...'}</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-cyan-400 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">{ssoProcessing ? 'Авторизация через SSO...' : 'Загрузка...'}</p>
         </div>
       </div>
     );
@@ -135,10 +135,10 @@ function AuthProviderInner({ children }: AuthProviderProps) {
 
 function AuthProviderFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-500">Загрузка...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-cyan-400 mx-auto mb-4"></div>
+        <p className="text-gray-500 dark:text-gray-400">Загрузка...</p>
       </div>
     </div>
   );
