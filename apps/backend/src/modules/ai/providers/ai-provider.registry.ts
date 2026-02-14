@@ -6,11 +6,10 @@ import {
   LlmCompletionResult,
   LlmEmbeddingResult,
 } from './base-llm.provider';
-import { OllamaProvider } from './ollama.provider';
 import { OpenAiProvider } from './openai.provider';
 import { YandexCloudProvider } from './yandex-cloud.provider';
 
-export type ProviderName = 'ollama' | 'openai' | 'yandex';
+export type ProviderName = 'openai' | 'yandex';
 
 interface ProviderConfig {
   name: ProviderName;
@@ -23,13 +22,13 @@ interface ProviderConfig {
 /**
  * Реестр AI провайдеров с приоритетами и fallback
  *
- * Стратегия по умолчанию:
- * - Embeddings: Yandex (облако, 256 dims) → Ollama (локально) → OpenAI (платно, fallback)
- * - Completions: Yandex (облако, YandexGPT) → Ollama (локально) → OpenAI (платно)
+ * Стратегия:
+ * - Embeddings: Yandex (облако, 256 dims) → OpenAI (платно, fallback)
+ * - Completions: Yandex (облако, YandexGPT) → OpenAI (платно)
  *
  * Настраивается через переменные окружения:
- * - AI_LLM_PRIORITY: yandex,ollama,openai (порядок для LLM)
- * - AI_EMBEDDING_PRIORITY: ollama,openai (порядок для embeddings)
+ * - AI_LLM_PRIORITY: yandex,openai (порядок для LLM)
+ * - AI_EMBEDDING_PRIORITY: yandex,openai (порядок для embeddings)
  */
 @Injectable()
 export class AiProviderRegistry implements OnModuleInit {
@@ -38,8 +37,7 @@ export class AiProviderRegistry implements OnModuleInit {
 
   private readonly providerConfigs: ProviderConfig[] = [
     { name: 'yandex', priority: 0, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
-    { name: 'ollama', priority: 1, supportsEmbeddings: true, supportsCompletion: true, isFree: true },
-    { name: 'openai', priority: 2, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
+    { name: 'openai', priority: 1, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
   ];
 
   private llmPriority: ProviderName[] = [];
@@ -47,27 +45,23 @@ export class AiProviderRegistry implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly ollamaProvider: OllamaProvider,
     private readonly openAiProvider: OpenAiProvider,
     private readonly yandexCloudProvider: YandexCloudProvider,
   ) {
     // Регистрируем провайдеры
     this.providers.set('yandex', yandexCloudProvider);
-    this.providers.set('ollama', ollamaProvider);
     this.providers.set('openai', openAiProvider);
 
     // Парсим приоритеты из конфига
     this.llmPriority = this.parsePriority(
-      this.configService.get<string>('AI_LLM_PRIORITY') || 'yandex,ollama,openai',
+      this.configService.get<string>('AI_LLM_PRIORITY') || 'yandex,openai',
     );
     this.embeddingPriority = this.parsePriority(
-      this.configService.get<string>('AI_EMBEDDING_PRIORITY') || 'yandex,ollama,openai',
+      this.configService.get<string>('AI_EMBEDDING_PRIORITY') || 'yandex,openai',
     );
   }
 
   async onModuleInit(): Promise<void> {
-    // Ollama проверяет доступность асинхронно — ждём перед логированием
-    await this.ollamaProvider.checkAvailability();
     this.logStatus();
   }
 

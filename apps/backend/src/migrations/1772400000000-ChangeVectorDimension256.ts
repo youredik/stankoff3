@@ -3,8 +3,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * Миграция: изменение размерности vector с 1536 на 256
  *
- * Причина: переход с Ollama (nomic-embed-text, 768 dims, padded to 1536)
- * на Yandex Cloud Embeddings (text-search-doc/latest, 256 dims нативно).
+ * Причина: переход на Yandex Cloud Embeddings (text-search-doc/latest, 256 dims нативно)
+ * с предыдущего 1536-dim формата.
  *
  * Yandex Cloud Embeddings:
  * - Нет гео-блокировки

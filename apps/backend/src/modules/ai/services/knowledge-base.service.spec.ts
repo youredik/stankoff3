@@ -158,11 +158,11 @@ describe('KnowledgeBaseService', () => {
       );
     });
 
-    it('должен использовать разные провайдеры (Ollama)', async () => {
+    it('должен использовать разные провайдеры (OpenAI fallback)', async () => {
       providerRegistry.embed.mockResolvedValue({
         ...mockEmbeddingResult,
-        provider: 'ollama',
-        model: 'nomic-embed-text',
+        provider: 'openai',
+        model: 'text-embedding-3-large',
       });
       chunkRepo.create.mockReturnValue({ id: 'chunk-123' } as KnowledgeChunk);
       chunkRepo.save.mockResolvedValue({ id: 'chunk-123' } as KnowledgeChunk);
@@ -174,8 +174,8 @@ describe('KnowledgeBaseService', () => {
 
       expect(usageLogRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          provider: 'ollama',
-          model: 'nomic-embed-text',
+          provider: 'openai',
+          model: 'text-embedding-3-large',
         }),
       );
     });

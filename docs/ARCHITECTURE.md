@@ -130,7 +130,7 @@
 ## AI
 
 - **Yandex Cloud** — основной: YandexGPT (LLM) + text-search-doc (embeddings 256d)
-- **Ollama** — опциональный локальный LLM (для разработки)
+- **OpenAI** — fallback (платный)
 - RAG: legacy заявки → knowledge_chunks → hybrid search (vector + full-text)
 - **Confidence gating:** минимальный similarity порог 0.7, средняя релевантность >= 0.65 — при низкой уверенности AI помощник показывает empty state вместо нерелевантных результатов
 - Классификация: категория + приоритет + навыки (Zod validation)

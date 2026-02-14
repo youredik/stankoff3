@@ -70,33 +70,37 @@ export default function DashboardPage() {
     }
 
     // Загружаем inbox count
-    const inboxPromise = tasksApi
+    const myInboxCount = await tasksApi
       .getInbox({ perPage: 1 })
       .then((r) => r.total)
       .catch(() => 0);
 
-    // Загружаем данные по каждому workspace параллельно
-    const summaryPromises = activeWorkspaces.map(async (workspace) => {
-      const [taskStats, slaDashboard, processStats] = await Promise.allSettled([
-        tasksApi.getStatistics(workspace.id),
-        slaApi.getDashboard(workspace.id),
-        bpmnApi.getMiningWorkspaceStats(workspace.id),
-      ]);
+    // Загружаем данные батчами по 5 workspaces, чтобы не перегрузить nginx rate limit
+    const BATCH_SIZE = 5;
+    const summaries: WorkspaceSummary[] = [];
 
-      return {
-        workspace,
-        taskStats:
-          taskStats.status === 'fulfilled' ? taskStats.value : null,
-        sla: slaDashboard.status === 'fulfilled' ? slaDashboard.value : null,
-        processStats:
-          processStats.status === 'fulfilled' ? processStats.value : null,
-      } as WorkspaceSummary;
-    });
+    for (let i = 0; i < activeWorkspaces.length; i += BATCH_SIZE) {
+      const batch = activeWorkspaces.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (workspace) => {
+          const [taskStats, slaDashboard, processStats] = await Promise.allSettled([
+            tasksApi.getStatistics(workspace.id),
+            slaApi.getDashboard(workspace.id),
+            bpmnApi.getMiningWorkspaceStats(workspace.id),
+          ]);
 
-    const [summaries, myInboxCount] = await Promise.all([
-      Promise.all(summaryPromises),
-      inboxPromise,
-    ]);
+          return {
+            workspace,
+            taskStats:
+              taskStats.status === 'fulfilled' ? taskStats.value : null,
+            sla: slaDashboard.status === 'fulfilled' ? slaDashboard.value : null,
+            processStats:
+              processStats.status === 'fulfilled' ? processStats.value : null,
+          } as WorkspaceSummary;
+        }),
+      );
+      summaries.push(...batchResults);
+    }
 
     setData({ summaries, myInboxCount, loading: false });
   }, [workspaces]);

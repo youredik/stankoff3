@@ -139,9 +139,8 @@ export interface GeneratedResponse {
 export interface AiHealthStatus {
   available: boolean;
   providers: {
-    openai: boolean;
-    ollama?: boolean;
     yandex?: boolean;
+    openai?: boolean;
   };
 }
 

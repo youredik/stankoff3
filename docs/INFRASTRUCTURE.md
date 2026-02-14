@@ -57,5 +57,5 @@
 
 - **Пароль PostgreSQL** зафиксирован в томе данных. `POSTGRES_PASSWORD` env var игнорируется. Менять через `ALTER USER`.
 - **`.env` на сервере** (`/opt/stankoff-portal/.env`) — реальные секреты, не перезаписывать!
-- **Ollama** отключён на препроде — потреблял 5 ГБ RAM. AI через Yandex Cloud (0 ГБ на сервере).
+- **AI** — только Yandex Cloud (YandexGPT + embeddings), OpenAI как fallback. 0 ГБ RAM на сервере.
 - **Zeebe NullPointerException** — очистить volume: `docker volume rm stankoff-prepred_camunda-data`.

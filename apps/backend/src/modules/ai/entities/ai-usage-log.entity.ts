@@ -10,7 +10,7 @@ import {
 import { User } from '../../user/user.entity';
 import { Workspace } from '../../workspace/workspace.entity';
 
-export type AiProvider = 'openai' | 'anthropic' | 'yandex' | 'gigachat' | 'ollama' | 'unknown';
+export type AiProvider = 'openai' | 'yandex' | 'unknown';
 export type AiOperation = 'classify' | 'generate' | 'embed' | 'search' | 'chat' | 'summarize';
 
 @Entity('ai_usage_logs')

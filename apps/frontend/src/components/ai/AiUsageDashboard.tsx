@@ -10,14 +10,12 @@ import { ru } from 'date-fns/locale';
 const PROVIDER_LABELS: Record<string, string> = {
   yandex: 'YandexGPT',
   openai: 'OpenAI',
-  ollama: 'Ollama',
   unknown: 'Неизвестный',
 };
 
 const PROVIDER_COLORS: Record<string, string> = {
   yandex: 'bg-yellow-500',
   openai: 'bg-green-500',
-  ollama: 'bg-blue-500',
   unknown: 'bg-gray-500',
 };
 
