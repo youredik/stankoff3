@@ -23,7 +23,7 @@ export function ProductCatalogView({ workspaceId }: ProductCatalogViewProps) {
   return (
     <div className="flex h-full gap-0">
       {/* Дерево категорий — левая панель */}
-      <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+      <div className="w-80 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 overflow-hidden">
         <CategoryTree
           workspaceId={workspaceId}
           selectedCategoryId={selectedCategoryId}

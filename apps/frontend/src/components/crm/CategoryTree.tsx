@@ -43,7 +43,7 @@ function TreeNode({
             ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50'
         }`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         {hasChildren ? (
           <span
@@ -69,7 +69,7 @@ function TreeNode({
         ) : (
           <Package className="w-4 h-4 text-gray-400 flex-shrink-0" />
         )}
-        <span className="flex-1 truncate text-left">{node.name}</span>
+        <span className="flex-1 truncate text-left" title={node.name}>{node.name}</span>
         {totalCount > 0 && (
           <span className="text-xs text-gray-400 tabular-nums">{totalCount}</span>
         )}
