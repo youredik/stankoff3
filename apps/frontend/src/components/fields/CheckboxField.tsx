@@ -15,7 +15,7 @@ function CheckboxRenderer({ value, canEdit, onUpdate }: Parameters<FieldRenderer
           </div>
         ) : (
           <div className="w-5 h-5 rounded bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-            <XIcon className="w-3.5 h-3.5 text-white" />
+            <XIcon className="w-3.5 h-3.5 text-gray-600 dark:text-gray-300" />
           </div>
         )}
         <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -28,8 +28,9 @@ function CheckboxRenderer({ value, canEdit, onUpdate }: Parameters<FieldRenderer
   return (
     <button
       onClick={() => onUpdate(!isChecked)}
-      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-      style={{ backgroundColor: isChecked ? '#10B981' : '#D1D5DB' }}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+        isChecked ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+      }`}
     >
       <span
         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -46,8 +47,9 @@ function CheckboxForm({ value, onChange }: Parameters<FieldRenderer['Form']>[0])
     <button
       type="button"
       onClick={() => onChange(!isChecked)}
-      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-      style={{ backgroundColor: isChecked ? '#10B981' : '#D1D5DB' }}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+        isChecked ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+      }`}
     >
       <span
         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${

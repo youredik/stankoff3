@@ -161,7 +161,7 @@ export function CheckboxCellRenderer({ value }: FieldCellRendererProps) {
     </div>
   ) : (
     <div className="w-4 h-4 rounded bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-      <XIcon className="w-2.5 h-2.5 text-white" />
+      <XIcon className="w-2.5 h-2.5 text-gray-600 dark:text-gray-300" />
     </div>
   );
 }

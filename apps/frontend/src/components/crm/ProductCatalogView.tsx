@@ -82,7 +82,7 @@ export function ProductCatalogView({ workspaceId }: ProductCatalogViewProps) {
     <div ref={containerRef} className="flex h-full">
       {/* Дерево категорий — левая панель (resizable) */}
       <div
-        className="flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 overflow-hidden relative"
+        className="flex-shrink-0 bg-gray-50/50 dark:bg-gray-900/50 overflow-hidden relative"
         style={{ width: panelWidth }}
       >
         <CategoryTree
@@ -90,13 +90,29 @@ export function ProductCatalogView({ workspaceId }: ProductCatalogViewProps) {
           selectedCategoryId={selectedCategoryId}
           onSelectCategory={handleSelectCategory}
         />
-        {/* Drag handle */}
+      </div>
+
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className={`group relative flex-shrink-0 w-px cursor-col-resize transition-all ${
+          isDragging
+            ? 'w-1 bg-primary-500/50'
+            : 'bg-gray-200 dark:bg-gray-800 hover:w-1 hover:bg-primary-500/30'
+        }`}
+      >
+        {/* Wider invisible hit area */}
+        <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
+        {/* Grip indicator — 3 dots in center */}
         <div
-          onMouseDown={handleMouseDown}
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize transition-colors hover:bg-primary-500/40 ${
-            isDragging ? 'bg-primary-500/60' : ''
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1 transition-opacity ${
+            isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
-        />
+        >
+          <div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500" />
+          <div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500" />
+          <div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500" />
+        </div>
       </div>
 
       {/* Таблица товаров — основная область */}

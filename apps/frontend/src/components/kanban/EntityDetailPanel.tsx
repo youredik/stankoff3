@@ -402,7 +402,7 @@ export function EntityDetailPanel() {
 
   const priorityColor =
     PRIORITY_COLORS[selectedEntity.priority ?? ''] ||
-    'bg-gray-100 text-gray-800 border-gray-200';
+    'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
   const priorityLabel =
     PRIORITY_LABELS[selectedEntity.priority ?? ''] || 'Обычный';
 
