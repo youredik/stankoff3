@@ -69,17 +69,24 @@ export default function DashboardPage() {
       return;
     }
 
-    // Загружаем inbox count
+    // Загружаем inbox count первым
     const myInboxCount = await tasksApi
       .getInbox({ perPage: 1 })
       .then((r) => r.total)
       .catch(() => 0);
 
-    // Загружаем данные батчами по 5 workspaces, чтобы не перегрузить nginx rate limit
-    const BATCH_SIZE = 5;
-    const summaries: WorkspaceSummary[] = [];
+    // Показываем layout сразу, данные подгрузим прогрессивно
+    setData((prev) => ({ ...prev, myInboxCount, loading: false }));
+
+    // Загружаем по 2 workspace за батч (6 запросов) с задержкой 300ms
+    // чтобы не перебить nginx rate limit (30r/s burst=60)
+    const BATCH_SIZE = 2;
+    const BATCH_DELAY_MS = 300;
+    const allSummaries: WorkspaceSummary[] = [];
 
     for (let i = 0; i < activeWorkspaces.length; i += BATCH_SIZE) {
+      if (i > 0) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+
       const batch = activeWorkspaces.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
         batch.map(async (workspace) => {
@@ -99,10 +106,10 @@ export default function DashboardPage() {
           } as WorkspaceSummary;
         }),
       );
-      summaries.push(...batchResults);
+      allSummaries.push(...batchResults);
+      // Прогрессивное обновление — данные появляются по мере загрузки
+      setData((prev) => ({ ...prev, summaries: [...allSummaries] }));
     }
-
-    setData({ summaries, myInboxCount, loading: false });
   }, [workspaces]);
 
   useEffect(() => {
