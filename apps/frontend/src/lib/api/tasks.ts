@@ -99,4 +99,15 @@ export const tasksApi = {
     apiClient
       .post<UserTaskComment>(`/bpmn/tasks/${taskId}/comments`, { content, mentionedUserIds })
       .then((r) => r.data),
+
+  // Statistics - статистика задач по workspace
+  getStatistics: (workspaceId: string) =>
+    apiClient
+      .get<{
+        total: number;
+        byStatus: Record<string, number>;
+        overdue: number;
+        avgCompletionTimeMs: number | null;
+      }>('/bpmn/tasks/statistics', { params: { workspaceId } })
+      .then((r) => r.data),
 };

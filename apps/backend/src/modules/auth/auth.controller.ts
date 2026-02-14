@@ -10,6 +10,7 @@ import {
   Query,
   UnauthorizedException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
@@ -26,6 +27,7 @@ const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 дней
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
   private readonly isSecure: boolean;
 
   constructor(
@@ -43,13 +45,13 @@ export class AuthController {
     @Request() req: { cookies: Record<string, string> },
     @Res({ passthrough: true }) res: Response,
   ) {
-    console.log('Refresh endpoint called, cookies:', Object.keys(req.cookies || {}));
+    this.logger.debug('Refresh endpoint called');
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
     if (!refreshToken) {
-      console.log('Refresh token NOT found in cookies');
+      this.logger.debug('Refresh token not found in cookies');
       throw new UnauthorizedException('Refresh token не найден');
     }
-    console.log('Refresh token found, refreshing...');
+    this.logger.debug('Refresh token found, refreshing');
 
     const tokens = await this.authService.refreshTokens(refreshToken);
 
@@ -72,8 +74,7 @@ export class AuthController {
   ) {
     // Получаем id_token для logout hint (позволяет пропустить страницу подтверждения)
     const idToken = req.cookies?.[ID_TOKEN_COOKIE];
-    console.log('Logout: cookies available:', Object.keys(req.cookies || {}));
-    console.log('Logout: id_token present:', !!idToken);
+    this.logger.debug('Logout: id_token present: %s', !!idToken);
 
     // Очищаем refresh token cookie
     res.clearCookie(REFRESH_TOKEN_COOKIE, {
@@ -150,7 +151,7 @@ export class AuthController {
     const redirectUri = `${baseUrl}/api/auth/keycloak/callback`;
 
     try {
-      console.log('Keycloak callback: code=', code?.substring(0, 20) + '...', 'state=', state?.substring(0, 20) + '...', 'iss=', iss, 'session_state=', sessionState?.substring(0, 10));
+      this.logger.debug('Keycloak callback: processing authorization code');
       const { accessToken, refreshToken, idToken } = await this.authService.handleKeycloakCallback(
         code,
         redirectUri,
@@ -158,7 +159,7 @@ export class AuthController {
         iss,
         sessionState,
       );
-      console.log('Keycloak callback: tokens received');
+      this.logger.debug('Keycloak callback: tokens received');
 
       // Устанавливаем refresh token в HttpOnly cookie
       res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
@@ -170,7 +171,7 @@ export class AuthController {
       });
 
       // Сохраняем id_token для logout (позволяет пропустить страницу подтверждения)
-      console.log('Keycloak callback: idToken present:', !!idToken);
+      this.logger.debug('Keycloak callback: idToken present: %s', !!idToken);
       if (idToken) {
         res.cookie(ID_TOKEN_COOKIE, idToken, {
           httpOnly: true,
@@ -185,8 +186,7 @@ export class AuthController {
       // Frontend (AuthProvider на /workspace) сохранит токен в памяти и очистит URL
       return res.redirect(`${frontendUrl}/workspace?access_token=${accessToken}`);
     } catch (error) {
-      console.error('Keycloak callback error:', error);
-      console.error('Error stack:', (error as Error).stack);
+      this.logger.error('Keycloak callback error: %s', (error as Error).message);
       // При ошибке редирект на страницу логина с ошибкой
       return res.redirect(`${frontendUrl}/login?error=sso_failed`);
     }

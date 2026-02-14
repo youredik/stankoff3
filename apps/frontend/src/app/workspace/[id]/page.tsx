@@ -25,16 +25,20 @@ const TableView = dynamic(
   { ssr: false },
 );
 
+const ProductCatalogView = dynamic(
+  () => import('@/components/crm/ProductCatalogView').then((m) => m.ProductCatalogView),
+  { ssr: false },
+);
+
 function WorkspaceContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const workspaceId = params.id as string;
   const { currentWorkspace } = useWorkspaceStore();
-  // Системные workspace (справочники) — всегда табличный вид
-  const view = currentWorkspace?.isSystem
-    ? 'table'
-    : (searchParams.get('view') as DashboardView) || 'kanban';
+  // CRM workspace: default table, но доступны все views
+  const defaultView: DashboardView = currentWorkspace?.isSystem ? 'table' : 'kanban';
+  const view = (searchParams.get('view') as DashboardView) || defaultView;
 
   useEntitySync();
 
@@ -55,11 +59,15 @@ function WorkspaceContent() {
           <KanbanBoard workspaceId={workspaceId} />
         </div>
       )}
-      {view === 'table' && (
+      {view === 'table' && currentWorkspace?.systemType === 'products' ? (
+        <div className="relative flex-1 flex flex-col">
+          <ProductCatalogView workspaceId={workspaceId} />
+        </div>
+      ) : view === 'table' ? (
         <div className="relative p-6">
           <TableView workspaceId={workspaceId} />
         </div>
-      )}
+      ) : null}
       {view === 'analytics' && (
         <AnalyticsDashboard />
       )}

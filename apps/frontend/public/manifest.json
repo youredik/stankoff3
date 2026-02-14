@@ -1,0 +1,16 @@
+{
+  "name": "Stankoff Portal",
+  "short_name": "Stankoff",
+  "description": "Корпоративный портал управления цифровыми рабочими местами",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0D9488",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

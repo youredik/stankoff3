@@ -19,13 +19,17 @@ interface ToastStore {
   removeToast: (id: string) => void;
 }
 
+const MAX_TOASTS = 3;
+
 export const useToastStore = create<ToastStore>((set) => ({
   toasts: [],
   addToast: (data) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    set((state) => ({
-      toasts: [...state.toasts, { ...data, id }],
-    }));
+    set((state) => {
+      const next = [...state.toasts, { ...data, id }];
+      // Keep only newest MAX_TOASTS — oldest non-rendered toasts never fire timers
+      return { toasts: next.length > MAX_TOASTS ? next.slice(-MAX_TOASTS) : next };
+    });
     return id;
   },
   removeToast: (id) => {
@@ -34,6 +38,11 @@ export const useToastStore = create<ToastStore>((set) => ({
     }));
   },
 }));
+
+// Expose for Playwright/dev testing
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  (window as any).__toastStore = useToastStore;
+}
 
 /** Вызывается из stores/utils без хуков */
 export const toast = {

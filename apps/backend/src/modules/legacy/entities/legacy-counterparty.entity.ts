@@ -34,6 +34,15 @@ export class LegacyCounterparty {
   @Column({ type: 'varchar', length: 10, nullable: true })
   type: string;
 
+  @Column({ name: 'employee_count', type: 'int', nullable: true })
+  employeeCount: number;
+
+  @Column({ name: 'dadata_bank_name', type: 'text', nullable: true })
+  bankName: string;
+
+  @Column({ name: 'dadata_bank_bik', type: 'varchar', length: 9, nullable: true })
+  bankBik: string;
+
   /**
    * Короткое название (без ОПФ)
    */

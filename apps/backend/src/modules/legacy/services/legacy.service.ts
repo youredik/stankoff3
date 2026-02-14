@@ -809,6 +809,129 @@ export class LegacyService implements OnModuleInit {
   }
 
   /**
+   * Получить сделки батчем (для синхронизации)
+   */
+  async getAllDealsBatch(offset: number, limit: number): Promise<LegacyDeal[]> {
+    if (!this.isAvailable()) return [];
+    return this.dealRepository
+      .createQueryBuilder('d')
+      .orderBy('d.id', 'ASC')
+      .skip(offset)
+      .take(limit)
+      .getMany();
+  }
+
+  /**
+   * Общее количество сделок
+   */
+  async getDealsCount(): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    return this.dealRepository.count();
+  }
+
+  /**
+   * Получить все этапы воронки продаж
+   */
+  async getAllDealStages(): Promise<LegacyDealStage[]> {
+    if (!this.isAvailable()) return [];
+    return this.dealStageRepository.find({
+      order: { sortOrder: 'ASC' },
+    });
+  }
+
+  // ==================== INCREMENTAL SYNC HELPERS ====================
+
+  /**
+   * Контрагенты с id > minId (инкрементальная синхронизация).
+   * Legacy counterparty не имеет updated_at — синхронизируем только новые записи.
+   */
+  async getCounterpartiesSinceId(minId: number, limit: number): Promise<LegacyCounterparty[]> {
+    if (!this.isAvailable()) return [];
+    return this.counterpartyRepository
+      .createQueryBuilder('cp')
+      .where('cp.id > :minId', { minId })
+      .orderBy('cp.id', 'ASC')
+      .take(limit)
+      .getMany();
+  }
+
+  async getCounterpartiesCountSinceId(minId: number): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    return this.counterpartyRepository
+      .createQueryBuilder('cp')
+      .where('cp.id > :minId', { minId })
+      .getCount();
+  }
+
+  /**
+   * Контакты с customerID > minId (инкрементальная синхронизация)
+   */
+  async getContactsSinceId(minId: number, limit: number): Promise<LegacyCustomer[]> {
+    if (!this.isAvailable()) return [];
+    return this.customerRepository
+      .createQueryBuilder('c')
+      .where('c.is_manager = :isManager', { isManager: 0 })
+      .andWhere('c.customerID > :minId', { minId })
+      .orderBy('c.customerID', 'ASC')
+      .take(limit)
+      .getMany();
+  }
+
+  async getContactsCountSinceId(minId: number): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    return this.customerRepository
+      .createQueryBuilder('c')
+      .where('c.is_manager = :isManager', { isManager: 0 })
+      .andWhere('c.customerID > :minId', { minId })
+      .getCount();
+  }
+
+  /**
+   * Активные товары с productID > minId (инкрементальная синхронизация)
+   */
+  async getProductsSinceId(minId: number, limit: number): Promise<LegacyProduct[]> {
+    if (!this.isAvailable()) return [];
+    return this.productRepository
+      .createQueryBuilder('p')
+      .where('p.enabled = :enabled', { enabled: 1 })
+      .andWhere('p.productID > :minId', { minId })
+      .orderBy('p.productID', 'ASC')
+      .take(limit)
+      .getMany();
+  }
+
+  async getProductsCountSinceId(minId: number): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    return this.productRepository
+      .createQueryBuilder('p')
+      .where('p.enabled = :enabled', { enabled: 1 })
+      .andWhere('p.productID > :minId', { minId })
+      .getCount();
+  }
+
+  /**
+   * Сделки, изменённые после указанной даты.
+   * Deals имеют updated_at — можем делать настоящий delta sync.
+   */
+  async getDealsSinceDate(since: Date, limit: number): Promise<LegacyDeal[]> {
+    if (!this.isAvailable()) return [];
+    return this.dealRepository
+      .createQueryBuilder('d')
+      .where('d.updated_at > :since', { since })
+      .orderBy('d.id', 'ASC')
+      .take(limit)
+      .getMany();
+  }
+
+  async getDealsCountSinceDate(since: Date): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    return this.dealRepository
+      .createQueryBuilder('d')
+      .where('d.updated_at > :since', { since })
+      .getCount();
+  }
+
+  /**
    * Получить все активные категории
    */
   async getAllActiveCategories(): Promise<LegacyCategory[]> {

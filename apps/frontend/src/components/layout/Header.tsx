@@ -24,25 +24,26 @@ function HeaderInner() {
 
   const { currentWorkspace } = useWorkspaceStore();
 
-  // Показываем view toggle только на основной странице workspace (не settings/processes/системных)
+  // Показываем view toggle на основной странице workspace (включая CRM)
   const isWorkspacePage = pathname.startsWith('/workspace/') &&
     !pathname.includes('/settings') &&
-    !pathname.includes('/processes') &&
-    !currentWorkspace?.isSystem;
+    !pathname.includes('/processes');
 
-  const currentView = (searchParams.get('view') as DashboardView) || 'kanban';
+  const defaultView: DashboardView = currentWorkspace?.isSystem ? 'table' : 'kanban';
+  const currentView = (searchParams.get('view') as DashboardView) || defaultView;
 
   const handleViewChange = useCallback((view: DashboardView) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (view === 'kanban') {
-      params.delete('view'); // kanban — default, не засоряем URL
+    // Для CRM workspace default = table, для обычных = kanban
+    if (view === defaultView) {
+      params.delete('view'); // default, не засоряем URL
     } else {
       params.set('view', view);
     }
     const qs = params.toString();
     router.replace(`${pathname}${qs ? '?' + qs : ''}`);
     localStorage.setItem(VIEW_KEY, view);
-  }, [router, pathname, searchParams]);
+  }, [router, pathname, searchParams, defaultView]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { notifications } = useNotificationStore();

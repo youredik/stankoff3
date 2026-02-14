@@ -62,14 +62,23 @@ export class RoleService {
    * Создать новую роль.
    */
   async create(dto: CreateRoleDto): Promise<Role> {
-    const existing = await this.roleRepo.findOne({ where: { slug: dto.slug } });
+    const slug =
+      dto.slug ||
+      dto.name
+        .toLowerCase()
+        .replace(/[^a-z0-9а-яё]+/gi, '_')
+        .replace(/[а-яё]/g, '')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
+    const existing = await this.roleRepo.findOne({ where: { slug } });
     if (existing) {
-      throw new ConflictException(`Роль с slug '${dto.slug}' уже существует`);
+      throw new ConflictException(`Роль с slug '${slug}' уже существует`);
     }
 
     const role = this.roleRepo.create({
       name: dto.name,
-      slug: dto.slug,
+      slug,
       description: dto.description || null,
       scope: dto.scope,
       permissions: dto.permissions,

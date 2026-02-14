@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from '@/types';
 import { authApi } from '@/lib/api/auth';
+import { useNotificationStore } from './useNotificationStore';
 
 /**
  * Извлекает время истечения JWT токена (в мс) без внешних зависимостей
@@ -154,6 +155,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       try {
         const freshUser = await authApi.me();
         set({ user: freshUser, isAuthenticated: true, isLoading: false });
+        useNotificationStore.getState().setServerPreferences(freshUser.notificationPreferences ?? null);
         scheduleProactiveRefresh(accessToken, get().refreshTokens);
         return;
       } catch {
@@ -167,6 +169,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       try {
         const freshUser = await authApi.me();
         set({ user: freshUser, isAuthenticated: true, isLoading: false });
+        useNotificationStore.getState().setServerPreferences(freshUser.notificationPreferences ?? null);
         return;
       } catch {
         // Refresh прошёл, но профиль не удалось получить

@@ -36,9 +36,11 @@ export const legacyDatabaseConfig: DataSourceOptions = {
   // КРИТИЧЕСКИ ВАЖНО: никогда не синхронизировать схему legacy БД!
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
-  // Ограничиваем количество соединений
+  // Ограничиваем количество соединений и таймауты
   extra: {
     connectionLimit: 5,
+    connectTimeout: 10000,
+    acquireTimeout: 10000,
   },
 };
 

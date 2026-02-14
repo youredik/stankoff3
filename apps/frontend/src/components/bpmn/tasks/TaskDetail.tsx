@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { ru } from 'date-fns/locale';
 import {
   X,
@@ -194,6 +195,7 @@ export function TaskDetail({
           <button
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
           </button>
@@ -367,7 +369,7 @@ export function TaskDetail({
                       </div>
                       <div
                         className="text-sm text-gray-700 dark:text-gray-300 prose prose-sm dark:prose-invert max-w-none [&_[data-type=mention]]:text-primary-600 [&_[data-type=mention]]:dark:text-primary-400 [&_[data-type=mention]]:bg-primary-50 [&_[data-type=mention]]:dark:bg-primary-900/40 [&_[data-type=mention]]:rounded [&_[data-type=mention]]:px-0.5 [&_[data-type=mention]]:font-medium"
-                        dangerouslySetInnerHTML={{ __html: comment.content }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.content) }}
                       />
                     </div>
                   ))}
@@ -384,6 +386,7 @@ export function TaskDetail({
                     onClick={handleSendComment}
                     disabled={!commentEditor || commentEditor.isEmpty || isSendingComment}
                     className="px-3 py-2 text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                    aria-label="Отправить комментарий"
                   >
                     {isSendingComment ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

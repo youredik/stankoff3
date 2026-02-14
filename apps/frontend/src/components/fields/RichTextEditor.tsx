@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { sanitizeHtml } from '@/lib/sanitize';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Bold, Italic, Strikethrough, Link as LinkIcon, List, ListOrdered } from 'lucide-react';
@@ -146,7 +147,7 @@ export function RichTextView({ html }: { html: string }) {
   return (
     <div
       className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 [&_[data-type=mention]]:text-primary-600 [&_[data-type=mention]]:dark:text-primary-400 [&_[data-type=mention]]:bg-primary-50 [&_[data-type=mention]]:dark:bg-primary-900/40 [&_[data-type=mention]]:rounded [&_[data-type=mention]]:px-0.5 [&_[data-type=mention]]:font-medium"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
     />
   );
 }

@@ -3,6 +3,7 @@
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { AttachmentPreview } from '@/components/ui/AttachmentPreview';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useUserProfileStore } from '@/store/useUserProfileStore';
 import type { Comment, Attachment } from '@/types';
@@ -41,7 +42,7 @@ export function TimelineCommentItem({ comment, allAttachments }: TimelineComment
         </div>
         <div
           className="text-sm text-gray-700 dark:text-gray-300 mt-1 [&_p]:mb-2 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-400 [&_a]:underline [&_.mention]:text-primary-400 [&_.mention]:bg-primary-100 dark:[&_.mention]:bg-primary-900/30 [&_.mention]:rounded [&_.mention]:px-0.5"
-          dangerouslySetInnerHTML={{ __html: comment.content }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.content) }}
         />
         {comment.attachments && comment.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">

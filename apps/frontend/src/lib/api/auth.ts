@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { User } from '@/types';
+import { User, NotificationPreferences } from '@/types';
 
 export interface RefreshResponse {
   accessToken: string;
@@ -38,6 +38,7 @@ export const authApi = {
     lastName?: string;
     department?: string;
     avatar?: string | null;
+    notificationPreferences?: NotificationPreferences;
   }): Promise<User> => {
     const { data } = await apiClient.patch<User>('/auth/me', profileData);
     return data;

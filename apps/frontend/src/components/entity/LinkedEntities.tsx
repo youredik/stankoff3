@@ -277,6 +277,7 @@ export function LinkedEntities({
             onClick={() => setShowAddModal(true)}
             className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
             title="Добавить связь"
+            aria-label="Добавить связь"
           >
             <Plus className="w-4 h-4" />
           </button>

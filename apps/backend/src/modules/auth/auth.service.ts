@@ -10,6 +10,7 @@ import { KeycloakUserInfo } from './interfaces/keycloak-user.interface';
 import { RoleService } from '../rbac/role.service';
 import { LEGACY_ROLE_MAPPING } from '../rbac/system-roles';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { S3Service } from '../s3/s3.service';
 
 export interface TokensResponse {
   accessToken: string;
@@ -26,6 +27,7 @@ export class AuthService {
     private configService: ConfigService,
     private keycloakService: KeycloakService,
     private roleService: RoleService,
+    private s3Service: S3Service,
   ) {}
 
   async login(user: User): Promise<{ accessToken: string; refreshToken: string }> {
@@ -71,11 +73,26 @@ export class AuthService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto): Promise<User> {
+    // При смене/удалении аватара — очистка старого S3 файла
+    if (dto.avatar !== undefined) {
+      const currentUser = await this.userService.findOne(userId);
+      const oldAvatar = currentUser?.avatar;
+      if (oldAvatar && oldAvatar !== dto.avatar && !oldAvatar.startsWith('http')) {
+        // Удаляем старый файл и его thumbnail из S3 (fire-and-forget)
+        this.s3Service.deleteFile(oldAvatar).catch(() => {});
+        const thumbKey = oldAvatar.replace(/^(attachments\/)/, '$1thumbnails/') + '.jpg';
+        this.s3Service.deleteFile(thumbKey).catch(() => {});
+      }
+    }
+
     return this.userService.update(userId, {
       ...(dto.firstName !== undefined && { firstName: dto.firstName }),
       ...(dto.lastName !== undefined && { lastName: dto.lastName }),
       ...(dto.department !== undefined && { department: dto.department }),
       ...(dto.avatar !== undefined && { avatar: dto.avatar }),
+      ...(dto.notificationPreferences !== undefined && {
+        notificationPreferences: dto.notificationPreferences,
+      }),
     });
   }
 

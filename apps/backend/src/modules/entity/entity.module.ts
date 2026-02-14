@@ -3,12 +3,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkspaceEntity } from './entity.entity';
 import { Comment } from './comment.entity';
 import { GlobalCounter } from './global-counter.entity';
+import { ProductCategory } from './product-category.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { User } from '../user/user.entity';
 import { EntityService } from './entity.service';
 import { EntityController } from './entity.controller';
 import { CommentService } from './comment.service';
 import { CommentController } from './comment.controller';
+import { ProductCategoryService } from './product-category.service';
+import { ProductCategoryController } from './product-category.controller';
 import { RecommendationsService } from './recommendations/recommendations.service';
 import { RecommendationsController } from './recommendations/recommendations.controller';
 import { OgPreviewService } from './og-preview.service';
@@ -26,7 +29,7 @@ import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WorkspaceEntity, Comment, GlobalCounter, Workspace, User]),
+    TypeOrmModule.forFeature([WorkspaceEntity, Comment, GlobalCounter, ProductCategory, Workspace, User]),
     WebsocketModule,
     S3Module,
     WorkspaceModule,
@@ -36,8 +39,8 @@ import { AiModule } from '../ai/ai.module';
     forwardRef(() => AiModule),
     SlaModule,
   ],
-  providers: [EntityService, CommentService, RecommendationsService, OgPreviewService, FieldValidationService, FormulaEvaluatorService],
-  controllers: [EntityController, CommentController, RecommendationsController, OgPreviewController],
-  exports: [EntityService, RecommendationsService],
+  providers: [EntityService, CommentService, ProductCategoryService, RecommendationsService, OgPreviewService, FieldValidationService, FormulaEvaluatorService],
+  controllers: [EntityController, CommentController, ProductCategoryController, RecommendationsController, OgPreviewController],
+  exports: [EntityService, ProductCategoryService, RecommendationsService],
 })
 export class EntityModule {}

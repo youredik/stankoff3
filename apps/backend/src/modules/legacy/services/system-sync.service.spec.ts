@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { SystemSyncService, SystemType } from './system-sync.service';
 import { LegacyService } from './legacy.service';
 import { LegacyUrlService } from './legacy-url.service';
+import { ProductCategoryService } from '../../entity/product-category.service';
 import { Workspace } from '../../workspace/workspace.entity';
 import { SystemSyncLog } from '../entities/system-sync-log.entity';
 
@@ -30,7 +32,9 @@ describe('SystemSyncService', () => {
   let syncLogRepo: jest.Mocked<Partial<Repository<SystemSyncLog>>>;
   let legacyService: jest.Mocked<Partial<LegacyService>>;
   let legacyUrlService: jest.Mocked<Partial<LegacyUrlService>>;
+  let productCategoryService: jest.Mocked<Partial<ProductCategoryService>>;
   let dataSource: jest.Mocked<Partial<DataSource>>;
+  let configService: jest.Mocked<Partial<ConfigService>>;
 
   const mockQueryRunner = {
     connect: jest.fn(),
@@ -41,21 +45,35 @@ describe('SystemSyncService', () => {
     query: jest.fn(),
   };
 
+  // Mock для syncLogRepo.createQueryBuilder (getLastSyncedLegacyId / getLastSyncTime)
+  const mockQb = {
+    select: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn().mockResolvedValue({ maxId: 0 }),
+  };
+
   beforeEach(async () => {
+    // Reset mocks
+    mockQb.getRawOne.mockResolvedValue({ maxId: 0 });
+
     workspaceRepo = {
       findOne: jest.fn(),
       create: jest.fn(),
-      save: jest.fn(),
+      save: jest.fn().mockImplementation(async (data) => data),
+      update: jest.fn(),
     };
 
     syncLogRepo = {
       findOne: jest.fn(),
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       count: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(mockQb),
     };
 
     legacyService = {
       isAvailable: jest.fn().mockReturnValue(true),
+      // Full sync
       getCounterpartiesCount: jest.fn().mockResolvedValue(0),
       getAllCounterpartiesBatch: jest.fn().mockResolvedValue([]),
       getContactsCount: jest.fn().mockResolvedValue(0),
@@ -64,16 +82,38 @@ describe('SystemSyncService', () => {
       getActiveProductsCount: jest.fn().mockResolvedValue(0),
       getAllActiveProductsBatch: jest.fn().mockResolvedValue([]),
       getAllActiveCategories: jest.fn().mockResolvedValue([]),
+      getDealsCount: jest.fn().mockResolvedValue(0),
+      getAllDealsBatch: jest.fn().mockResolvedValue([]),
+      getAllDealStages: jest.fn().mockResolvedValue([]),
+      // Incremental sync
+      getCounterpartiesSinceId: jest.fn().mockResolvedValue([]),
+      getCounterpartiesCountSinceId: jest.fn().mockResolvedValue(0),
+      getContactsSinceId: jest.fn().mockResolvedValue([]),
+      getContactsCountSinceId: jest.fn().mockResolvedValue(0),
+      getProductsSinceId: jest.fn().mockResolvedValue([]),
+      getProductsCountSinceId: jest.fn().mockResolvedValue(0),
+      getDealsSinceDate: jest.fn().mockResolvedValue([]),
+      getDealsCountSinceDate: jest.fn().mockResolvedValue(0),
     };
 
     legacyUrlService = {
       getCounterpartyUrl: jest.fn().mockReturnValue('https://test.com/cp/1'),
       getCustomerUrl: jest.fn().mockReturnValue('https://test.com/c/1'),
       getProductUrl: jest.fn().mockReturnValue('https://test.com/p/1'),
+      getDealUrl: jest.fn().mockReturnValue('https://test.com/d/1'),
+    };
+
+    productCategoryService = {
+      upsertFromLegacy: jest.fn().mockResolvedValue({ id: 'cat-1', name: 'Test' }),
+      recalculateCounts: jest.fn().mockResolvedValue(undefined),
     };
 
     dataSource = {
       createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+    };
+
+    configService = {
+      get: jest.fn().mockReturnValue(null), // No Telegram config in tests
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -84,6 +124,8 @@ describe('SystemSyncService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: LegacyService, useValue: legacyService },
         { provide: LegacyUrlService, useValue: legacyUrlService },
+        { provide: ProductCategoryService, useValue: productCategoryService },
+        { provide: ConfigService, useValue: configService },
       ],
     }).compile();
 
@@ -132,7 +174,6 @@ describe('SystemSyncService', () => {
       await service.ensureCounterpartiesWorkspace();
       const createArg = (workspaceRepo.create as jest.Mock).mock.calls[0][0];
 
-      // Проверяем наличие ключевых полей
       const allFields = createArg.sections.flatMap((s: any) => s.fields);
       const fieldIds = allFields.map((f: any) => f.id);
       expect(fieldIds).toContain('inn');
@@ -141,8 +182,9 @@ describe('SystemSyncService', () => {
       expect(fieldIds).toContain('orgType');
       expect(fieldIds).toContain('status');
       expect(fieldIds).toContain('legacyId');
+      expect(fieldIds).toContain('bankName');
+      expect(fieldIds).toContain('bankBik');
 
-      // Все поля должны быть system: true
       expect(allFields.every((f: any) => f.system === true)).toBe(true);
     });
   });
@@ -150,10 +192,8 @@ describe('SystemSyncService', () => {
   describe('ensureContactsWorkspace', () => {
     it('должен создать workspace с relation на контрагентов', async () => {
       const cpWs = mockWorkspace({ id: 'cp-ws-id' });
-      // Первый вызов findOne — для counterparties (ensureCounterpartiesWorkspace)
-      // Второй — для contacts
       (workspaceRepo.findOne as jest.Mock)
-        .mockResolvedValueOnce(cpWs) // counterparties exists
+        .mockResolvedValueOnce(cpWs)  // counterparties exists
         .mockResolvedValueOnce(null); // contacts doesn't exist
       (workspaceRepo.create as jest.Mock).mockImplementation((data) => data);
       (workspaceRepo.save as jest.Mock).mockImplementation(async (data) => ({ id: 'ct-ws', ...data }));
@@ -170,28 +210,31 @@ describe('SystemSyncService', () => {
   });
 
   describe('ensureAllWorkspaces', () => {
-    it('должен создать все три workspace', async () => {
+    it('должен создать все четыре workspace', async () => {
       const cpWs = mockWorkspace({ id: 'cp', systemType: 'counterparties' });
       const ctWs = mockWorkspace({ id: 'ct', systemType: 'contacts', name: 'Контакты', prefix: 'CT' });
       const prWs = mockWorkspace({ id: 'pr', systemType: 'products', name: 'Товары', prefix: 'PR' });
+      const dlWs = mockWorkspace({ id: 'dl', systemType: 'deals' as any, name: 'Сделки', prefix: 'DL' });
 
-      // Mock: counterparties, contacts, products — все существуют
       (workspaceRepo.findOne as jest.Mock)
-        .mockResolvedValueOnce(cpWs)   // counterparties (from ensureCounterparties)
+        .mockResolvedValueOnce(cpWs)   // counterparties
         .mockResolvedValueOnce(cpWs)   // counterparties (from ensureContacts)
         .mockResolvedValueOnce(ctWs)   // contacts
-        .mockResolvedValueOnce(prWs);  // products
+        .mockResolvedValueOnce(prWs)   // products
+        .mockResolvedValueOnce(cpWs)   // counterparties (from ensureDeals)
+        .mockResolvedValueOnce(dlWs);  // deals
 
       const result = await service.ensureAllWorkspaces();
       expect(result.counterparties.id).toBe('cp');
       expect(result.contacts.id).toBe('ct');
       expect(result.products.id).toBe('pr');
+      expect(result.deals.id).toBe('dl');
     });
   });
 
-  // ==================== SYNC OPERATIONS ====================
+  // ==================== SYNC: FULL MODE ====================
 
-  describe('syncCounterparties', () => {
+  describe('syncCounterparties (full sync)', () => {
     it('должен создать entity для каждого контрагента', async () => {
       const ws = mockWorkspace();
       (workspaceRepo.findOne as jest.Mock).mockResolvedValue(ws);
@@ -200,13 +243,14 @@ describe('SystemSyncService', () => {
         { id: 1, name: 'ООО Тест', inn: '1234567890', status: null, type: null },
         { id: 2, name: 'ИП Иванов', inn: '772345678901', status: null, type: 'individual' },
       ]).mockResolvedValueOnce([]);
-      (syncLogRepo.findOne as jest.Mock).mockResolvedValue(null); // Нет ранее синхронизированных
+      (syncLogRepo.findOne as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.syncCounterparties(500);
+      const result = await service.syncCounterparties(500, true);
 
       expect(result.systemType).toBe('counterparties');
       expect(result.created).toBe(2);
       expect(result.errors).toBe(0);
+      expect(result.incremental).toBe(false);
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
     });
 
@@ -223,11 +267,54 @@ describe('SystemSyncService', () => {
         systemType: 'counterparties',
       });
 
-      const result = await service.syncCounterparties(500);
+      const result = await service.syncCounterparties(500, true);
       expect(result.updated).toBe(1);
       expect(result.created).toBe(0);
     });
+  });
 
+  // ==================== SYNC: INCREMENTAL MODE ====================
+
+  describe('syncCounterparties (incremental)', () => {
+    it('должен обработать только новые записи (sinceId)', async () => {
+      const ws = mockWorkspace();
+      (workspaceRepo.findOne as jest.Mock).mockResolvedValue(ws);
+      // getLastSyncedLegacyId → maxId=5
+      mockQb.getRawOne.mockResolvedValueOnce({ maxId: 5 });
+      (legacyService.getCounterpartiesCountSinceId as jest.Mock).mockResolvedValue(2);
+      (legacyService.getCounterpartiesSinceId as jest.Mock)
+        .mockResolvedValueOnce([
+          { id: 6, name: 'Новый 1', inn: '111', status: null, type: null },
+          { id: 7, name: 'Новый 2', inn: '222', status: null, type: null },
+        ])
+        .mockResolvedValueOnce([]);
+      (syncLogRepo.findOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.syncCounterparties(500);
+
+      expect(result.systemType).toBe('counterparties');
+      expect(result.incremental).toBe(true);
+      expect(result.created).toBe(2);
+      expect(legacyService.getCounterpartiesSinceId).toHaveBeenCalledWith(5, 500);
+    });
+
+    it('должен пропустить когда нет новых записей', async () => {
+      const ws = mockWorkspace();
+      (workspaceRepo.findOne as jest.Mock).mockResolvedValue(ws);
+      mockQb.getRawOne.mockResolvedValueOnce({ maxId: 100 });
+      (legacyService.getCounterpartiesCountSinceId as jest.Mock).mockResolvedValue(0);
+
+      const result = await service.syncCounterparties(500);
+
+      expect(result.totalProcessed).toBe(0);
+      expect(result.created).toBe(0);
+      expect(result.incremental).toBe(true);
+    });
+  });
+
+  // ==================== CONCURRENCY ====================
+
+  describe('concurrent sync protection', () => {
     it('должен бросить ошибку при повторном запуске', async () => {
       const ws = mockWorkspace();
       (workspaceRepo.findOne as jest.Mock).mockResolvedValue(ws);
@@ -238,17 +325,14 @@ describe('SystemSyncService', () => {
       (legacyService.getAllCounterpartiesBatch as jest.Mock).mockReturnValueOnce(batchPromise);
       (syncLogRepo.findOne as jest.Mock).mockResolvedValue(null);
 
-      // Запускаем первую без await — она застрянет на getAllCounterpartiesBatch
-      const promise1 = service.syncCounterparties(500);
-      // Даём микротаскам обработаться, чтобы isRunning стал true
+      // Запускаем первую (fullSync — initProgress вызывается сразу после getCount)
+      const promise1 = service.syncCounterparties(500, true);
       await new Promise((r) => setTimeout(r, 50));
 
-      // Пробуем запустить вторую
-      await expect(service.syncCounterparties(500)).rejects.toThrow(
-        'Синхронизация контрагентов уже запущена',
+      await expect(service.syncCounterparties(500, true)).rejects.toThrow(
+        'Синхронизация counterparties уже запущена',
       );
 
-      // Разрешаем первую — пустой batch чтобы завершить цикл
       resolveBatch!([]);
       await promise1;
     });
@@ -264,6 +348,7 @@ describe('SystemSyncService', () => {
       expect(status.counterparties.isRunning).toBe(false);
       expect(status.contacts.isRunning).toBe(false);
       expect(status.products.isRunning).toBe(false);
+      expect(status.deals.isRunning).toBe(false);
     });
   });
 
@@ -297,6 +382,19 @@ describe('SystemSyncService', () => {
       expect(preview.workspaceExists).toBe(false);
       expect(preview.workspaceId).toBeNull();
     });
+
+    it('должен вернуть preview для сделок', async () => {
+      (legacyService.getDealsCount as jest.Mock).mockResolvedValue(5000);
+      (syncLogRepo.count as jest.Mock).mockResolvedValue(200);
+      (workspaceRepo.findOne as jest.Mock).mockResolvedValue(
+        mockWorkspace({ id: 'dl-ws', systemType: 'deals' as any }),
+      );
+
+      const preview = await service.getPreview('deals');
+      expect(preview.totalLegacy).toBe(5000);
+      expect(preview.alreadySynced).toBe(200);
+      expect(preview.remaining).toBe(4800);
+    });
   });
 
   // ==================== CRON ====================
@@ -315,13 +413,68 @@ describe('SystemSyncService', () => {
     it('не должен запускать sync если cron отключён', async () => {
       service.disableCron();
       await service.scheduledSync();
-      expect(legacyService.getCounterpartiesCount).not.toHaveBeenCalled();
+      expect(legacyService.getCounterpartiesCountSinceId).not.toHaveBeenCalled();
     });
 
     it('не должен запускать sync если legacy недоступен', async () => {
       (legacyService.isAvailable as jest.Mock).mockReturnValue(false);
       await service.scheduledSync();
+      expect(legacyService.getCounterpartiesCountSinceId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('scheduledFullSync', () => {
+    it('не должен запускать sync если cron отключён', async () => {
+      service.disableCron();
+      await service.scheduledFullSync();
       expect(legacyService.getCounterpartiesCount).not.toHaveBeenCalled();
+    });
+
+    it('не должен запускать sync если legacy недоступен', async () => {
+      (legacyService.isAvailable as jest.Mock).mockReturnValue(false);
+      await service.scheduledFullSync();
+      expect(legacyService.getCounterpartiesCount).not.toHaveBeenCalled();
+    });
+  });
+
+  // ==================== CIRCUIT BREAKER ====================
+
+  describe('circuit breaker', () => {
+    it('должен прервать sync при высоком проценте ошибок', async () => {
+      const ws = mockWorkspace();
+      (workspaceRepo.findOne as jest.Mock).mockResolvedValue(ws);
+      (legacyService.getCounterpartiesCount as jest.Mock).mockResolvedValue(30);
+
+      const errorBatch = Array.from({ length: 30 }, (_, i) => ({
+        id: i + 1, name: `CP ${i}`, inn: '000', status: null, type: null,
+      }));
+      (legacyService.getAllCounterpartiesBatch as jest.Mock)
+        .mockResolvedValueOnce(errorBatch)
+        .mockResolvedValueOnce([]);
+
+      // Каждый findOne бросает ошибку → все 30 записей ошибочны
+      (syncLogRepo.findOne as jest.Mock).mockRejectedValue(new Error('DB connection lost'));
+
+      await expect(service.syncCounterparties(500, true)).rejects.toThrow(/Circuit breaker/);
+    });
+  });
+
+  // ==================== TELEGRAM ALERTS ====================
+
+  describe('telegram alerts', () => {
+    it('не должен отправлять алерт если токен не настроен', async () => {
+      // configService.get returns null → no telegram
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({} as any);
+
+      const ws = mockWorkspace();
+      (workspaceRepo.findOne as jest.Mock).mockResolvedValue(ws);
+      mockQb.getRawOne.mockResolvedValue({ maxId: 0 });
+      (legacyService.getCounterpartiesCountSinceId as jest.Mock).mockResolvedValue(0);
+
+      await service.syncCounterparties(500);
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
     });
   });
 });

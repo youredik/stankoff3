@@ -229,6 +229,7 @@ export function CommentEditor({ users, onSubmit, entityId, onEditorReady }: Comm
             <button
               onClick={() => setAiDraft(null)}
               className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
+              aria-label="Закрыть AI-предложение"
             >
               <X className="w-3.5 h-3.5" />
             </button>

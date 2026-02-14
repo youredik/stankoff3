@@ -18,6 +18,7 @@ import { SystemSyncLog } from './entities/system-sync-log.entity';
 import { User } from '../user/user.entity';
 import { Workspace } from '../workspace/workspace.entity';
 import { AuthModule } from '../auth/auth.module';
+import { EntityModule } from '../entity/entity.module';
 
 /**
  * Модуль интеграции с Legacy CRM (MariaDB/MySQL)
@@ -34,6 +35,7 @@ import { AuthModule } from '../auth/auth.module';
     ConfigModule,
     TypeOrmModule.forFeature([LegacyMigrationLog, SystemSyncLog, User, Workspace]),
     forwardRef(() => AuthModule),
+    forwardRef(() => EntityModule),
   ],
   controllers: [LegacyController, LegacyImportController, LegacyMigrationController, LegacySyncController, LegacySystemSyncController],
   providers: [

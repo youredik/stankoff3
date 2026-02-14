@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as sharp from 'sharp';
 
@@ -112,6 +112,20 @@ export class S3Service {
       }),
     );
     return result;
+  }
+
+  /** Удаляет файл из S3 по ключу. Не бросает ошибку если файл не найден. */
+  async deleteFile(key: string): Promise<void> {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+      await this.s3Client.send(command);
+      this.logger.log(`Deleted S3 file: ${key}`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to delete S3 file ${key}: ${error?.message}`);
+    }
   }
 
   async getFileStream(key: string): Promise<{

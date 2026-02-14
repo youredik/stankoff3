@@ -120,6 +120,7 @@ export function SectionMembersModal({ section, onClose }: SectionMembersModalPro
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              aria-label="Закрыть"
             >
               <X className="w-5 h-5" />
             </button>
@@ -241,6 +242,7 @@ export function SectionMembersModal({ section, onClose }: SectionMembersModalPro
                                 disabled={removing === member.userId}
                                 className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
                                 title="Удалить"
+                                aria-label="Удалить участника"
                               >
                                 {removing === member.userId ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />

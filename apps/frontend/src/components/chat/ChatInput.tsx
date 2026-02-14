@@ -531,6 +531,7 @@ export function ChatInput({
             data-testid="chat-attach-btn" onClick={() => fileInputRef.current?.click()}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors flex-shrink-0 mb-0.5"
             title="Прикрепить файл"
+            aria-label="Прикрепить файл"
           >
             <Paperclip className="w-5 h-5" />
           </button>

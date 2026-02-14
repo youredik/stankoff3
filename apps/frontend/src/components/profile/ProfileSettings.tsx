@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { User as UserIcon, Palette, Bell, Shield, Check, Loader2, BellRing, Volume2, Camera, Trash2 } from 'lucide-react';
+import { User as UserIcon, Palette, Bell, Shield, Check, Loader2, BellRing, Volume2, Camera, Trash2, Moon } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useThemeStore, type Theme } from '@/store/useThemeStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
@@ -12,8 +12,26 @@ import { authApi } from '@/lib/api/auth';
 import { filesApi } from '@/lib/api/files';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import type { NotificationPreferences } from '@/types';
 
 const MAX_AVATAR_SIZE = 15 * 1024 * 1024; // 15 MB
+
+const NOTIFICATION_TYPE_OPTIONS: {
+  key: keyof NotificationPreferences;
+  label: string;
+  description: string;
+}[] = [
+  { key: 'taskReminder', label: 'Напоминания о задачах', description: 'За 1 час до дедлайна' },
+  { key: 'taskOverdue', label: 'Просроченные задачи', description: 'Когда дедлайн прошёл' },
+  { key: 'entityCreated', label: 'Новые заявки', description: 'Создание заявок в ваших workspace' },
+  { key: 'commentReceived', label: 'Комментарии', description: 'Новые комментарии к заявкам' },
+  { key: 'mentionReceived', label: 'Упоминания', description: 'Когда вас @упомянули' },
+  { key: 'statusChanged', label: 'Изменение статуса', description: 'Смена статуса заявок' },
+  { key: 'slaWarning', label: 'Предупреждения SLA', description: 'Приближение к нарушению SLA' },
+  { key: 'slaBreach', label: 'Нарушения SLA', description: 'SLA нарушен' },
+  { key: 'chatMessage', label: 'Сообщения чата', description: 'Новые сообщения в чатах' },
+  { key: 'aiSuggestion', label: 'AI подсказки', description: 'Рекомендации от AI-ассистента' },
+];
 
 export function ProfileSettings() {
   const { user } = useAuthStore();
@@ -132,6 +150,11 @@ export function ProfileSettings() {
     }
   }, [user]);
 
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(
+    user?.notificationPreferences || {},
+  );
+  const [notifSaving, setNotifSaving] = useState(false);
+
   const handleTogglePush = async () => {
     if (!browserNotificationsEnabled) {
       if (permission !== 'granted') {
@@ -144,6 +167,24 @@ export function ProfileSettings() {
       setBrowserNotificationsEnabled(false);
     }
   };
+
+  const handleNotifPrefChange = useCallback(
+    async (key: keyof NotificationPreferences, value: boolean | number) => {
+      const updated = { ...notifPrefs, [key]: value };
+      setNotifPrefs(updated);
+      setNotifSaving(true);
+      try {
+        const result = await authApi.updateProfile({ notificationPreferences: updated });
+        useAuthStore.setState({ user: { ...user!, ...result } });
+      } catch {
+        // revert on error
+        setNotifPrefs(notifPrefs);
+      } finally {
+        setNotifSaving(false);
+      }
+    },
+    [notifPrefs, user],
+  );
 
   const hasChanges =
     firstName.trim() !== (user?.firstName || '') ||
@@ -306,6 +347,7 @@ export function ProfileSettings() {
       {/* Уведомления */}
       <Section icon={Bell} title="Уведомления">
         <div className="space-y-4">
+          {/* Browser push & sound */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <BellRing className="w-4 h-4 text-gray-400" />
@@ -341,11 +383,77 @@ export function ProfileSettings() {
               Push-уведомления заблокированы в браузере. Разрешите их в настройках сайта (значок замка в адресной строке).
             </p>
           )}
-          {browserNotificationsEnabled && permission === 'granted' && (
-            <p className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg px-3 py-2">
-              Push-уведомления включены. Вы будете получать уведомления о заявках, комментариях, SLA и других событиях.
-            </p>
-          )}
+
+          {/* Granular per-type notification preferences */}
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Типы уведомлений
+              </p>
+              {notifSaving && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+            </div>
+            <div className="space-y-3">
+              {NOTIFICATION_TYPE_OPTIONS.map(({ key, label, description }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-900 dark:text-gray-100">{label}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+                  </div>
+                  <Toggle
+                    checked={notifPrefs[key] !== false}
+                    onToggle={() => handleNotifPrefChange(key, notifPrefs[key] === false)}
+                    label={label}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* DND mode */}
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Moon className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-sm text-gray-900 dark:text-gray-100">Не беспокоить</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Отключить уведомления в выбранные часы
+                  </p>
+                </div>
+              </div>
+              <Toggle
+                checked={notifPrefs.dndEnabled === true}
+                onToggle={() => handleNotifPrefChange('dndEnabled', !notifPrefs.dndEnabled)}
+                label="Не беспокоить"
+              />
+            </div>
+            {notifPrefs.dndEnabled && (
+              <div className="flex items-center gap-3 pl-6">
+                <label className="text-xs text-gray-500 dark:text-gray-400">с</label>
+                <select
+                  value={notifPrefs.dndStartHour ?? 22}
+                  onChange={(e) => handleNotifPrefChange('dndStartHour', parseInt(e.target.value))}
+                  className="px-2 py-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  aria-label="Начало тихого режима"
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+                <label className="text-xs text-gray-500 dark:text-gray-400">до</label>
+                <select
+                  value={notifPrefs.dndEndHour ?? 8}
+                  onChange={(e) => handleNotifPrefChange('dndEndHour', parseInt(e.target.value))}
+                  className="px-2 py-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  aria-label="Конец тихого режима"
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       </Section>
 

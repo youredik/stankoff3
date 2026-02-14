@@ -40,6 +40,18 @@ export class LegacyProduct {
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 
+  @Column({ name: 'brief_description', type: 'mediumtext', nullable: true })
+  briefDescription: string;
+
+  @Column({ name: 'base_price', type: 'decimal', precision: 20, scale: 2, default: 0 })
+  basePrice: number;
+
+  @Column({ name: 'fob_price', type: 'decimal', precision: 20, scale: 2, default: 0 })
+  fobPrice: number;
+
+  @Column({ type: 'tinyint', default: 12, nullable: true })
+  warranty: number;
+
   /**
    * Есть ли товар в наличии
    */

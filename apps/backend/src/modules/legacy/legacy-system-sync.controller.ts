@@ -81,11 +81,13 @@ export class LegacySystemSyncController {
         return this.systemSyncService.syncContacts();
       case 'products':
         return this.systemSyncService.syncProducts();
+      case 'deals':
+        return this.systemSyncService.syncDeals();
     }
   }
 
   private validateType(type: string): asserts type is SystemType {
-    const validTypes: SystemType[] = ['counterparties', 'contacts', 'products'];
+    const validTypes: SystemType[] = ['counterparties', 'contacts', 'products', 'deals'];
     if (!validTypes.includes(type as SystemType)) {
       throw new Error(`Неизвестный тип: ${type}. Допустимые: ${validTypes.join(', ')}`);
     }

@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AiProviderRegistry } from './ai-provider.registry';
 import { OllamaProvider } from './ollama.provider';
-import { GroqProvider } from './groq.provider';
 import { OpenAiProvider } from './openai.provider';
 import { YandexCloudProvider } from './yandex-cloud.provider';
 import { LlmCompletionResult, LlmEmbeddingResult } from './base-llm.provider';
@@ -11,7 +10,6 @@ describe('AiProviderRegistry', () => {
   let registry: AiProviderRegistry;
   let yandexProvider: jest.Mocked<YandexCloudProvider>;
   let ollamaProvider: jest.Mocked<OllamaProvider>;
-  let groqProvider: jest.Mocked<GroqProvider>;
   let openAiProvider: jest.Mocked<OpenAiProvider>;
 
   const mockCompletionResult: LlmCompletionResult = {
@@ -28,7 +26,6 @@ describe('AiProviderRegistry', () => {
   };
 
   beforeEach(async () => {
-    // Создаём моки провайдеров
     yandexProvider = {
       name: 'yandex',
       isConfigured: false,
@@ -41,14 +38,8 @@ describe('AiProviderRegistry', () => {
       isConfigured: false,
       complete: jest.fn(),
       embed: jest.fn(),
+      checkAvailability: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<OllamaProvider>;
-
-    groqProvider = {
-      name: 'groq',
-      isConfigured: false,
-      complete: jest.fn(),
-      embed: jest.fn(),
-    } as unknown as jest.Mocked<GroqProvider>;
 
     openAiProvider = {
       name: 'openai',
@@ -65,7 +56,7 @@ describe('AiProviderRegistry', () => {
           useValue: {
             get: jest.fn((key: string) => {
               const config: Record<string, string> = {
-                AI_LLM_PRIORITY: 'yandex,groq,ollama,openai',
+                AI_LLM_PRIORITY: 'yandex,ollama,openai',
                 AI_EMBEDDING_PRIORITY: 'yandex,ollama,openai',
               };
               return config[key];
@@ -74,7 +65,6 @@ describe('AiProviderRegistry', () => {
         },
         { provide: YandexCloudProvider, useValue: yandexProvider },
         { provide: OllamaProvider, useValue: ollamaProvider },
-        { provide: GroqProvider, useValue: groqProvider },
         { provide: OpenAiProvider, useValue: openAiProvider },
       ],
     }).compile();
@@ -88,7 +78,7 @@ describe('AiProviderRegistry', () => {
     });
 
     it('должен вернуть true если есть хотя бы один доступный провайдер', () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
+      Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
       expect(registry.isCompletionAvailable()).toBe(true);
     });
   });
@@ -96,11 +86,6 @@ describe('AiProviderRegistry', () => {
   describe('isCompletionAvailable', () => {
     it('должен вернуть true если Yandex доступен', () => {
       Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
-      expect(registry.isCompletionAvailable()).toBe(true);
-    });
-
-    it('должен вернуть true если Groq доступен', () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
       expect(registry.isCompletionAvailable()).toBe(true);
     });
 
@@ -134,11 +119,6 @@ describe('AiProviderRegistry', () => {
       Object.defineProperty(openAiProvider, 'isConfigured', { value: true });
       expect(registry.isEmbeddingAvailable()).toBe(true);
     });
-
-    it('должен вернуть false если только Groq доступен (не поддерживает embeddings)', () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
-      expect(registry.isEmbeddingAvailable()).toBe(false);
-    });
   });
 
   describe('complete', () => {
@@ -152,23 +132,10 @@ describe('AiProviderRegistry', () => {
 
       expect(result.provider).toBe('yandex');
       expect(yandexProvider.complete).toHaveBeenCalled();
-      expect(groqProvider.complete).not.toHaveBeenCalled();
       expect(ollamaProvider.complete).not.toHaveBeenCalled();
     });
 
-    it('должен fallback на Groq если Yandex недоступен', async () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
-      groqProvider.complete.mockResolvedValue(mockCompletionResult);
-
-      const result = await registry.complete({
-        messages: [{ role: 'user', content: 'test' }],
-      });
-
-      expect(result.provider).toBe('groq');
-      expect(groqProvider.complete).toHaveBeenCalled();
-    });
-
-    it('должен fallback на Ollama если Yandex и Groq недоступны', async () => {
+    it('должен fallback на Ollama если Yandex недоступен', async () => {
       Object.defineProperty(ollamaProvider, 'isConfigured', { value: true });
       ollamaProvider.complete.mockResolvedValue(mockCompletionResult);
 
@@ -194,18 +161,18 @@ describe('AiProviderRegistry', () => {
 
     it('должен fallback если первый провайдер вернул ошибку', async () => {
       Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
+      Object.defineProperty(ollamaProvider, 'isConfigured', { value: true });
 
       yandexProvider.complete.mockRejectedValue(new Error('Yandex error'));
-      groqProvider.complete.mockResolvedValue(mockCompletionResult);
+      ollamaProvider.complete.mockResolvedValue(mockCompletionResult);
 
       const result = await registry.complete({
         messages: [{ role: 'user', content: 'test' }],
       });
 
-      expect(result.provider).toBe('groq');
+      expect(result.provider).toBe('ollama');
       expect(yandexProvider.complete).toHaveBeenCalled();
-      expect(groqProvider.complete).toHaveBeenCalled();
+      expect(ollamaProvider.complete).toHaveBeenCalled();
     });
 
     it('должен выбросить ошибку если все провайдеры недоступны', async () => {
@@ -246,20 +213,7 @@ describe('AiProviderRegistry', () => {
       expect(openAiProvider.embed).toHaveBeenCalledWith('test text');
     });
 
-    it('не должен использовать Groq для embeddings (не поддерживает)', async () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
-      Object.defineProperty(openAiProvider, 'isConfigured', { value: true });
-      openAiProvider.embed.mockResolvedValue(mockEmbeddingResult);
-
-      const result = await registry.embed('test text');
-
-      expect(result.provider).toBe('openai');
-      expect(groqProvider.embed).not.toHaveBeenCalled();
-    });
-
     it('должен выбросить ошибку если нет провайдеров для embeddings', async () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
-
       await expect(registry.embed('test text')).rejects.toThrow(
         'Нет доступных провайдеров для embeddings',
       );
@@ -270,14 +224,12 @@ describe('AiProviderRegistry', () => {
     it('должен вернуть информацию о всех провайдерах', () => {
       Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
       Object.defineProperty(ollamaProvider, 'isConfigured', { value: true });
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
 
       const info = registry.getProvidersInfo();
 
-      expect(info).toHaveLength(4);
+      expect(info).toHaveLength(3);
       expect(info.find((p) => p.name === 'yandex')?.isConfigured).toBe(true);
       expect(info.find((p) => p.name === 'ollama')?.isConfigured).toBe(true);
-      expect(info.find((p) => p.name === 'groq')?.isConfigured).toBe(true);
       expect(info.find((p) => p.name === 'openai')?.isConfigured).toBe(false);
     });
 
@@ -286,7 +238,6 @@ describe('AiProviderRegistry', () => {
 
       expect(info.find((p) => p.name === 'yandex')?.supportsEmbeddings).toBe(true);
       expect(info.find((p) => p.name === 'ollama')?.supportsEmbeddings).toBe(true);
-      expect(info.find((p) => p.name === 'groq')?.supportsEmbeddings).toBe(false);
       expect(info.find((p) => p.name === 'openai')?.supportsEmbeddings).toBe(true);
     });
 
@@ -295,7 +246,6 @@ describe('AiProviderRegistry', () => {
 
       expect(info.find((p) => p.name === 'yandex')?.isFree).toBe(false);
       expect(info.find((p) => p.name === 'ollama')?.isFree).toBe(true);
-      expect(info.find((p) => p.name === 'groq')?.isFree).toBe(true);
       expect(info.find((p) => p.name === 'openai')?.isFree).toBe(false);
     });
   });
@@ -320,17 +270,16 @@ describe('AiProviderRegistry', () => {
   describe('getCompletionProvider', () => {
     it('должен вернуть Yandex как первый доступный LLM провайдер', () => {
       Object.defineProperty(yandexProvider, 'isConfigured', { value: true });
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
 
       const provider = registry.getCompletionProvider();
       expect(provider).toBe(yandexProvider);
     });
 
-    it('должен вернуть Groq если Yandex недоступен', () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
+    it('должен вернуть Ollama если Yandex недоступен', () => {
+      Object.defineProperty(ollamaProvider, 'isConfigured', { value: true });
 
       const provider = registry.getCompletionProvider();
-      expect(provider).toBe(groqProvider);
+      expect(provider).toBe(ollamaProvider);
     });
 
     it('должен вернуть null если нет доступных LLM провайдеров', () => {
@@ -352,14 +301,6 @@ describe('AiProviderRegistry', () => {
 
       const provider = registry.getEmbeddingProvider();
       expect(provider).toBe(ollamaProvider);
-    });
-
-    it('должен пропустить Groq (не поддерживает embeddings)', () => {
-      Object.defineProperty(groqProvider, 'isConfigured', { value: true });
-      Object.defineProperty(openAiProvider, 'isConfigured', { value: true });
-
-      const provider = registry.getEmbeddingProvider();
-      expect(provider).toBe(openAiProvider);
     });
   });
 });

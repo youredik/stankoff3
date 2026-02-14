@@ -70,7 +70,7 @@ describe('SeedUsersService', () => {
         .map(([data]) => data.email);
 
       expect(adminEmails).toContain('youredik@gmail.com');
-      expect(adminEmails).toContain('korshunovsm@yandex.ru');
+      expect(adminEmails).toContain('s.korshunov88@ya.ru');
       expect(adminEmails).toContain('ruslan.stankoff@gmail.com');
       expect(adminEmails).toHaveLength(3);
     });
@@ -159,7 +159,7 @@ describe('SeedUsersService', () => {
       // Используем реальные email из EMPLOYEES для отдела IT
       const users = [
         { id: '1', email: 'youredik@gmail.com' },
-        { id: '2', email: 'korshunovsm@yandex.ru' },
+        { id: '2', email: 's.korshunov88@ya.ru' },
         { id: '3', email: 'grachev@stankoff.ru' },
       ] as User[];
 
@@ -167,7 +167,7 @@ describe('SeedUsersService', () => {
 
       expect(itUsers).toHaveLength(2);
       expect(itUsers.map((u) => u.email)).toContain('youredik@gmail.com');
-      expect(itUsers.map((u) => u.email)).toContain('korshunovsm@yandex.ru');
+      expect(itUsers.map((u) => u.email)).toContain('s.korshunov88@ya.ru');
     });
 
     it('должен вернуть пустой массив для несуществующего отдела', () => {

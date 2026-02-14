@@ -7,6 +7,7 @@ import { User } from '../modules/user/user.entity';
 import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
 import { KNOWLEDGE_BASE_ARTICLES } from './data/knowledge-base-articles';
 import { SeedWorkspaces } from './seed-structure.service';
+import * as fs from 'fs';
 
 describe('SeedKnowledgeBaseService', () => {
   let service: SeedKnowledgeBaseService;
@@ -39,6 +40,11 @@ describe('SeedKnowledgeBaseService', () => {
   ] as User[];
 
   beforeEach(async () => {
+    // Мокаем readFileSync чтобы seedBusinessProcessesDoc не пытался читать файл
+    jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('File not found');
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SeedKnowledgeBaseService,
@@ -53,6 +59,10 @@ describe('SeedKnowledgeBaseService', () => {
 
     service = module.get(SeedKnowledgeBaseService);
     articleRepo = module.get(getRepositoryToken(KnowledgeArticle));
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('createAll', () => {

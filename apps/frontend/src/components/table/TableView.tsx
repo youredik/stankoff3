@@ -35,6 +35,7 @@ import type { Entity, FieldOption } from '@/types';
 
 interface TableViewProps {
   workspaceId: string;
+  categoryId?: string;
 }
 
 interface TableColumn {
@@ -186,7 +187,7 @@ function Pagination({
   );
 }
 
-export function TableView({ workspaceId }: TableViewProps) {
+export function TableView({ workspaceId, categoryId }: TableViewProps) {
   const router = useRouter();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -248,6 +249,10 @@ export function TableView({ workspaceId }: TableViewProps) {
   // Fetch table when workspace, sort, page, or filters change
   useEffect(() => {
     const apiFilters = filtersToApi(filters);
+    // Добавляем categoryId в customFilters для фильтрации по категории
+    if (categoryId) {
+      apiFilters.customFilters = { ...apiFilters.customFilters, categoryId };
+    }
     fetchTable(workspaceId, {
       page: tablePage,
       perPage: tablePerPage,
@@ -255,7 +260,7 @@ export function TableView({ workspaceId }: TableViewProps) {
       sortOrder: tableSortOrder,
       ...apiFilters,
     });
-  }, [workspaceId, tablePage, tablePerPage, tableSortBy, tableSortOrder, fetchTable, filters]);
+  }, [workspaceId, tablePage, tablePerPage, tableSortBy, tableSortOrder, fetchTable, filters, categoryId]);
 
   const handleSort = useCallback((columnId: string) => {
     const { tableSortBy, tableSortOrder } = useEntityStore.getState();

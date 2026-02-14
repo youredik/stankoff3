@@ -7,11 +7,10 @@ import {
   LlmEmbeddingResult,
 } from './base-llm.provider';
 import { OllamaProvider } from './ollama.provider';
-import { GroqProvider } from './groq.provider';
 import { OpenAiProvider } from './openai.provider';
 import { YandexCloudProvider } from './yandex-cloud.provider';
 
-export type ProviderName = 'ollama' | 'groq' | 'openai' | 'yandex';
+export type ProviderName = 'ollama' | 'openai' | 'yandex';
 
 interface ProviderConfig {
   name: ProviderName;
@@ -26,10 +25,10 @@ interface ProviderConfig {
  *
  * Стратегия по умолчанию:
  * - Embeddings: Yandex (облако, 256 dims) → Ollama (локально) → OpenAI (платно, fallback)
- * - Completions: Yandex (облако, YandexGPT) → Ollama (локально) → Groq (облако) → OpenAI (платно)
+ * - Completions: Yandex (облако, YandexGPT) → Ollama (локально) → OpenAI (платно)
  *
  * Настраивается через переменные окружения:
- * - AI_LLM_PRIORITY: yandex,ollama,groq,openai (порядок для LLM)
+ * - AI_LLM_PRIORITY: yandex,ollama,openai (порядок для LLM)
  * - AI_EMBEDDING_PRIORITY: ollama,openai (порядок для embeddings)
  */
 @Injectable()
@@ -40,8 +39,7 @@ export class AiProviderRegistry implements OnModuleInit {
   private readonly providerConfigs: ProviderConfig[] = [
     { name: 'yandex', priority: 0, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
     { name: 'ollama', priority: 1, supportsEmbeddings: true, supportsCompletion: true, isFree: true },
-    { name: 'groq', priority: 2, supportsEmbeddings: false, supportsCompletion: true, isFree: true },
-    { name: 'openai', priority: 3, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
+    { name: 'openai', priority: 2, supportsEmbeddings: true, supportsCompletion: true, isFree: false },
   ];
 
   private llmPriority: ProviderName[] = [];
@@ -50,19 +48,17 @@ export class AiProviderRegistry implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly ollamaProvider: OllamaProvider,
-    private readonly groqProvider: GroqProvider,
     private readonly openAiProvider: OpenAiProvider,
     private readonly yandexCloudProvider: YandexCloudProvider,
   ) {
     // Регистрируем провайдеры
     this.providers.set('yandex', yandexCloudProvider);
     this.providers.set('ollama', ollamaProvider);
-    this.providers.set('groq', groqProvider);
     this.providers.set('openai', openAiProvider);
 
     // Парсим приоритеты из конфига
     this.llmPriority = this.parsePriority(
-      this.configService.get<string>('AI_LLM_PRIORITY') || 'yandex,ollama,groq,openai',
+      this.configService.get<string>('AI_LLM_PRIORITY') || 'yandex,ollama,openai',
     );
     this.embeddingPriority = this.parsePriority(
       this.configService.get<string>('AI_EMBEDDING_PRIORITY') || 'yandex,ollama,openai',

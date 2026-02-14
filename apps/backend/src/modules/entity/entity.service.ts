@@ -61,6 +61,101 @@ export class EntityService {
     this.frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
   }
 
+  async getCounts(workspaceIds: string[]): Promise<Record<string, number>> {
+    if (workspaceIds.length === 0) return {};
+    const rows = await this.entityRepository
+      .createQueryBuilder('e')
+      .select('e.workspaceId', 'workspaceId')
+      .addSelect('COUNT(*)::int', 'count')
+      .where('e.workspaceId IN (:...workspaceIds)', { workspaceIds })
+      .groupBy('e.workspaceId')
+      .getRawMany<{ workspaceId: string; count: number }>();
+    const result: Record<string, number> = {};
+    for (const id of workspaceIds) result[id] = 0;
+    for (const row of rows) result[row.workspaceId] = row.count;
+    return result;
+  }
+
+  /**
+   * Найти entity из других workspace, которые ссылаются на данную entity
+   * через relation-поля в data (например, контакт → контрагент, заявка → контрагент)
+   */
+  async findRelated(
+    entityId: string,
+    accessibleWorkspaceIds: string[],
+    limit = 20,
+  ): Promise<{ items: Array<{ id: string; customId: string; title: string; status: string; workspaceId: string; workspaceName: string; workspaceIcon: string; createdAt: Date }>; total: number }> {
+    if (accessibleWorkspaceIds.length === 0) return { items: [], total: 0 };
+
+    // Ищем entity где в data JSONB есть вложенный объект с id = entityId
+    // Это покрывает relation-поля вида { id: "uuid", customId: "CO-1", workspaceId: "..." }
+    const qb = this.entityRepository
+      .createQueryBuilder('e')
+      .innerJoin('workspaces', 'w', 'w.id = e."workspaceId"')
+      .addSelect('w.name', 'workspaceName')
+      .addSelect('w.icon', 'workspaceIcon')
+      .where('e."workspaceId" IN (:...wsIds)', { wsIds: accessibleWorkspaceIds })
+      .andWhere(`e.data::text LIKE :pattern`, { pattern: `%"id":"${entityId}"%` });
+
+    const total = await qb.getCount();
+
+    const rows = await qb
+      .select('e.id', 'id')
+      .addSelect('e.customId', 'customId')
+      .addSelect('e.title', 'title')
+      .addSelect('e.status', 'status')
+      .addSelect('e.workspaceId', 'workspaceId')
+      .addSelect('w.name', 'workspaceName')
+      .addSelect('w.icon', 'workspaceIcon')
+      .addSelect('e.createdAt', 'createdAt')
+      .orderBy('e."createdAt"', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    // Также ищем по linkedEntityIds (JSONB массив, используем @> для containment)
+    const linkedQb = this.entityRepository
+      .createQueryBuilder('e2')
+      .innerJoin('workspaces', 'w2', 'w2.id = e2."workspaceId"')
+      .where('e2."workspaceId" IN (:...wsIds)', { wsIds: accessibleWorkspaceIds })
+      .andWhere(`e2."linkedEntityIds" @> :linkedPattern::jsonb`, {
+        linkedPattern: JSON.stringify([entityId]),
+      });
+
+    const linkedRows = await linkedQb
+      .select('e2.id', 'id')
+      .addSelect('e2.customId', 'customId')
+      .addSelect('e2.title', 'title')
+      .addSelect('e2.status', 'status')
+      .addSelect('e2.workspaceId', 'workspaceId')
+      .addSelect('w2.name', 'workspaceName')
+      .addSelect('w2.icon', 'workspaceIcon')
+      .addSelect('e2.createdAt', 'createdAt')
+      .orderBy('e2."createdAt"', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    // Объединяем и дедуплицируем
+    const seen = new Set<string>();
+    const combined = [];
+    for (const row of [...rows, ...linkedRows]) {
+      if (row.id && !seen.has(row.id)) {
+        seen.add(row.id);
+        combined.push(row);
+      }
+    }
+
+    combined.sort((a, b) => {
+      const ta = a.createdAt || a.createdat;
+      const tb = b.createdAt || b.createdat;
+      return new Date(tb).getTime() - new Date(ta).getTime();
+    });
+
+    return {
+      items: combined.slice(0, limit),
+      total: combined.length,
+    };
+  }
+
   async findAll(workspaceId?: string): Promise<WorkspaceEntity[]> {
     return this.entityRepository.find({
       where: workspaceId ? { workspaceId } : {},
@@ -253,6 +348,28 @@ export class EntityService {
       for (const field of section.fields || []) {
         fieldMap.set(field.id, { type: field.type, config: field.config });
       }
+    }
+
+    // Специальный фильтр: categoryId → фильтрация по product_categories.name
+    if (parsed.categoryId && typeof parsed.categoryId === 'string') {
+      qb.andWhere(`
+        entity.data->>'category' IN (
+          SELECT pc.name FROM product_categories pc
+          WHERE pc.id = :catId
+          UNION ALL
+          SELECT pc2.name FROM product_categories pc2
+          WHERE pc2."parentId" = :catId
+        )
+      `, { catId: parsed.categoryId });
+      delete parsed.categoryId;
+    }
+
+    // Специальный фильтр: counterpartyEntityId → контакты привязанные к контрагенту
+    if (parsed.counterpartyEntityId && typeof parsed.counterpartyEntityId === 'string') {
+      qb.andWhere(`entity.data->'counterparty'->>'id' = :cpEntityId`, {
+        cpEntityId: parsed.counterpartyEntityId,
+      });
+      delete parsed.counterpartyEntityId;
     }
 
     let paramIndex = 0;

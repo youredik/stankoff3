@@ -26,12 +26,14 @@ import {
   Building2,
   Contact,
   Package,
-  Database,
+  Briefcase,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
 import { useSidebarStore } from '@/store/useSidebarStore';
 import { workspacesApi } from '@/lib/api/workspaces';
+import { entitiesApi } from '@/lib/api/entities';
 import { useTaskStore } from '@/store/useTaskStore';
 import { useChatStore } from '@/store/useChatStore';
 import { usePermissionCan } from '@/store/usePermissionStore';
@@ -40,15 +42,15 @@ import { SectionMembersModal } from '@/components/section/SectionMembersModal';
 import type { Workspace, MenuSection } from '@/types';
 
 const STORAGE_KEY = 'stankoff-selected-workspace';
-const DIRECTORIES_COLLAPSED_KEY = 'stankoff-directories-collapsed';
+const CRM_COLLAPSED_KEY = 'stankoff-crm-collapsed';
 const SIDEBAR_SCROLL_KEY = 'stankoff-sidebar-scroll';
 
-function getDirectoryIcon(systemType?: string | null) {
+function getCrmIcon(systemType?: string | null) {
   switch (systemType) {
     case 'counterparties': return Building2;
     case 'contacts': return Contact;
     case 'products': return Package;
-    default: return Database;
+    default: return Briefcase;
   }
 }
 
@@ -159,23 +161,33 @@ export function Sidebar() {
     [workspaces]
   );
 
-  const [directoriesCollapsed, setDirectoriesCollapsed] = useState(() => {
+  const [crmCollapsed, setCrmCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem(DIRECTORIES_COLLAPSED_KEY) === 'true';
+    return localStorage.getItem(CRM_COLLAPSED_KEY) === 'true';
   });
 
-  const toggleDirectoriesCollapsed = () => {
-    setDirectoriesCollapsed((prev) => {
+  const toggleCrmCollapsed = () => {
+    setCrmCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem(DIRECTORIES_COLLAPSED_KEY, String(next));
+      localStorage.setItem(CRM_COLLAPSED_KEY, String(next));
       return next;
     });
   };
+
+  // Бейджи с количеством записей для CRM workspace
+  const [crmCounts, setCrmCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchWorkspaces();
     fetchSections();
   }, [fetchWorkspaces, fetchSections]);
+
+  // Загружаем counts для CRM workspace
+  useEffect(() => {
+    if (systemWorkspaces.length === 0) return;
+    const ids = systemWorkspaces.map((ws) => ws.id);
+    entitiesApi.getCounts(ids).then(setCrmCounts).catch(() => {});
+  }, [systemWorkspaces]);
 
   // Начальная загрузка; дальнейшие обновления через WebSocket (task:created / task:updated)
   useEffect(() => {
@@ -670,15 +682,33 @@ export function Sidebar() {
             </div>
           )}
 
-          {/* Входящие задания */}
+          {/* Навигация */}
           <div className="mb-4">
+            {/* Dashboard */}
+            <button
+              onClick={() => {
+                router.push('/dashboard');
+                close();
+              }}
+              data-testid="sidebar-dashboard-button"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer ${
+                pathname === '/dashboard'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+              }`}
+            >
+              <LayoutDashboard className="w-5 h-5" />
+              <span className="font-medium">Дашборд</span>
+            </button>
+
+            {/* Входящие задания */}
             <button
               onClick={() => {
                 router.push('/tasks');
                 close();
               }}
               data-testid="sidebar-inbox-button"
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer mt-1 ${
                 pathname === '/tasks'
                   ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
@@ -750,51 +780,51 @@ export function Sidebar() {
             )}
           </div>
 
-          {/* Справочники — системные workspace */}
+          {/* CRM — системные workspace (контакты, контрагенты, товары) */}
           {systemWorkspaces.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
               <button
-                onClick={toggleDirectoriesCollapsed}
+                onClick={toggleCrmCollapsed}
                 className="w-full flex items-center gap-1 px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer"
               >
                 <span className="p-0.5 text-gray-400">
-                  {directoriesCollapsed ? (
+                  {crmCollapsed ? (
                     <ChevronRight className="w-4 h-4" />
                   ) : (
                     <ChevronDown className="w-4 h-4" />
                   )}
                 </span>
-                <Database className="w-4 h-4 text-gray-400" />
+                <Briefcase className="w-4 h-4 text-gray-400" />
                 <span className="flex-1 text-sm font-medium text-gray-600 dark:text-gray-400 text-left">
-                  Справочники
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  {systemWorkspaces.length}
+                  CRM
                 </span>
               </button>
-              {!directoriesCollapsed && (
-                <div className="ml-4 mt-0.5 space-y-0.5">
+              {!crmCollapsed && (
+                <div className="mt-0.5 space-y-0.5">
                   {systemWorkspaces.map((ws) => {
-                    const Icon = getDirectoryIcon(ws.systemType);
+                    const Icon = getCrmIcon(ws.systemType);
                     const isActive = selectedWorkspace === ws.id;
+                    const count = crmCounts[ws.id];
                     return (
                       <button
                         key={ws.id}
                         onClick={() => {
                           localStorage.setItem(STORAGE_KEY, ws.id);
-                          router.push(`/workspace/${ws.id}?view=table`);
+                          router.push(`/workspace/${ws.id}`);
                           close();
                         }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded transition-colors cursor-pointer ${
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer ${
                           isActive
                             ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 border border-transparent'
+                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
                         }`}
                       >
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-                        <span className="font-medium truncate text-sm">{ws.name}</span>
-                        {isActive && (
-                          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400 flex-shrink-0" />
+                        <Icon className="w-5 h-5 flex-shrink-0" />
+                        <span className="flex-1 font-medium truncate text-sm text-left">{ws.name}</span>
+                        {count != null && count > 0 && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
+                            {count.toLocaleString('ru-RU')}
+                          </span>
                         )}
                       </button>
                     );

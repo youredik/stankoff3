@@ -23,6 +23,10 @@ export class CreateEntityDto {
   @IsOptional()
   creatorId?: string;
 
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @IsObject()
   @IsOptional()
   data?: Record<string, any>;

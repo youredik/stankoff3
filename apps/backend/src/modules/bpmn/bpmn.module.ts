@@ -34,6 +34,7 @@ import { EmailModule } from '../email/email.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { ConnectorsModule } from '../connectors/connectors.module';
+import { User } from '../user/user.entity';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { ConnectorsModule } from '../connectors/connectors.module';
       FormDefinition,
       ProcessActivityLog,
       ProcessDefinitionVersion,
+      User,
     ]),
     // Import modules for workers (use forwardRef to avoid circular dependencies)
     forwardRef(() => EntityModule),

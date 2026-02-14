@@ -165,6 +165,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
                     onClick={handleCopy}
                     className="p-1.5 text-gray-500 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                     title="Копировать"
+                    aria-label="Копировать черновик"
                   >
                     {copied ? (
                       <Check className="w-4 h-4 text-green-500" />
@@ -178,6 +179,7 @@ export function AiAssistantTab({ entityId, onInsertDraft }: AiAssistantTabProps)
                       onClick={handleInsert}
                       className="p-1.5 text-gray-500 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                       title="Вставить в комментарий"
+                      aria-label="Вставить в комментарий"
                     >
                       <MessageSquare className="w-4 h-4" />
                     </button>
@@ -359,6 +361,7 @@ function SimilarCaseCard({ caseItem }: { caseItem: SimilarCase }) {
                 onClick={handleCopyResolution}
                 className="p-0.5 text-gray-400 hover:text-teal-500 shrink-0 transition-colors"
                 title="Копировать решение"
+                aria-label="Копировать решение"
               >
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-green-500" />

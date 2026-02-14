@@ -28,6 +28,9 @@ export class LegacyCustomer {
   @Column({ name: 'default_counterparty_id', type: 'int', default: 0 })
   defaultCounterpartyId: number;
 
+  @Column({ type: 'varchar', length: 70, nullable: true })
+  position: string;
+
   @Column({ name: 'reg_datetime', type: 'datetime', nullable: true })
   registrationDate: Date;
 

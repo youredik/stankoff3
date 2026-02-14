@@ -569,7 +569,7 @@ export function FieldEditor({
                       key={option.id}
                       className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
                     >
-                      <button className="p-1 text-gray-400 dark:text-gray-500 cursor-grab">
+                      <button className="p-1 text-gray-400 dark:text-gray-500 cursor-grab" aria-label="Перетащить для сортировки">
                         <GripVertical className="w-4 h-4" />
                       </button>
 

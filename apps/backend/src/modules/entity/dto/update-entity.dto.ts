@@ -7,6 +7,10 @@ export class UpdateEntityDto {
 
   @IsString()
   @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
   status?: string;
 
   @IsString()

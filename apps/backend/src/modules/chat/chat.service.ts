@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Like } from 'typeorm';
+import { Repository, IsNull, Like, In } from 'typeorm';
 import { Conversation, ConversationType } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message } from './entities/message.entity';
@@ -480,19 +480,41 @@ export class ChatService implements OnModuleInit {
 
     if (participantConvIds.length === 0) return [];
 
-    const results = await this.messageRepo
+    // Two-step approach: getRawMany for ranking, then find() for full entities
+    // Avoids TypeORM getMany() + computed column ordering issues
+    const rankedIds = await this.messageRepo
       .createQueryBuilder('m')
-      .leftJoinAndSelect('m.author', 'a')
-      .leftJoinAndSelect('m.conversation', 'c')
-      .addSelect(`ts_rank(m."searchVector", plainto_tsquery('russian', :query))`, 'rank')
-      .where('m.conversationId IN (:...convIds)', { convIds: participantConvIds })
+      .select('m.id', 'id')
+      .addSelect(
+        `ts_rank(m."searchVector", plainto_tsquery('russian', :query))`,
+        'rank',
+      )
+      .where('m.conversationId IN (:...convIds)', {
+        convIds: participantConvIds,
+      })
       .andWhere('m.isDeleted = false')
-      .andWhere(`m."searchVector" @@ plainto_tsquery('russian', :query)`, { query })
+      .andWhere(`m."searchVector" @@ plainto_tsquery('russian', :query)`, {
+        query,
+      })
       .orderBy('rank', 'DESC')
-      .take(50)
-      .getMany();
+      .limit(50)
+      .getRawMany();
 
-    return results;
+    if (rankedIds.length === 0) return [];
+
+    const ids = rankedIds.map((r) => r.id);
+    const messages = await this.messageRepo.find({
+      where: { id: In(ids) },
+      relations: ['author', 'conversation'],
+    });
+
+    // Preserve rank ordering
+    const idOrder = new Map(ids.map((id, i) => [id, i]));
+    messages.sort(
+      (a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0),
+    );
+
+    return messages;
   }
 
   // ─── Entity chat ──────────────────────────────────────────

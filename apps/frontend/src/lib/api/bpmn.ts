@@ -111,4 +111,24 @@ export const bpmnApi = {
 
   getTemplate: (id: string) =>
     apiClient.get<BpmnTemplate>(`/bpmn/templates/${id}`).then((r) => r.data),
+
+  // Process Mining
+  getMiningWorkspaceStats: (workspaceId: string) =>
+    apiClient
+      .get<{
+        totalDefinitions: number;
+        totalInstances: number;
+        avgCompletionRate: number;
+        avgDurationMinutes: number;
+        topProcessesByVolume: { name: string; count: number }[];
+        topProcessesByDuration: { name: string; avgMinutes: number }[];
+        statusDistribution: { status: string; count: number }[];
+      }>(`/bpmn/mining/workspaces/${workspaceId}/stats`)
+      .then((r) => r.data),
+
+  // Incidents count
+  getIncidentCount: (workspaceId: string) =>
+    apiClient
+      .get<{ count: number }>('/bpmn/incidents/count', { params: { workspaceId } })
+      .then((r) => r.data),
 };

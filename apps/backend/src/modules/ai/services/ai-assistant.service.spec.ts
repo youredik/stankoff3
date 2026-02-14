@@ -518,7 +518,7 @@ describe('AiAssistantService', () => {
         inputTokens: 500,
         outputTokens: 200,
         model: 'llama-3.1-70b',
-        provider: 'groq',
+        provider: 'yandex',
       });
 
       const result = await service.generateResponseSuggestion('entity-1');

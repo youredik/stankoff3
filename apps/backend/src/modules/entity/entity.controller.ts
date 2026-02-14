@@ -101,6 +101,17 @@ export class EntityController {
     return this.entityService.getFacets(query);
   }
 
+  @Get('counts')
+  async getCounts(
+    @Query('workspaceIds') workspaceIdsParam: string,
+    @CurrentUser() user: User,
+  ): Promise<Record<string, number>> {
+    if (!workspaceIdsParam) return {};
+    const workspaceIds = workspaceIdsParam.split(',').filter(Boolean);
+    if (workspaceIds.length === 0) return {};
+    return this.entityService.getCounts(workspaceIds);
+  }
+
   @Get('search')
   async search(
     @Query('q') query: string,
@@ -166,6 +177,23 @@ export class EntityController {
       throw new ForbiddenException('Нет доступа к этому рабочему месту');
     }
     return this.entityService.findForTable(query);
+  }
+
+  @Get('related')
+  async findRelated(
+    @Query('entityId') entityId: string,
+    @Query('limit') limit: string,
+    @CurrentUser() user: User,
+  ) {
+    if (!entityId) return { items: [], total: 0 };
+    const accessibleWorkspaces =
+      await this.workspaceService.getAccessibleWorkspaces(user.id, user.role);
+    const workspaceIds = accessibleWorkspaces.map((ws) => ws.id);
+    return this.entityService.findRelated(
+      entityId,
+      workspaceIds,
+      limit ? parseInt(limit, 10) : 20,
+    );
   }
 
   @Get(':id')

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { UserTaskDeadlineScheduler } from './user-task-deadline.scheduler';
 import { UserTask, UserTaskStatus } from '../entities/user-task.entity';
 import { EventsGateway } from '../../websocket/events.gateway';
+import { User } from '../../user/user.entity';
 
 describe('UserTaskDeadlineScheduler', () => {
   let scheduler: UserTaskDeadlineScheduler;
@@ -72,6 +73,12 @@ describe('UserTaskDeadlineScheduler', () => {
           useValue: {
             save: jest.fn().mockImplementation(async (tasks) => tasks),
             createQueryBuilder: jest.fn(() => ({ ...mockQueryBuilder })),
+          },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: {
+            find: jest.fn().mockResolvedValue([]),
           },
         },
         {

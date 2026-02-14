@@ -95,6 +95,7 @@ export function MediaLightbox({
                 onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
                 className="p-2 text-white/80 hover:text-white transition-colors"
                 title="Уменьшить"
+                aria-label="Уменьшить"
               >
                 <ZoomOut className="w-5 h-5" />
               </button>
@@ -105,6 +106,7 @@ export function MediaLightbox({
                 onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
                 className="p-2 text-white/80 hover:text-white transition-colors"
                 title="Увеличить"
+                aria-label="Увеличить"
               >
                 <ZoomIn className="w-5 h-5" />
               </button>
@@ -114,6 +116,7 @@ export function MediaLightbox({
             onClick={handleDownload}
             className="p-2 text-white/80 hover:text-white transition-colors"
             title="Скачать"
+            aria-label="Скачать"
           >
             <Download className="w-5 h-5" />
           </button>
@@ -121,6 +124,7 @@ export function MediaLightbox({
             onClick={onClose}
             className="p-2 text-white/80 hover:text-white transition-colors"
             title="Закрыть"
+            aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
           </button>

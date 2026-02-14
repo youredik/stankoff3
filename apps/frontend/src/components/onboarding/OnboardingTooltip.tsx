@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, SkipForward } from 'lucide-react';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { useOnboardingStore } from '@/store/useOnboardingStore';
 import { TooltipPosition } from '@/lib/api/onboarding';
 
@@ -222,7 +223,7 @@ export function OnboardingTooltip() {
         {/* Content */}
         <div
           className="text-sm text-gray-600 dark:text-gray-300 mb-4"
-          dangerouslySetInnerHTML={{ __html: currentStep.content }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentStep.content) }}
         />
 
         {/* Progress bar */}

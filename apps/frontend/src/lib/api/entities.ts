@@ -52,6 +52,15 @@ function serializeFilters(filters?: EntityFilters) {
 }
 
 export const entitiesApi = {
+  getCounts: (workspaceIds: string[]) =>
+    workspaceIds.length === 0
+      ? Promise.resolve({} as Record<string, number>)
+      : apiClient
+          .get<Record<string, number>>('/entities/counts', {
+            params: { workspaceIds: workspaceIds.join(',') },
+          })
+          .then((r) => r.data),
+
   getByWorkspace: (workspaceId: string) =>
     apiClient
       .get<Entity[]>('/entities', { params: { workspaceId } })
@@ -139,6 +148,13 @@ export const entitiesApi = {
 
   remove: (id: string) => apiClient.delete(`/entities/${id}`),
 
+  getRelated: (entityId: string, limit = 20) =>
+    apiClient
+      .get<RelatedEntitiesResponse>('/entities/related', {
+        params: { entityId, limit },
+      })
+      .then((r) => r.data),
+
   search: (query: string, limit = 10, workspaceId?: string) =>
     apiClient
       .get<{ results: SearchResult[] }>('/entities/search', {
@@ -178,6 +194,22 @@ export const entitiesApi = {
       .then((r) => r.data);
   },
 };
+
+export interface RelatedEntityItem {
+  id: string;
+  customId: string;
+  title: string;
+  status: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceIcon: string;
+  createdAt: string;
+}
+
+export interface RelatedEntitiesResponse {
+  items: RelatedEntityItem[];
+  total: number;
+}
 
 export interface SearchResult {
   id: string;

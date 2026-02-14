@@ -13,6 +13,7 @@ import { usePermissionStore } from '@/store/usePermissionStore';
 import { initSocket, destroySocket, getSocket } from '@/lib/socket';
 import { browserNotifications } from '@/hooks/useBrowserNotifications';
 import { playNotificationSound } from '@/store/useNotificationStore';
+import type { Entity, ChatMessage, ChatConversation, ChatMessageReaction } from '@/types';
 
 // Стандартные статусы для fallback
 const DEFAULT_STATUS_LABELS: Record<string, string> = {
@@ -63,7 +64,7 @@ export function useWebSocket() {
         const columns = { ...state.kanbanColumns };
         const col = columns[statusId];
         if (col) {
-          const exists = col.items.find((e: any) => e.id === entity.id);
+          const exists = col.items.find((e) => e.id === entity.id);
           if (!exists) {
             columns[statusId] = {
               ...col,
@@ -132,12 +133,12 @@ export function useWebSocket() {
       }
     });
 
-    socket.on('status:changed', (data: { id: string; status: string; entity?: any }) => {
+    socket.on('status:changed', (data: { id: string; status: string; entity?: Partial<Entity> }) => {
       const state = useEntityStore.getState();
       const columns = { ...state.kanbanColumns };
 
       // Find entity in old column and move to new column
-      let movedEntity: any = null;
+      let movedEntity: Entity | null = null;
       for (const statusId of Object.keys(columns)) {
         const col = columns[statusId];
         const found = col.items.find((e) => e.id === data.id);
@@ -187,7 +188,7 @@ export function useWebSocket() {
     socket.on('comment:created', (comment) => {
       const state = useEntityStore.getState();
       if (state.selectedEntity?.id === comment.entityId) {
-        const exists = state.comments.find((c: any) => c.id === comment.id);
+        const exists = state.comments.find((c) => c.id === comment.id);
         if (!exists) {
           useEntityStore.setState({
             comments: [...state.comments, comment],
@@ -203,7 +204,7 @@ export function useWebSocket() {
 
     socket.on('user:assigned', (data: {
       entityId: string;
-      entity: any;
+      entity: Partial<Entity> | null;
       assigneeId: string | null;
       previousAssigneeId: string | null;
     }) => {
@@ -383,7 +384,7 @@ export function useWebSocket() {
 
     // ─── Chat events ───────────────────────────────────────
 
-    socket.on('chat:message', (data: { conversationId: string; message: any }) => {
+    socket.on('chat:message', (data: { conversationId: string; message: ChatMessage }) => {
       useChatStore.getState().onNewMessage(data.conversationId, data.message);
 
       // Desktop notification + sound for messages from others
@@ -408,7 +409,7 @@ export function useWebSocket() {
       }
     });
 
-    socket.on('chat:message:edited', (data: { conversationId: string; message: any }) => {
+    socket.on('chat:message:edited', (data: { conversationId: string; message: ChatMessage }) => {
       useChatStore.getState().onMessageEdited(data.conversationId, data.message);
     });
 
@@ -424,23 +425,30 @@ export function useWebSocket() {
       useChatStore.getState().onReadReceipt(data.conversationId, data.userId, data.lastReadMessageId, data.lastReadAt);
     });
 
-    socket.on('chat:conversation:created', (conversation: any) => {
+    socket.on('chat:conversation:created', (conversation: ChatConversation) => {
       useChatStore.getState().onConversationCreated(conversation);
     });
 
-    socket.on('chat:conversation:updated', (data: any) => {
+    socket.on('chat:conversation:updated', (data: {
+      conversationId: string;
+      lastMessageAt?: string;
+      lastMessagePreview?: string;
+      lastMessageAuthorId?: string;
+      name?: string | null;
+      icon?: string | null;
+    }) => {
       useChatStore.getState().onConversationUpdated(data);
     });
 
     // ─── Chat reactions ─────────────────────────────────────
 
-    socket.on('chat:reaction', (data: { conversationId: string; messageId: string; reactions: any }) => {
+    socket.on('chat:reaction', (data: { conversationId: string; messageId: string; reactions: ChatMessageReaction[] }) => {
       useChatStore.getState().onReactionUpdated(data.conversationId, data.messageId, data.reactions);
     });
 
     // ─── Chat pin ─────────────────────────────────────────
 
-    socket.on('chat:message:pinned', (data: { conversationId: string; message: any }) => {
+    socket.on('chat:message:pinned', (data: { conversationId: string; message: ChatMessage }) => {
       useChatStore.getState().onMessagePinned(data.conversationId, data.message);
     });
 

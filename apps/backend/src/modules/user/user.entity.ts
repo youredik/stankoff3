@@ -58,9 +58,32 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  notificationPreferences?: NotificationPreferences | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+}
+
+/** Granular notification preferences stored as JSONB on User */
+export interface NotificationPreferences {
+  // Per-type toggles (default: all true)
+  taskReminder?: boolean;
+  taskOverdue?: boolean;
+  entityCreated?: boolean;
+  commentReceived?: boolean;
+  mentionReceived?: boolean;
+  statusChanged?: boolean;
+  slaWarning?: boolean;
+  slaBreach?: boolean;
+  aiSuggestion?: boolean;
+  chatMessage?: boolean;
+
+  // Do Not Disturb
+  dndEnabled?: boolean;
+  dndStartHour?: number; // 0-23
+  dndEndHour?: number;   // 0-23
 }

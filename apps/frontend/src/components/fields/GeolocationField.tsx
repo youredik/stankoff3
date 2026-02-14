@@ -83,6 +83,7 @@ function GeolocationRenderer({ field, value, canEdit, onUpdate }: Parameters<Fie
           <button
             onClick={() => setIsEditing(true)}
             className="p-0.5 text-gray-400 hover:text-primary-600"
+            aria-label="Изменить геолокацию"
           >
             <MapPin className="w-3 h-3" />
           </button>
@@ -161,7 +162,7 @@ function AddressSearch({
           autoFocus
         />
         {loading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />}
-        <button onClick={onCancel} className="p-0.5 text-gray-400 hover:text-gray-600">
+        <button onClick={onCancel} className="p-0.5 text-gray-400 hover:text-gray-600" aria-label="Отмена">
           <X className="w-4 h-4" />
         </button>
       </div>

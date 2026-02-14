@@ -62,6 +62,7 @@ export function PdfViewer({ attachment, onClose }: PdfViewerProps) {
             onClick={handleOpenInNewTab}
             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             title="Открыть в новой вкладке"
+            aria-label="Открыть в новой вкладке"
           >
             <ExternalLink className="w-5 h-5" />
           </button>
@@ -69,6 +70,7 @@ export function PdfViewer({ attachment, onClose }: PdfViewerProps) {
             onClick={handleDownload}
             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             title="Скачать"
+            aria-label="Скачать"
           >
             <Download className="w-5 h-5" />
           </button>
@@ -76,6 +78,7 @@ export function PdfViewer({ attachment, onClose }: PdfViewerProps) {
             onClick={onClose}
             className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             title="Закрыть"
+            aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
           </button>

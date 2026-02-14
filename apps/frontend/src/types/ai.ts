@@ -141,7 +141,7 @@ export interface AiHealthStatus {
   providers: {
     openai: boolean;
     ollama?: boolean;
-    groq?: boolean;
+    yandex?: boolean;
   };
 }
 

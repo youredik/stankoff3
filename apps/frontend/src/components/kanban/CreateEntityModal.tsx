@@ -213,7 +213,7 @@ export function CreateEntityModal({ workspaceId, onClose }: CreateEntityModalPro
             <h3 id="create-entity-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Новая заявка
             </h3>
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer">
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer" aria-label="Закрыть">
               <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </button>
           </div>

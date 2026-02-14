@@ -48,7 +48,7 @@ const mockClassification: AiClassification = {
   skills: ['mechanical'],
   confidence: 0.85,
   reasoning: 'Тестовое обоснование',
-  provider: 'groq',
+  provider: 'yandex',
   model: 'llama-3.1-70b',
   applied: false,
   createdAt: '2026-02-10T00:00:00Z',

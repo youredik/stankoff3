@@ -21,18 +21,27 @@ export async function getSignedUrl(key: string): Promise<string> {
   const pending = pendingRequests.get(key);
   if (pending) return pending;
 
-  const promise = apiClient
-    .get<{ url: string }>(`/files/signed-url/${key}`)
-    .then((r) => {
-      cache.set(key, { url: r.data.url, expiresAt: Date.now() + CACHE_TTL });
-      return r.data.url;
-    })
-    .finally(() => {
-      pendingRequests.delete(key);
-    });
-
+  const promise = fetchWithRetry(key);
   pendingRequests.set(key, promise);
   return promise;
+}
+
+/** Fetch signed URL с retry (exponential backoff, max 3 попытки) */
+async function fetchWithRetry(key: string, attempt = 0): Promise<string> {
+  const MAX_RETRIES = 2;
+  try {
+    const r = await apiClient.get<{ url: string }>(`/files/signed-url/${key}`);
+    cache.set(key, { url: r.data.url, expiresAt: Date.now() + CACHE_TTL });
+    return r.data.url;
+  } catch (err) {
+    if (attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+      return fetchWithRetry(key, attempt + 1);
+    }
+    throw err;
+  } finally {
+    if (attempt === 0) pendingRequests.delete(key);
+  }
 }
 
 /** Инвалидирует кэш для конкретного ключа (для принудительного обновления) */

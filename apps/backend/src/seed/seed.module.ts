@@ -21,6 +21,7 @@ import { UserGroup } from '../modules/bpmn/entities/user-group.entity';
 import { FormDefinition } from '../modules/bpmn/entities/form-definition.entity';
 import { Role } from '../modules/rbac/role.entity';
 import { KnowledgeArticle } from '../modules/knowledge-base/entities/knowledge-article.entity';
+import { ProductCategory } from '../modules/entity/product-category.entity';
 
 // Modules (forwardRef для избежания circular dependencies)
 import { AuthModule } from '../modules/auth/auth.module';
@@ -64,6 +65,7 @@ import { SeedOrchestratorService } from './seed-orchestrator.service';
       FormDefinition,
       Role,
       KnowledgeArticle,
+      ProductCategory,
     ]),
     forwardRef(() => AuthModule),
     forwardRef(() => BpmnModule),

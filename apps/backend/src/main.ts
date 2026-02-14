@@ -2,6 +2,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { WinstonModule } from 'nest-winston';
 import * as cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { winstonConfig } from './common/logger.config';
 
@@ -13,6 +14,14 @@ async function bootstrap() {
     },
     logger: WinstonModule.createLogger(winstonConfig),
   });
+
+  // Security headers (Helmet)
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // CSP управляется Nginx
+      crossOriginEmbedderPolicy: false, // Для загрузки S3-ресурсов
+    }),
+  );
 
   // Cookie parser для работы с HttpOnly cookies
   app.use(cookieParser());

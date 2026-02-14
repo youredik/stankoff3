@@ -4,12 +4,12 @@ import { format, formatDistanceToNow, isPast } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
   Clock,
-  User,
   AlertTriangle,
   CheckCircle2,
   ArrowRight,
   Users,
 } from 'lucide-react';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { UserTask, UserTaskStatus } from '@/types';
 
 interface TaskCardProps {
@@ -124,6 +124,7 @@ export function TaskCard({ task, onClick, onClaim, compact = false, selectable, 
                   ? 'bg-teal-500 border-teal-500 text-white'
                   : 'border-gray-300 dark:border-gray-600 hover:border-teal-400'
               }`}
+              aria-label={selected ? 'Снять выделение' : 'Выбрать задачу'}
             >
               {selected && <CheckCircle2 className="w-3 h-3" />}
             </button>
@@ -154,8 +155,15 @@ export function TaskCard({ task, onClick, onClaim, compact = false, selectable, 
       <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
         {/* Assignee or Candidates */}
         {task.assignee ? (
-          <span className="flex items-center gap-1">
-            <User className="w-3 h-3" />
+          <span className="flex items-center gap-1.5">
+            <UserAvatar
+              firstName={task.assignee.firstName}
+              lastName={task.assignee.lastName}
+              avatar={(task.assignee as any).avatar}
+              userId={(task.assignee as any).id}
+              size="xs"
+              clickable={false}
+            />
             {task.assignee.firstName} {task.assignee.lastName}
           </span>
         ) : task.candidateGroups.length > 0 ? (

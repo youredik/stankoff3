@@ -20,6 +20,7 @@ jest.mock('./keycloak.service', () => ({
 import { AuthService } from './auth.service';
 import { KeycloakService } from './keycloak.service';
 import { RoleService } from '../rbac/role.service';
+import { S3Service } from '../s3/s3.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -73,6 +74,7 @@ describe('AuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: KeycloakService, useValue: new (KeycloakService as any)() },
         { provide: RoleService, useValue: mockRoleService },
+        { provide: S3Service, useValue: { deleteFile: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

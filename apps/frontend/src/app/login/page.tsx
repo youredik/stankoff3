@@ -2,9 +2,10 @@
 
 import { useEffect, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Shield, User as UserIcon, Loader2 } from 'lucide-react';
+import { Shield, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authApi, DevUser } from '@/lib/api/auth';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 const roleBadgeColors: Record<string, string> = {
   admin: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -283,13 +284,15 @@ function LoginPageContent() {
                   className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/10 transition-all text-left disabled:opacity-50 disabled:cursor-wait"
                 >
                   {/* Avatar */}
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-                    {user.avatar ? (
-                      <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserIcon className="w-5 h-5 text-gray-400" />
-                    )}
-                  </div>
+                  <UserAvatar
+                    firstName={user.firstName}
+                    lastName={user.lastName}
+                    email={user.email}
+                    avatar={user.avatar}
+                    userId={user.id}
+                    size="lg"
+                    clickable={false}
+                  />
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">

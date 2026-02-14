@@ -72,7 +72,11 @@ describe('ChatService', () => {
         }) },
         {
           provide: EventsGateway,
-          useValue: { emitToUser: jest.fn() },
+          useValue: {
+            emitToUser: jest.fn(),
+            joinUserToConversation: jest.fn(),
+            emitToConversationRoom: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -274,7 +278,7 @@ describe('ChatService', () => {
         lastMessagePreview: 'Hello',
         lastMessageAuthorId: userId,
       }));
-      expect(eventsGateway.emitToUser).toHaveBeenCalled();
+      expect(eventsGateway.emitToConversationRoom).toHaveBeenCalled();
     });
 
     it('должен отправить голосовое сообщение', async () => {
@@ -556,7 +560,7 @@ describe('ChatService', () => {
       const result = await service.pinMessage(conversationId, messageId, userId);
       expect(result.success).toBe(true);
       expect(pinnedRepo.save).toHaveBeenCalled();
-      expect(eventsGateway.emitToUser).toHaveBeenCalled();
+      expect(eventsGateway.emitToConversationRoom).toHaveBeenCalled();
     });
 
     it('должен отклонить повторное закрепление', async () => {

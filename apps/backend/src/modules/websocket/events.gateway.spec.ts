@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventsGateway } from './events.gateway';
+import { ConversationParticipant } from '../chat/entities/conversation-participant.entity';
 
 describe('EventsGateway', () => {
   let gateway: EventsGateway;
@@ -31,6 +33,12 @@ describe('EventsGateway', () => {
           provide: JwtService,
           useValue: {
             verify: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(ConversationParticipant),
+          useValue: {
+            find: jest.fn().mockResolvedValue([]),
           },
         },
       ],
@@ -209,7 +217,7 @@ describe('EventsGateway', () => {
   });
 
   describe('handleAuthRefresh', () => {
-    it('должен обновлять user при валидном токене', () => {
+    it('должен обновлять user при валидном токене', async () => {
       const newPayload = { sub: 'user-1', email: 'new@example.com', role: 'admin' };
       jwtService.verify.mockReturnValue(newPayload);
 
@@ -227,13 +235,13 @@ describe('EventsGateway', () => {
       );
       jwtService.verify.mockReturnValue(newPayload);
 
-      const result = gateway.handleAuthRefresh(socket as any, { token: 'new-token' });
+      const result = await gateway.handleAuthRefresh(socket as any, { token: 'new-token' });
 
       expect(result).toEqual({ success: true });
       expect(socket.data.user).toEqual(newPayload);
     });
 
-    it('должен возвращать success: false при невалидном токене', () => {
+    it('должен возвращать success: false при невалидном токене', async () => {
       jwtService.verify.mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -244,12 +252,12 @@ describe('EventsGateway', () => {
         role: 'user',
       });
 
-      const result = gateway.handleAuthRefresh(socket as any, { token: 'bad-token' });
+      const result = await gateway.handleAuthRefresh(socket as any, { token: 'bad-token' });
 
       expect(result).toEqual({ success: false });
     });
 
-    it('должен обновлять presence при смене userId', () => {
+    it('должен обновлять presence при смене userId', async () => {
       const oldPayload = { sub: 'user-1', email: 'a@test.com', role: 'user' };
       jwtService.verify.mockReturnValue(oldPayload);
       const socket = createMockSocket('socket-1', 'old-token');
@@ -261,7 +269,7 @@ describe('EventsGateway', () => {
       jwtService.verify.mockReturnValue(newPayload);
       socket.data.user = oldPayload;
 
-      gateway.handleAuthRefresh(socket as any, { token: 'new-token' });
+      await gateway.handleAuthRefresh(socket as any, { token: 'new-token' });
 
       expect(gateway.getOnlineUserIds()).not.toContain('user-1');
       expect(gateway.getOnlineUserIds()).toContain('user-2');

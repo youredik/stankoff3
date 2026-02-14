@@ -76,6 +76,9 @@ export function UserProfileModal() {
       <div className="fixed inset-0 z-[91] flex items-center justify-center p-4 pointer-events-none">
         <div
           className="pointer-events-auto bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Профиль ${profileUser.firstName} ${profileUser.lastName}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header with gradient background */}

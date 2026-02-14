@@ -31,6 +31,8 @@ import { bpmnApi } from '@/lib/api/bpmn';
 import { getAssigneeRecommendations, type AssigneeRecommendation } from '@/lib/api/recommendations';
 import { StartProcessModal, ProcessInstanceList } from '@/components/bpmn';
 import { SlaStatusBadge } from '@/components/sla/SlaStatusBadge';
+import { CrmRelatedEntities } from '@/components/crm/CrmRelatedEntities';
+import { CrmContacts } from '@/components/crm/CrmContacts';
 import type { ProcessInstance } from '@/types';
 
 // Default statuses for backwards compatibility
@@ -193,7 +195,7 @@ export function EntityDetailPanel() {
   } = useEntityStore();
   const { openEntity, closeEntity } = useEntityNavigation();
 
-  const { currentWorkspace, canEdit } = useWorkspaceStore();
+  const { currentWorkspace, canEdit, workspaces } = useWorkspaceStore();
   const { user } = useAuthStore();
   const can = usePermissionCan();
 
@@ -201,6 +203,14 @@ export function EntityDetailPanel() {
   const wsId = currentWorkspace?.id;
   const canEditEntity = wsId ? can('workspace:entity:update', wsId) : canEdit();
   const canAssign = wsId ? can('workspace:entity:update', wsId) : canEditEntity;
+
+  // CRM: проверяем тип workspace
+  const isCrmWorkspace = currentWorkspace?.isSystem === true;
+  const isCounterparties = currentWorkspace?.systemType === 'counterparties';
+  const contactsWorkspaceId = useMemo(
+    () => isCounterparties ? workspaces.find((w) => w.systemType === 'contacts')?.id : undefined,
+    [isCounterparties, workspaces],
+  );
 
   // Sentiment из AI assistance cache
   const aiSentiment = useAiStore((s) =>
@@ -535,6 +545,26 @@ export function EntityDetailPanel() {
                     readOnly={!canEditEntity}
                   />
                 </div>
+
+                {/* CRM: связанные контакты (для контрагентов) */}
+                {isCounterparties && contactsWorkspaceId && (
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <CrmContacts
+                      counterpartyEntityId={selectedEntity.id}
+                      contactsWorkspaceId={contactsWorkspaceId}
+                    />
+                  </div>
+                )}
+
+                {/* CRM: связанные заявки из других workspace */}
+                {isCrmWorkspace && (
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <CrmRelatedEntities
+                      entityId={selectedEntity.id}
+                      excludeWorkspaceId={currentWorkspace?.id}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

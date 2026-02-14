@@ -1964,7 +1964,7 @@ Conventional Commits:
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand
 - **Backend:** NestJS 11, TypeORM, PostgreSQL (pgvector), Socket.IO
 - **BPMN:** Camunda 8, Zeebe workflow engine
-- **AI:** Groq (LLM), Ollama (embeddings), RAG поиск
+- **AI:** YandexGPT (LLM + Embeddings), RAG поиск
 - **Инфра:** Docker Swarm, GitHub Actions CI/CD, Nginx
 
 ## Монорепо (npm workspaces)

@@ -5,7 +5,6 @@ import { ConfigModule } from '@nestjs/config';
 import { AiController } from './ai.controller';
 import { OpenAiProvider } from './providers/openai.provider';
 import { OllamaProvider } from './providers/ollama.provider';
-import { GroqProvider } from './providers/groq.provider';
 import { YandexCloudProvider } from './providers/yandex-cloud.provider';
 import { AiProviderRegistry } from './providers/ai-provider.registry';
 import { ClassifierService } from './services/classifier.service';
@@ -40,7 +39,6 @@ import { ChatModule } from '../chat/chat.module';
     // Провайдеры (в порядке приоритета)
     YandexCloudProvider,
     OllamaProvider,
-    GroqProvider,
     OpenAiProvider,
     // Реестр провайдеров
     AiProviderRegistry,
@@ -61,7 +59,6 @@ import { ChatModule } from '../chat/chat.module';
     // Отдельные провайдеры для специфических случаев
     YandexCloudProvider,
     OllamaProvider,
-    GroqProvider,
     OpenAiProvider,
     // Сервисы
     ClassifierService,

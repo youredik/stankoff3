@@ -16,12 +16,12 @@ export class CreateRoleDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
   @Matches(/^[a-z0-9_]+$/, {
     message: 'slug должен содержать только строчные буквы, цифры и подчёркивания',
   })
-  slug: string;
+  slug?: string;
 
   @IsString()
   @IsOptional()

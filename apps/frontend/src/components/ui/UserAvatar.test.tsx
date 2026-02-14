@@ -84,6 +84,32 @@ describe('UserAvatar', () => {
     });
   });
 
+  describe('детерминированные цвета инициалов', () => {
+    it('должен назначать цвет на основе userId', () => {
+      const { container: c1 } = render(<UserAvatar firstName="И" lastName="П" userId="user-1" />);
+      const { container: c2 } = render(<UserAvatar firstName="И" lastName="П" userId="user-1" />);
+      const { container: c3 } = render(<UserAvatar firstName="И" lastName="П" userId="user-2" />);
+
+      const circle1 = c1.querySelector('.rounded-full')!;
+      const circle2 = c2.querySelector('.rounded-full')!;
+      const circle3 = c3.querySelector('.rounded-full')!;
+
+      // Один и тот же userId → один и тот же цвет
+      expect(circle1.className).toEqual(circle2.className);
+      // Разный userId → может быть другой цвет (или совпадение, но хеш должен быть стабильным)
+      // Не проверяем неравенство — хеш-коллизия возможна
+      expect(circle3).toBeTruthy();
+    });
+
+    it('должен использовать email если нет userId', () => {
+      const { container } = render(<UserAvatar firstName="И" lastName="П" email="test@ex.com" />);
+      const circle = container.querySelector('.rounded-full');
+      expect(circle).toBeTruthy();
+      // Не bg-primary-600, а один из AVATAR_COLORS
+      expect(circle!.className).toMatch(/bg-(blue|emerald|violet|amber|rose|cyan|orange|indigo|teal|pink|lime|fuchsia)-/);
+    });
+  });
+
   describe('аватар изображение', () => {
     it('должен показывать img при наличии avatar', () => {
       render(<UserAvatar firstName="И" lastName="П" avatar="https://example.com/photo.jpg" />);
@@ -100,6 +126,25 @@ describe('UserAvatar', () => {
     it('должен fallback на инициалы если avatar null', () => {
       render(<UserAvatar firstName="И" lastName="П" avatar={null} />);
       expect(screen.getByText('ИП')).toBeTruthy();
+    });
+  });
+
+  describe('skeleton placeholder при загрузке S3 URL', () => {
+    it('должен показывать skeleton пока signed URL загружается', () => {
+      // S3 key → useSignedUrl вернёт null (загрузка) → isLoading = true
+      const { container } = render(
+        <UserAvatar firstName="И" lastName="П" avatar="attachments/123-photo.webp" />,
+      );
+      const skeleton = container.querySelector('.animate-pulse');
+      expect(skeleton).toBeTruthy();
+    });
+
+    it('не должен показывать skeleton для http URL', () => {
+      const { container } = render(
+        <UserAvatar firstName="И" lastName="П" avatar="https://example.com/photo.jpg" />,
+      );
+      const skeleton = container.querySelector('.animate-pulse');
+      expect(skeleton).toBeNull();
     });
   });
 
@@ -186,7 +231,20 @@ describe('UserAvatar', () => {
       const avatar = container.firstElementChild!;
       fireEvent.click(avatar);
       // Fullscreen preview не должен появиться
-      expect(container.querySelector('.fixed')).toBeNull();
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
+    });
+  });
+
+  describe('fullscreen preview', () => {
+    it('должен показывать role="dialog" при клике на аватар', () => {
+      const { container } = render(
+        <UserAvatar firstName="Иван" lastName="Петров" avatar="https://example.com/photo.jpg" size="md" clickable={true} />,
+      );
+      const avatar = container.firstElementChild!;
+      fireEvent.click(avatar);
+      const dialog = container.querySelector('[role="dialog"]');
+      expect(dialog).toBeTruthy();
+      expect(dialog?.getAttribute('aria-modal')).toBe('true');
     });
   });
 });

@@ -585,7 +585,7 @@ export class AiController {
 
     return this.aiUsageService.getUsageStats({
       startDate,
-      provider: provider as 'openai' | 'ollama' | 'groq' | undefined,
+      provider: provider as 'openai' | 'ollama' | 'yandex' | undefined,
       operation: operation as 'classify' | 'generate' | 'embed' | 'search' | undefined,
     });
   }
@@ -624,7 +624,7 @@ export class AiController {
     }
 
     const logs = await this.aiUsageService.getRecentLogs(numLimit, {
-      provider: provider as 'openai' | 'ollama' | 'groq' | undefined,
+      provider: provider as 'openai' | 'ollama' | 'yandex' | undefined,
       operation: operation as 'classify' | 'generate' | 'embed' | 'search' | undefined,
     });
 

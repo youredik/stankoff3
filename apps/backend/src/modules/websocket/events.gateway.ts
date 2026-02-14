@@ -5,6 +5,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -28,6 +29,8 @@ interface AuthenticatedSocket extends Socket {
   },
 })
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  private readonly logger = new Logger(EventsGateway.name);
+
   @WebSocketServer()
   server: Server;
 
@@ -50,7 +53,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (token) {
         const payload = this.jwtService.verify(token);
         client.data.user = payload;
-        console.log(`Client connected: ${client.id}, user: ${payload.email}`);
+        this.logger.debug(`Client connected: ${client.id}, user: ${payload.email}`);
 
         // Presence tracking
         this.addUserPresence(payload.sub, client.id);
@@ -59,17 +62,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         await this.joinUserChatRooms(client, payload.sub);
       } else {
         // Разрешаем анонимные подключения (для обратной совместимости)
-        console.log(`Client connected (anonymous): ${client.id}`);
+        this.logger.debug(`Client connected (anonymous): ${client.id}`);
       }
     } catch {
       // Токен невалидный, но разрешаем подключение (для обратной совместимости)
-      console.log(`Client connected (invalid token): ${client.id}`);
+      this.logger.debug(`Client connected (invalid token): ${client.id}`);
     }
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
     const userEmail = client.data?.user?.email || 'anonymous';
-    console.log(`Client disconnected: ${client.id}, user: ${userEmail}`);
+    this.logger.debug(`Client disconnected: ${client.id}, user: ${userEmail}`);
 
     // Presence tracking
     const userId = client.data?.user?.sub;
@@ -122,25 +125,25 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // Методы для отправки событий
-  emitEntityCreated(data: any) {
+  emitEntityCreated(data: object) {
     this.server.emit('entity:created', data);
   }
 
-  emitEntityUpdated(data: any) {
+  emitEntityUpdated(data: object) {
     this.server.emit('entity:updated', data);
   }
 
-  emitStatusChanged(data: any) {
+  emitStatusChanged(data: { id: string; status: string; entity?: object }) {
     this.server.emit('status:changed', data);
   }
 
-  emitCommentCreated(data: any) {
+  emitCommentCreated(data: object) {
     this.server.emit('comment:created', data);
   }
 
   emitAssigneeChanged(data: {
     entityId: string;
-    entity: any;
+    entity: object | null;
     assigneeId: string | null;
     previousAssigneeId: string | null;
   }) {
@@ -148,7 +151,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // Отправка события конкретному пользователю по userId
-  emitToUser(userId: string, event: string, data: any) {
+  emitToUser(userId: string, event: string, data: unknown) {
     const clients = this.server.sockets.sockets;
     clients.forEach((client: AuthenticatedSocket) => {
       if (client.data?.user?.sub === userId) {
@@ -158,7 +161,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /** Broadcast to a conversation room (all sockets joined to the room) */
-  emitToConversationRoom(conversationId: string, event: string, data: any) {
+  emitToConversationRoom(conversationId: string, event: string, data: unknown) {
     this.server.to(`chat:${conversationId}`).emit(event, data);
   }
 
@@ -174,7 +177,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // Отправка события в workspace (broadcast с workspaceId в payload)
-  emitToWorkspace(workspaceId: string, event: string, data: any) {
+  emitToWorkspace(workspaceId: string, event: string, data: object) {
     // Отправляем всем клиентам с workspaceId в payload
     // Клиент фильтрует по workspaceId
     this.server.emit(event, { ...data, workspaceId });
@@ -284,13 +287,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleSlaSubscribe(client: AuthenticatedSocket, payload: { entityIds: string[] }): void {
     // Client wants to subscribe to SLA updates for specific entities
     client.join(payload.entityIds.map(id => `sla:${id}`));
-    console.log(`Client ${client.id} subscribed to SLA updates for ${payload.entityIds.length} entities`);
+    this.logger.debug(`Client ${client.id} subscribed to SLA updates for ${payload.entityIds.length} entities`);
   }
 
   @SubscribeMessage('sla:unsubscribe')
   handleSlaUnsubscribe(client: AuthenticatedSocket, payload: { entityIds: string[] }): void {
     payload.entityIds.forEach(id => client.leave(`sla:${id}`));
-    console.log(`Client ${client.id} unsubscribed from SLA updates`);
+    this.logger.debug(`Client ${client.id} unsubscribed from SLA updates`);
   }
 
   // ─── Chat events ──────────────────────────────────────────

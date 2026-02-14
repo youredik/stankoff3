@@ -9,7 +9,7 @@
 - **Frontend:** Next.js 16, React 19, TypeScript 5.9, Tailwind CSS 4, Zustand, @dnd-kit, Tiptap, Socket.IO Client, bpmn-js, dmn-js
 - **Backend:** NestJS 11, TypeORM, PostgreSQL 16 (pgvector), Socket.IO, AWS SDK v3 (S3), @camunda8/sdk, OpenAI SDK, Zod
 - **BPMN:** Camunda 8 Platform, Zeebe 8.7, BPMN 2.0
-- **AI:** Yandex Cloud (YandexGPT + Embeddings), Groq (fallback), pgvector (RAG)
+- **AI:** Yandex Cloud (YandexGPT + Embeddings), pgvector (RAG) — **ТОЛЬКО YandexGPT**, никаких других LLM-провайдеров
 - **Инфраструктура:** Docker Swarm (preprod), Docker Compose (dev), Yandex Object Storage, GitHub Actions CI/CD, Nginx, Let's Encrypt
 
 ## Структура проекта

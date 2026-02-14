@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, IsNull, In } from 'typeorm';
 import { UserTask, UserTaskStatus } from '../entities/user-task.entity';
 import { EventsGateway } from '../../websocket/events.gateway';
+import { User, NotificationPreferences } from '../../user/user.entity';
 
 /**
  * Scheduler that checks for approaching deadlines and overdue user tasks.
@@ -19,6 +20,8 @@ export class UserTaskDeadlineScheduler {
   constructor(
     @InjectRepository(UserTask)
     private readonly taskRepository: Repository<UserTask>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly eventsGateway: EventsGateway,
   ) {}
 
@@ -60,10 +63,17 @@ export class UserTaskDeadlineScheduler {
 
       this.logger.log(`Sending deadline reminders for ${tasks.length} task(s)`);
 
+      // Collect all target user IDs to load preferences in batch
+      const allUserIds = new Set<string>();
       for (const task of tasks) {
-        // Notify assignee or candidate users
+        this.getNotificationTargets(task).forEach((id) => allUserIds.add(id));
+      }
+      const prefsMap = await this.loadUserPreferences([...allUserIds]);
+
+      for (const task of tasks) {
         const targetUserIds = this.getNotificationTargets(task);
         for (const userId of targetUserIds) {
+          if (!this.shouldNotify(prefsMap.get(userId), 'taskReminder')) continue;
           this.eventsGateway.emitToUser(userId, 'task:reminder', {
             taskId: task.id,
             taskName: task.elementName || task.elementId,
@@ -106,9 +116,16 @@ export class UserTaskDeadlineScheduler {
 
       this.logger.log(`Sending overdue notifications for ${tasks.length} task(s)`);
 
+      const allUserIds = new Set<string>();
+      for (const task of tasks) {
+        this.getNotificationTargets(task).forEach((id) => allUserIds.add(id));
+      }
+      const prefsMap = await this.loadUserPreferences([...allUserIds]);
+
       for (const task of tasks) {
         const targetUserIds = this.getNotificationTargets(task);
         for (const userId of targetUserIds) {
+          if (!this.shouldNotify(prefsMap.get(userId), 'taskOverdue')) continue;
           this.eventsGateway.emitToUser(userId, 'task:overdue', {
             taskId: task.id,
             taskName: task.elementName || task.elementId,
@@ -141,5 +158,54 @@ export class UserTaskDeadlineScheduler {
     }
     // No specific target — will be visible in inbox
     return [];
+  }
+
+  /** Load notification preferences for a batch of user IDs */
+  private async loadUserPreferences(
+    userIds: string[],
+  ): Promise<Map<string, NotificationPreferences | null | undefined>> {
+    const map = new Map<string, NotificationPreferences | null | undefined>();
+    if (userIds.length === 0) return map;
+
+    const users = await this.userRepository.find({
+      where: userIds.map((id) => ({ id })),
+      select: ['id', 'notificationPreferences'],
+    });
+    for (const u of users) {
+      map.set(u.id, u.notificationPreferences);
+    }
+    return map;
+  }
+
+  /**
+   * Check if user should receive a notification of the given type,
+   * respecting DND hours and per-type preferences.
+   * Default: true (notify) when no preferences are set.
+   */
+  private shouldNotify(
+    prefs: NotificationPreferences | null | undefined,
+    type: keyof NotificationPreferences,
+  ): boolean {
+    if (!prefs) return true; // no preferences → all enabled
+
+    // Check per-type toggle (default true)
+    if (prefs[type] === false) return false;
+
+    // Check DND
+    if (prefs.dndEnabled) {
+      const now = new Date();
+      const hour = now.getHours();
+      const start = prefs.dndStartHour ?? 22;
+      const end = prefs.dndEndHour ?? 8;
+
+      // Handle overnight DND (e.g. 22:00 → 08:00)
+      if (start > end) {
+        if (hour >= start || hour < end) return false;
+      } else if (start < end) {
+        if (hour >= start && hour < end) return false;
+      }
+    }
+
+    return true;
   }
 }

@@ -10,6 +10,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Stankoff Portal - Корпоративный портал',
   description: 'Система управления цифровыми рабочими местами',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+  },
+  manifest: '/manifest.json',
 };
 
 // Script to prevent theme flash

@@ -105,6 +105,7 @@ export function VideoPlayer({ attachment, onClose }: VideoPlayerProps) {
             onClick={() => setIsMuted((m) => !m)}
             className="p-2 text-white/80 hover:text-white transition-colors"
             title={isMuted ? 'Включить звук (M)' : 'Выключить звук (M)'}
+            aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
           >
             {isMuted ? (
               <VolumeX className="w-5 h-5" />
@@ -116,6 +117,7 @@ export function VideoPlayer({ attachment, onClose }: VideoPlayerProps) {
             onClick={toggleFullscreen}
             className="p-2 text-white/80 hover:text-white transition-colors"
             title={isFullscreen ? 'Выйти из полноэкранного режима (F)' : 'Полноэкранный режим (F)'}
+            aria-label={isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
           >
             {isFullscreen ? (
               <Minimize className="w-5 h-5" />
@@ -127,6 +129,7 @@ export function VideoPlayer({ attachment, onClose }: VideoPlayerProps) {
             onClick={handleDownload}
             className="p-2 text-white/80 hover:text-white transition-colors"
             title="Скачать"
+            aria-label="Скачать"
           >
             <Download className="w-5 h-5" />
           </button>
@@ -134,6 +137,7 @@ export function VideoPlayer({ attachment, onClose }: VideoPlayerProps) {
             onClick={onClose}
             className="p-2 text-white/80 hover:text-white transition-colors"
             title="Закрыть (Esc)"
+            aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
           </button>

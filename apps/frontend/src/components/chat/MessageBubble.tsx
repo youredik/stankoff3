@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Check, CheckCheck, Reply, Copy, Pencil, Trash2, Pin, SmilePlus, Sparkles, Download, Play, X as XIcon } from 'lucide-react';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { VoicePlayer } from './VoicePlayer';
 import type { ChatMessage, ChatMessageReaction } from '@/types';
@@ -353,7 +354,7 @@ export function MessageBubble({
                   <button onClick={handleSaveEdit} className="text-xs text-primary-500 hover:text-primary-600">OK</button>
                 </div>
               ) : (
-                <div className="text-sm text-gray-900 dark:text-gray-100 break-words [&>p]:m-0 [&_[data-type=mention]]:text-primary-500 [&_[data-type=mention]]:font-medium" dangerouslySetInnerHTML={{ __html: renderContent() }} />
+                <div className="text-sm text-gray-900 dark:text-gray-100 break-words [&>p]:m-0 [&_[data-type=mention]]:text-primary-500 [&_[data-type=mention]]:font-medium" dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderContent()) }} />
               )}
             </>
           )}

@@ -257,6 +257,22 @@ export interface LinkedEntity {
   workspaceName: string;
 }
 
+export interface NotificationPreferences {
+  taskReminder?: boolean;
+  taskOverdue?: boolean;
+  entityCreated?: boolean;
+  commentReceived?: boolean;
+  mentionReceived?: boolean;
+  statusChanged?: boolean;
+  slaWarning?: boolean;
+  slaBreach?: boolean;
+  aiSuggestion?: boolean;
+  chatMessage?: boolean;
+  dndEnabled?: boolean;
+  dndStartHour?: number;
+  dndEndHour?: number;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -267,6 +283,7 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   createdAt?: string;
+  notificationPreferences?: NotificationPreferences | null;
 }
 
 export type UserRole = 'admin' | 'manager' | 'employee';

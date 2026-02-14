@@ -15,6 +15,7 @@ import { SeedRbacService } from './seed-rbac.service';
 import { SeedSlaDmnService } from './seed-sla-dmn.service';
 import { SeedKnowledgeBaseService } from './seed-knowledge-base.service';
 import { SeedUserGroupsService } from './seed-user-groups.service';
+import { SeedSystemWorkspacesService } from './seed-system-workspaces.service';
 import { Workspace } from '../modules/workspace/workspace.entity';
 
 describe('SeedOrchestratorService', () => {
@@ -132,6 +133,10 @@ describe('SeedOrchestratorService', () => {
         {
           provide: SeedUserGroupsService,
           useValue: { createAll: jest.fn() },
+        },
+        {
+          provide: SeedSystemWorkspacesService,
+          useValue: { createAll: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();

@@ -49,7 +49,7 @@ const TASKS: TaskDef[] = [
   { num: 7, title: 'WebSocket real-time обновления (Socket.IO)', status: 'done', priority: 'high', taskType: 'feature', storyPoints: 8, createdDaysAgo: 90, assigneeEmail: 'youredik@gmail.com' },
   { num: 8, title: 'BPMN движок: интеграция Camunda/Zeebe', status: 'done', priority: 'critical', taskType: 'feature', storyPoints: 21, createdDaysAgo: 75, assigneeEmail: 'youredik@gmail.com' },
   { num: 9, title: 'Миграция Legacy CRM: 356K заявок + 2.2M комментариев', status: 'done', priority: 'critical', taskType: 'infrastructure', storyPoints: 13, createdDaysAgo: 50, assigneeEmail: 'youredik@gmail.com' },
-  { num: 10, title: 'AI классификация заявок (Groq + Ollama embeddings)', status: 'done', priority: 'medium', taskType: 'feature', storyPoints: 13, createdDaysAgo: 40, assigneeEmail: 'youredik@gmail.com' },
+  { num: 10, title: 'AI классификация заявок (YandexGPT + Embeddings)', status: 'done', priority: 'medium', taskType: 'feature', storyPoints: 13, createdDaysAgo: 40, assigneeEmail: 'youredik@gmail.com' },
   { num: 11, title: 'SLA мониторинг и уведомления', status: 'done', priority: 'high', taskType: 'feature', storyPoints: 8, createdDaysAgo: 35, assigneeEmail: 'youredik@gmail.com' },
   { num: 12, title: 'DMN таблицы решений', status: 'done', priority: 'medium', taskType: 'feature', storyPoints: 5, createdDaysAgo: 30, assigneeEmail: 'youredik@gmail.com' },
 
@@ -179,7 +179,7 @@ const COMMENTS: Record<number, CommentDef[]> = {
   // DEV-10: AI классификация
   10: [
     { authorEmail: SM, text: 'Хочу AI-классификацию заявок: автоматически определять категорию, приоритет и нужные навыки. Бесплатно если возможно.', offsetDays: 0 },
-    { authorEmail: ED, text: 'Есть план: Groq для LLM (llama-3.1-70b-versatile, бесплатно ~30 req/min) и Ollama для embeddings (nomic-embed-text, 768 dims). RAG поиск по базе знаний из legacy данных.', offsetDays: 1 },
+    { authorEmail: ED, text: 'Есть план: YandexGPT для LLM (нативный русский, без гео-блокировки) и Yandex Embeddings (text-search-doc, 256 dims). RAG поиск по базе знаний из legacy данных.', offsetDays: 1 },
     { authorEmail: SM, text: 'RAG — это semantic search по закрытым заявкам?', offsetDays: 2 },
     { authorEmail: ED, text: 'Да. Индексирую закрытые заявки с ответами через pgvector. При новой заявке — ищу похожие, подсовываю LLM как контекст. Результат: категория, приоритет 1-5, список навыков, рекомендуемый ответ.', offsetDays: 3 },
     { authorEmail: SM, text: 'А BPMN worker для автоклассификации?', offsetDays: 4 },

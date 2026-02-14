@@ -178,7 +178,7 @@ export class AiUsageService {
   async getRecentLogs(limit = 50, filters: UsageFilters = {}): Promise<AiUsageLog[]> {
     const queryBuilder = this.usageLogRepo.createQueryBuilder('log')
       .leftJoinAndSelect('log.user', 'user')
-      .orderBy('log.created_at', 'DESC')
+      .orderBy('log.createdAt', 'DESC')
       .take(limit);
 
     if (filters.provider) {
@@ -188,7 +188,7 @@ export class AiUsageService {
       queryBuilder.andWhere('log.operation = :operation', { operation: filters.operation });
     }
     if (filters.userId) {
-      queryBuilder.andWhere('log.user_id = :userId', { userId: filters.userId });
+      queryBuilder.andWhere('log.userId = :userId', { userId: filters.userId });
     }
 
     return queryBuilder.getMany();
