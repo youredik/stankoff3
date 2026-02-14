@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware';
 import { User } from '@/types';
 import { authApi } from '@/lib/api/auth';
 import { useNotificationStore } from './useNotificationStore';
+import { resetFetchGuards } from '@/lib/fetchGuard';
 
 /**
  * Извлекает время истечения JWT токена (в мс) без внешних зависимостей
@@ -89,6 +90,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
   logout: async () => {
     clearRefreshTimer();
+    resetFetchGuards(); // Сброс кэшей дедупликации — следующий логин загрузит данные свежие
     try {
       const response = await authApi.logout();
 

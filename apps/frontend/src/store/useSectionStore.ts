@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import type { MenuSection, MenuSectionRole } from '@/types';
 import { sectionsApi } from '@/lib/api/sections';
 import { useNotificationStore } from './useNotificationStore';
+import { guardedFetch } from '@/lib/fetchGuard';
 
 interface SectionStore {
   sections: MenuSection[];
@@ -91,24 +92,27 @@ export const useSectionStore = create<SectionStore>((set, get) => ({
   hiddenSections: loadHiddenSections(),
 
   fetchSections: async () => {
-    set({ loading: true, error: null });
-    try {
-      const sections = await sectionsApi.getAll();
-      set({ sections, loading: false });
-      // Автоматически загружаем роли для всех разделов
-      get().fetchMyRoles();
-    } catch (err) {
-      set({ loading: false, error: (err as Error).message });
-    }
+    return guardedFetch('sections', async () => {
+      set({ loading: true, error: null });
+      try {
+        const sections = await sectionsApi.getAll();
+        set({ sections, loading: false });
+        get().fetchMyRoles();
+      } catch (err) {
+        set({ loading: false, error: (err as Error).message });
+      }
+    });
   },
 
   fetchMyRoles: async () => {
-    try {
-      const roles = await sectionsApi.getMyRoles();
-      set({ sectionRoles: roles });
-    } catch {
-      set({ sectionRoles: {} });
-    }
+    return guardedFetch('section-my-roles', async () => {
+      try {
+        const roles = await sectionsApi.getMyRoles();
+        set({ sectionRoles: roles });
+      } catch {
+        set({ sectionRoles: {} });
+      }
+    });
   },
 
   getRoleForSection: (sectionId: string) => {

@@ -18,7 +18,8 @@ export const apiClient = axios.create({
   withCredentials: true, // Отправлять cookies (для refresh token)
 });
 
-// Функции для работы с токенами — всегда берём из store напрямую
+// ── Token Management ──────────────────────────────────────────────────────
+
 const getAccessToken = () => {
   if (typeof window === 'undefined') return null;
   return useAuthStore.getState().accessToken;
@@ -41,7 +42,8 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Очередь запросов, ожидающих refresh
+// ── 401 Refresh + Redirect ────────────────────────────────────────────────
+
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (value?: unknown) => void;
@@ -59,7 +61,12 @@ const processQueue = (error: Error | null, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Response interceptor — обновляем токен при 401
+function redirectToLogin() {
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login';
+  }
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -67,15 +74,12 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // Если 401 и ещё не пытались обновить токен
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      // Не пытаемся обновить токен для auth эндпоинтов
       !originalRequest.url?.includes('/auth/')
     ) {
       if (isRefreshing) {
-        // Уже идёт refresh — ставим запрос в очередь
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
@@ -103,16 +107,11 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         }
         processQueue(new Error('Refresh failed'), null);
-        // Сессия истекла — редиректим на логин (безопасная проверка среды)
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login';
-        }
+        redirectToLogin();
         return Promise.reject(error);
       } catch (refreshError) {
         processQueue(refreshError as Error, null);
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login';
-        }
+        redirectToLogin();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

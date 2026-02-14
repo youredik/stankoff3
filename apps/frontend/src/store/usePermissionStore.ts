@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { rbacApi } from '@/lib/api/rbac';
 import { toast } from '@/lib/toast';
+import { guardedFetch } from '@/lib/fetchGuard';
 
 /**
  * Wildcard permission matching (зеркалит backend RbacService.matchPermission)
@@ -77,24 +78,23 @@ export const usePermissionStore = create<PermissionState & PermissionActions>()(
     ...initialState,
 
     fetchPermissions: async () => {
-      set({ loading: true });
-      try {
-        // Загружаем глобальные permissions
-        const globalResult = await rbacApi.getMyPermissions();
+      return guardedFetch('permissions', async () => {
+        set({ loading: true });
+        try {
+          const globalResult = await rbacApi.getMyPermissions();
+          const wsResult = await rbacApi.getMyWorkspacePermissions();
 
-        // Загружаем workspace permissions
-        const wsResult = await rbacApi.getMyWorkspacePermissions();
-
-        set({
-          globalPermissions: globalResult.permissions,
-          workspacePermissions: wsResult as unknown as Record<string, string[]>,
-          loaded: true,
-          loading: false,
-        });
-      } catch {
-        toast.error('Не удалось загрузить права доступа');
-        set({ loading: false });
-      }
+          set({
+            globalPermissions: globalResult.permissions,
+            workspacePermissions: wsResult as unknown as Record<string, string[]>,
+            loaded: true,
+            loading: false,
+          });
+        } catch {
+          toast.error('Не удалось загрузить права доступа');
+          set({ loading: false });
+        }
+      });
     },
 
     can: (permission: string, workspaceId?: string) => {

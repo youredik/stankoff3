@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import type { Workspace, Field, Section, FieldOption, WorkspaceRole } from '@/types';
 import { workspacesApi } from '@/lib/api/workspaces';
 import { useNotificationStore } from './useNotificationStore';
+import { guardedFetch } from '@/lib/fetchGuard';
 
 interface WorkspaceStore {
   workspaces: Workspace[];
@@ -13,7 +14,7 @@ interface WorkspaceStore {
   loading: boolean;
   error: string | null;
 
-  fetchWorkspaces: () => Promise<void>;
+  fetchWorkspaces: (force?: boolean) => Promise<void>;
   fetchWorkspace: (id: string) => Promise<void>;
   fetchMyRole: (workspaceId: string) => Promise<void>;
   fetchMyRoles: () => Promise<void>;
@@ -63,16 +64,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   loading: false,
   error: null,
 
-  fetchWorkspaces: async () => {
-    set({ loading: true, error: null });
-    try {
-      const workspaces = await workspacesApi.getAll();
-      set({ workspaces, loading: false });
-      // Автоматически загружаем роли для всех workspaces
-      get().fetchMyRoles();
-    } catch (err) {
-      set({ loading: false, error: (err as Error).message });
-    }
+  fetchWorkspaces: async (force = false) => {
+    return guardedFetch('workspaces', async () => {
+      set({ loading: true, error: null });
+      try {
+        const workspaces = await workspacesApi.getAll();
+        set({ workspaces, loading: false });
+        get().fetchMyRoles();
+      } catch (err) {
+        set({ loading: false, error: (err as Error).message });
+      }
+    }, { force });
   },
 
   fetchWorkspace: async (id: string) => {
@@ -97,12 +99,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   fetchMyRoles: async () => {
-    try {
-      const roles = await workspacesApi.getMyRoles();
-      set({ workspaceRoles: roles });
-    } catch {
-      set({ workspaceRoles: {} });
-    }
+    return guardedFetch('workspace-my-roles', async () => {
+      try {
+        const roles = await workspacesApi.getMyRoles();
+        set({ workspaceRoles: roles });
+      } catch {
+        set({ workspaceRoles: {} });
+      }
+    });
   },
 
   setCurrentWorkspace: (workspace) => set({ currentWorkspace: workspace }),
