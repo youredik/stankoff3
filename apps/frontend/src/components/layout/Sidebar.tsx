@@ -28,6 +28,8 @@ import {
   Package,
   Briefcase,
   LayoutDashboard,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useSectionStore } from '@/store/useSectionStore';
@@ -112,7 +114,7 @@ export function Sidebar() {
   const selectedWorkspace = (params?.id as string) || '';
   const { workspaces, fetchWorkspaces, createWorkspace, deleteWorkspace, duplicateWorkspace, archiveWorkspace } =
     useWorkspaceStore();
-  const { sections, fetchSections, createSection, deleteSection, updateSection, collapsedSections, toggleSectionCollapsed } =
+  const { sections, fetchSections, createSection, deleteSection, updateSection, toggleSectionCollapsed, isSectionExpanded, hiddenSections, toggleSectionHidden } =
     useSectionStore();
   const { inboxCount, fetchInboxCount } = useTaskStore();
   const totalChatUnread = useChatStore((s) => {
@@ -448,7 +450,7 @@ export function Sidebar() {
 
   // Рендер раздела с workspaces
   const renderSection = (section: MenuSection, sectionWorkspaces: Workspace[]) => {
-    const isCollapsed = collapsedSections[section.id];
+    const isExpanded = isSectionExpanded(section.id);
     const isEditing = editingSectionId === section.id;
 
     return (
@@ -458,7 +460,7 @@ export function Sidebar() {
           {isEditing ? (
             <>
               <span className="p-0.5 text-gray-400">
-                {isCollapsed ? (
+                {!isExpanded ? (
                   <ChevronRight className="w-4 h-4" />
                 ) : (
                   <ChevronDown className="w-4 h-4" />
@@ -487,7 +489,7 @@ export function Sidebar() {
               className="flex-1 flex items-center gap-1 text-left cursor-pointer"
             >
               <span className="p-0.5 text-gray-400">
-                {isCollapsed ? (
+                {!isExpanded ? (
                   <ChevronRight className="w-4 h-4" />
                 ) : (
                   <ChevronDown className="w-4 h-4" />
@@ -549,6 +551,16 @@ export function Sidebar() {
                       <Plus className="w-4 h-4 text-gray-400" />
                       <span>Добавить место</span>
                     </button>
+                    <button
+                      onClick={() => {
+                        setSectionMenuOpen(null);
+                        toggleSectionHidden(section.id);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 cursor-pointer"
+                    >
+                      <EyeOff className="w-4 h-4 text-gray-400" />
+                      <span>Скрыть раздел</span>
+                    </button>
                     <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                     <button
                       onClick={() => handleDeleteSection(section.id)}
@@ -564,7 +576,7 @@ export function Sidebar() {
         </div>
 
         {/* Workspaces в разделе */}
-        {!isCollapsed && (
+        {isExpanded && (
           <div className="ml-4 space-y-0.5">
             {sectionWorkspaces.length === 0 ? (
               <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500 italic">
@@ -767,10 +779,12 @@ export function Sidebar() {
 
           {/* Workspaces */}
           <div className="space-y-1">
-            {/* Разделы с workspaces */}
-            {grouped.sections.map(({ section, workspaces: sectionWorkspaces }) =>
-              renderSection(section, sectionWorkspaces)
-            )}
+            {/* Разделы с workspaces (видимые) */}
+            {grouped.sections
+              .filter(({ section }) => !hiddenSections[section.id])
+              .map(({ section, workspaces: sectionWorkspaces }) =>
+                renderSection(section, sectionWorkspaces)
+              )}
 
             {/* Workspaces без раздела */}
             {grouped.ungrouped.length > 0 && (
@@ -779,6 +793,37 @@ export function Sidebar() {
               </div>
             )}
           </div>
+
+          {/* Скрытые разделы */}
+          {(() => {
+            const hiddenList = grouped.sections.filter(({ section }) => hiddenSections[section.id]);
+            if (hiddenList.length === 0) return null;
+            return (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span>Скрытые разделы ({hiddenList.length})</span>
+                </div>
+                <div className="space-y-0.5">
+                  {hiddenList.map(({ section, workspaces: sectionWorkspaces }) => (
+                    <div key={section.id} className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800/50">
+                      <span className="flex-1 text-sm text-gray-400 dark:text-gray-500 truncate">
+                        {section.name}
+                        <span className="ml-1 text-xs">({sectionWorkspaces.length})</span>
+                      </span>
+                      <button
+                        onClick={() => toggleSectionHidden(section.id)}
+                        aria-label={`Показать раздел ${section.name}`}
+                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* CRM — системные workspace (контакты, контрагенты, товары) */}
           {systemWorkspaces.length > 0 && (

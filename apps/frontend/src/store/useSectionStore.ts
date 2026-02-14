@@ -11,7 +11,10 @@ interface SectionStore {
   loading: boolean;
   error: string | null;
   // Состояние свёрнутости разделов (сохраняется в localStorage)
+  // true = развёрнут (явно), отсутствие/false = свёрнут (по умолчанию)
   collapsedSections: Record<string, boolean>;
+  // Скрытые разделы (не отображаются в сайдбаре)
+  hiddenSections: Record<string, boolean>;
 
   fetchSections: () => Promise<void>;
   fetchMyRoles: () => Promise<void>;
@@ -25,13 +28,22 @@ interface SectionStore {
   deleteSection: (id: string) => Promise<void>;
   reorderSections: (sectionIds: string[]) => Promise<void>;
 
-  // Свёрнутость разделов
+  // Свёрнутость разделов (по умолчанию свёрнуты)
+  isSectionExpanded: (sectionId: string) => boolean;
   toggleSectionCollapsed: (sectionId: string) => void;
   setSectionCollapsed: (sectionId: string, collapsed: boolean) => void;
+
+  // Скрытие/показ разделов
+  isSectionHidden: (sectionId: string) => boolean;
+  toggleSectionHidden: (sectionId: string) => void;
+  setSectionHidden: (sectionId: string, hidden: boolean) => void;
 }
 
 const COLLAPSED_SECTIONS_KEY = 'stankoff-collapsed-sections';
+const HIDDEN_SECTIONS_KEY = 'stankoff-hidden-sections';
 
+// collapsedSections теперь хранит РАЗВЁРНУТЫЕ секции (true = expanded)
+// По умолчанию все секции свёрнуты (отсутствие записи = свёрнут)
 const loadCollapsedSections = (): Record<string, boolean> => {
   if (typeof window === 'undefined') return {};
   try {
@@ -51,12 +63,32 @@ const saveCollapsedSections = (collapsed: Record<string, boolean>) => {
   }
 };
 
+const loadHiddenSections = (): Record<string, boolean> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = localStorage.getItem(HIDDEN_SECTIONS_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveHiddenSections = (hidden: Record<string, boolean>) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(HIDDEN_SECTIONS_KEY, JSON.stringify(hidden));
+  } catch {
+    // Игнорируем ошибки localStorage
+  }
+};
+
 export const useSectionStore = create<SectionStore>((set, get) => ({
   sections: [],
   sectionRoles: {},
   loading: false,
   error: null,
   collapsedSections: loadCollapsedSections(),
+  hiddenSections: loadHiddenSections(),
 
   fetchSections: async () => {
     set({ loading: true, error: null });
@@ -147,11 +179,17 @@ export const useSectionStore = create<SectionStore>((set, get) => ({
     }
   },
 
+  // collapsedSections: true = expanded, отсутствие/false = collapsed (по умолчанию)
+  isSectionExpanded: (sectionId) => {
+    return get().collapsedSections[sectionId] === true;
+  },
+
   toggleSectionCollapsed: (sectionId) => {
     set((state) => {
+      const isExpanded = state.collapsedSections[sectionId] === true;
       const newCollapsed = {
         ...state.collapsedSections,
-        [sectionId]: !state.collapsedSections[sectionId],
+        [sectionId]: !isExpanded,
       };
       saveCollapsedSections(newCollapsed);
       return { collapsedSections: newCollapsed };
@@ -162,10 +200,38 @@ export const useSectionStore = create<SectionStore>((set, get) => ({
     set((state) => {
       const newCollapsed = {
         ...state.collapsedSections,
-        [sectionId]: collapsed,
+        [sectionId]: !collapsed,
       };
       saveCollapsedSections(newCollapsed);
       return { collapsedSections: newCollapsed };
+    });
+  },
+
+  // Скрытие разделов
+  isSectionHidden: (sectionId) => {
+    return get().hiddenSections[sectionId] === true;
+  },
+
+  toggleSectionHidden: (sectionId) => {
+    set((state) => {
+      const isHidden = state.hiddenSections[sectionId] === true;
+      const newHidden = {
+        ...state.hiddenSections,
+        [sectionId]: !isHidden,
+      };
+      saveHiddenSections(newHidden);
+      return { hiddenSections: newHidden };
+    });
+  },
+
+  setSectionHidden: (sectionId, hidden) => {
+    set((state) => {
+      const newHidden = {
+        ...state.hiddenSections,
+        [sectionId]: hidden,
+      };
+      saveHiddenSections(newHidden);
+      return { hiddenSections: newHidden };
     });
   },
 }));
