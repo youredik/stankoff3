@@ -12,9 +12,30 @@ import { checkboxFieldRenderer } from './CheckboxField';
 import { urlFieldRenderer } from './UrlField';
 import { geolocationFieldRenderer } from './GeolocationField';
 import { clientFieldRenderer } from './ClientField';
+import {
+  TextCellRenderer,
+  NumberCellRenderer,
+  SelectCellRenderer,
+  UserCellRenderer,
+  DateCellRenderer,
+  CheckboxCellRenderer,
+  UrlCellRenderer,
+  ClientCellRenderer,
+} from './cell-renderers';
 
 // Status использует тот же renderer что и select (options с цветами)
-const statusFieldRenderer = selectFieldRenderer;
+const statusFieldRenderer: FieldRenderer = { ...selectFieldRenderer };
+
+// Регистрируем компактные CellRenderer для таблицы
+textFieldRenderer.CellRenderer = TextCellRenderer;
+numberFieldRenderer.CellRenderer = NumberCellRenderer;
+selectFieldRenderer.CellRenderer = SelectCellRenderer;
+statusFieldRenderer.CellRenderer = SelectCellRenderer;
+userFieldRenderer.CellRenderer = UserCellRenderer;
+dateFieldRenderer.CellRenderer = DateCellRenderer;
+checkboxFieldRenderer.CellRenderer = CheckboxCellRenderer;
+urlFieldRenderer.CellRenderer = UrlCellRenderer;
+clientFieldRenderer.CellRenderer = ClientCellRenderer;
 
 export const fieldRegistry: Record<FieldType, FieldRenderer> = {
   text: textFieldRenderer,
@@ -32,4 +53,4 @@ export const fieldRegistry: Record<FieldType, FieldRenderer> = {
   client: clientFieldRenderer,
 };
 
-export type { FieldRenderer, FieldRendererProps, FieldFormRendererProps, FieldFilterRendererProps } from './types';
+export type { FieldRenderer, FieldRendererProps, FieldFormRendererProps, FieldFilterRendererProps, FieldCellRendererProps } from './types';

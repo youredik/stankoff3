@@ -1096,3 +1096,21 @@ export interface Invitation {
   acceptedAt: string | null;
   createdAt: string;
 }
+
+// ==================== Table Column Config ====================
+
+export interface TableColumnConfig {
+  /** field.id или системное поле ('customId', 'title', 'status', 'priority', 'assignee', 'createdAt', 'commentCount') */
+  fieldId: string;
+  /** Видимость колонки */
+  visible: boolean;
+  /** Фиксированная ширина (px). undefined = auto */
+  width?: number;
+  /** Порядок отображения (0-based) */
+  order: number;
+}
+
+export interface TableColumnsPreference {
+  version: 1;
+  columns: TableColumnConfig[];
+}

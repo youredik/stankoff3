@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
+  Columns3,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { EntityDetailPanel } from '@/components/kanban/EntityDetailPanel';
@@ -19,9 +20,9 @@ import { CreateEntityModal } from '@/components/kanban/CreateEntityModal';
 import {
   FilterPanel,
   createEmptyFilters,
-  isFilterActive,
   type FilterState,
 } from '@/components/kanban/FilterPanel';
+import { ColumnSettingsPanel } from './ColumnSettingsPanel';
 import { useEntityStore } from '@/store/useEntityStore';
 import { useEntityNavigation } from '@/hooks/useEntityNavigation';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
@@ -31,29 +32,14 @@ import { filtersToApi } from '@/lib/utils/filters';
 import SearchableUserSelect from '@/components/ui/SearchableUserSelect';
 import { useWorkspaceFilters } from '@/hooks/useWorkspaceFilters';
 import { useFacets } from '@/hooks/useFacets';
+import { useTableColumns, type ResolvedColumn } from '@/hooks/useTableColumns';
+import { fieldRegistry } from '@/components/fields';
 import type { Entity, FieldOption } from '@/types';
 
 interface TableViewProps {
   workspaceId: string;
   categoryId?: string;
 }
-
-interface TableColumn {
-  id: string;
-  label: string;
-  sortable: boolean;
-  width?: string;
-}
-
-const TABLE_COLUMNS: TableColumn[] = [
-  { id: 'customId', label: 'Номер', sortable: true, width: 'w-28' },
-  { id: 'title', label: 'Название', sortable: true },
-  { id: 'status', label: 'Статус', sortable: true, width: 'w-40' },
-  { id: 'priority', label: 'Приоритет', sortable: true, width: 'w-32' },
-  { id: 'assignee', label: 'Исполнитель', sortable: true, width: 'w-44' },
-  { id: 'createdAt', label: 'Создана', sortable: true, width: 'w-36' },
-  { id: 'commentCount', label: '', sortable: true, width: 'w-16' },
-];
 
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
   critical: { label: 'Критический', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
@@ -71,34 +57,47 @@ function formatDate(date: Date | string): string {
   });
 }
 
+// ==================== SortHeader ====================
+
 function SortHeader({
   column,
   sortBy,
   sortOrder,
   onSort,
 }: {
-  column: TableColumn;
+  column: ResolvedColumn;
   sortBy: string;
   sortOrder: 'ASC' | 'DESC';
-  onSort: (id: string) => void;
+  onSort: (sortKey: string) => void;
 }) {
-  const active = sortBy === column.id;
+  const active = sortBy === column.sortKey;
+  const widthStyle = column.width ? { width: column.width, minWidth: column.width } : undefined;
 
   if (!column.sortable) {
     return (
-      <th className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${column.width || ''}`}>
-        {column.label}
+      <th
+        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+        style={widthStyle}
+      >
+        {column.fieldId === 'commentCount' ? (
+          <MessageSquare className="w-3.5 h-3.5" />
+        ) : (
+          column.label
+        )}
       </th>
     );
   }
 
   return (
-    <th className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${column.width || ''}`}>
+    <th
+      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+      style={widthStyle}
+    >
       <button
-        onClick={() => onSort(column.id)}
+        onClick={() => onSort(column.sortKey)}
         className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
       >
-        {column.id === 'commentCount' ? (
+        {column.fieldId === 'commentCount' ? (
           <MessageSquare className="w-3.5 h-3.5" />
         ) : (
           column.label
@@ -112,6 +111,8 @@ function SortHeader({
     </th>
   );
 }
+
+// ==================== Pagination ====================
 
 function Pagination({
   page,
@@ -131,7 +132,6 @@ function Pagination({
   const from = (page - 1) * perPage + 1;
   const to = Math.min(page * perPage, total);
 
-  // Generate page numbers with ellipsis
   const pages: (number | '...')[] = [];
   if (totalPages <= 7) {
     for (let i = 1; i <= totalPages; i++) pages.push(i);
@@ -187,13 +187,169 @@ function Pagination({
   );
 }
 
+// ==================== TableCell — универсальный рендерер ячейки ====================
+
+function TableCell({
+  column,
+  entity,
+  users,
+  statuses,
+  statusMap,
+  canEditEntities,
+  onStatusChange,
+  onAssigneeChange,
+}: {
+  column: ResolvedColumn;
+  entity: Entity;
+  users: any[];
+  statuses: FieldOption[];
+  statusMap: Map<string, FieldOption>;
+  canEditEntities: boolean;
+  onStatusChange: (entityId: string, status: string) => void;
+  onAssigneeChange: (entityId: string, assigneeId: string | null) => void;
+}) {
+  // Системные колонки — сохраняем текущую логику
+  if (column.isSystem) {
+    switch (column.fieldId) {
+      case 'customId':
+        return (
+          <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+            {entity.customId}
+          </span>
+        );
+
+      case 'title':
+        return (
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
+            {entity.title}
+          </span>
+        );
+
+      case 'status': {
+        const statusOption = statusMap.get(entity.status);
+        if (canEditEntities) {
+          return (
+            <select
+              value={entity.status}
+              onChange={(e) => onStatusChange(entity.id, e.target.value)}
+              className="text-xs font-medium border rounded-lg px-2 py-1 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              style={statusOption?.color ? {
+                backgroundColor: statusOption.color + '20',
+                color: statusOption.color,
+                borderColor: statusOption.color + '40',
+              } : undefined}
+            >
+              {statuses.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          );
+        }
+        return (
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+            style={statusOption?.color ? {
+              backgroundColor: statusOption.color + '20',
+              color: statusOption.color,
+            } : undefined}
+          >
+            {statusOption?.label || entity.status}
+          </span>
+        );
+      }
+
+      case 'priority': {
+        const priorityInfo = entity.priority ? PRIORITY_LABELS[entity.priority] : null;
+        return priorityInfo ? (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${priorityInfo.color}`}>
+            {priorityInfo.label}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400 dark:text-gray-500">&mdash;</span>
+        );
+      }
+
+      case 'assignee':
+        if (canEditEntities) {
+          return (
+            <SearchableUserSelect
+              value={entity.assigneeId || null}
+              onChange={(userId) => onAssigneeChange(entity.id, userId)}
+              users={users}
+              placeholder="Не назначен"
+              emptyLabel="Не назначен"
+              compact
+            />
+          );
+        }
+        return (
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            {entity.assignee
+              ? `${entity.assignee.firstName} ${entity.assignee.lastName}`
+              : <span className="text-gray-400 dark:text-gray-500">&mdash;</span>
+            }
+          </span>
+        );
+
+      case 'createdAt':
+        return (
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {formatDate(entity.createdAt)}
+          </span>
+        );
+
+      case 'commentCount':
+        return (entity as any).commentCount > 0 ? (
+          <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <MessageSquare className="w-3 h-3" />
+            {(entity as any).commentCount}
+          </span>
+        ) : null;
+
+      default:
+        return null;
+    }
+  }
+
+  // Динамические колонки — через fieldRegistry
+  if (!column.field) {
+    return <span className="text-gray-400 dark:text-gray-600 text-xs">&mdash;</span>;
+  }
+
+  const renderer = fieldRegistry[column.field.type];
+  const CellComp = renderer?.CellRenderer;
+  const value = entity.data?.[column.fieldId];
+
+  if (CellComp) {
+    return <CellComp field={column.field} value={value} users={users} entity={entity} />;
+  }
+
+  // Fallback: read-only Renderer
+  if (renderer?.Renderer) {
+    return (
+      <div className="max-h-8 overflow-hidden">
+        <renderer.Renderer field={column.field} value={value} users={users} canEdit={false} onUpdate={() => {}} />
+      </div>
+    );
+  }
+
+  // Ultimate fallback
+  return (
+    <span className="text-sm text-gray-500 dark:text-gray-400 truncate block max-w-[200px]">
+      {value != null ? String(value) : <span className="text-gray-400">&mdash;</span>}
+    </span>
+  );
+}
+
+// ==================== TableView ====================
+
 export function TableView({ workspaceId, categoryId }: TableViewProps) {
   const router = useRouter();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [filters, setFilters] = useWorkspaceFilters(workspaceId);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     tableItems,
@@ -215,15 +371,23 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
   } = useEntityStore();
   const { openEntity } = useEntityNavigation();
 
-  const { currentWorkspace, fetchWorkspace, canEdit } = useWorkspaceStore();
-  const { user } = useAuthStore();
+  const { currentWorkspace, fetchWorkspace } = useWorkspaceStore();
   const can = usePermissionCan();
 
   const isAdmin = can('workspace:settings:read', workspaceId);
   const canEditEntities = can('workspace:entity:update', workspaceId);
   const { facets } = useFacets(workspaceId, filters);
 
-  // Get status options from workspace
+  // Динамические колонки из workspace sections
+  const {
+    columns: allColumns,
+    visibleColumns,
+    toggleVisibility,
+    reorder,
+    resetToDefaults,
+  } = useTableColumns(workspaceId, currentWorkspace?.sections);
+
+  // Status options from workspace
   const statuses = useMemo<FieldOption[]>(() => {
     if (!currentWorkspace?.sections) return [];
     for (const section of currentWorkspace.sections) {
@@ -233,7 +397,6 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
     return [];
   }, [currentWorkspace]);
 
-  // Status color map
   const statusMap = useMemo(() => {
     const map = new Map<string, FieldOption>();
     statuses.forEach((s) => map.set(s.id, s));
@@ -246,10 +409,16 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
     fetchUsers();
   }, [workspaceId, fetchWorkspace, fetchUsers]);
 
+  // Определяем тип поля для JSONB-сортировки (number, date, text)
+  const sortFieldType = useMemo(() => {
+    if (!tableSortBy.startsWith('data.')) return undefined;
+    const col = allColumns.find((c) => c.sortKey === tableSortBy);
+    return col?.field?.type;
+  }, [tableSortBy, allColumns]);
+
   // Fetch table when workspace, sort, page, or filters change
   useEffect(() => {
     const apiFilters = filtersToApi(filters);
-    // Добавляем categoryId в customFilters для фильтрации по категории
     if (categoryId) {
       apiFilters.customFilters = { ...apiFilters.customFilters, categoryId };
     }
@@ -258,14 +427,15 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
       perPage: tablePerPage,
       sortBy: tableSortBy,
       sortOrder: tableSortOrder,
+      sortFieldType,
       ...apiFilters,
     });
-  }, [workspaceId, tablePage, tablePerPage, tableSortBy, tableSortOrder, fetchTable, filters, categoryId]);
+  }, [workspaceId, tablePage, tablePerPage, tableSortBy, tableSortOrder, sortFieldType, fetchTable, filters, categoryId]);
 
-  const handleSort = useCallback((columnId: string) => {
+  const handleSort = useCallback((sortKey: string) => {
     const { tableSortBy, tableSortOrder } = useEntityStore.getState();
-    const newOrder = tableSortBy === columnId && tableSortOrder === 'ASC' ? 'DESC' : 'ASC';
-    setTableSort(columnId, newOrder);
+    const newOrder = tableSortBy === sortKey && tableSortOrder === 'ASC' ? 'DESC' : 'ASC';
+    setTableSort(sortKey, newOrder);
   }, [setTableSort]);
 
   const handlePageChange = useCallback((page: number) => {
@@ -326,7 +496,7 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
                 {currentWorkspace?.name || 'Загрузка...'}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                {tableTotal} {tableTotal === 1 ? 'заявка' : tableTotal < 5 ? 'заявки' : 'заявок'}
+                {tableTotal} {tableTotal === 1 ? 'запись' : tableTotal < 5 ? 'записи' : 'записей'}
               </p>
             </div>
 
@@ -359,11 +529,26 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
                 </button>
               )}
 
+              {/* Column settings */}
+              <button
+                onClick={() => setShowColumnSettings(!showColumnSettings)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showColumnSettings
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                aria-label="Настройка колонок"
+              >
+                <Columns3 className="w-4 h-4" />
+                Колонки
+              </button>
+
               {/* Settings */}
               {isAdmin && (
                 <button
                   onClick={() => router.push(`/workspace/${workspaceId}/settings`)}
                   className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  aria-label="Настройки workspace"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
@@ -397,9 +582,9 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
                       className="rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500"
                     />
                   </th>
-                  {TABLE_COLUMNS.map((col) => (
+                  {visibleColumns.map((col) => (
                     <SortHeader
-                      key={col.id}
+                      key={col.fieldId}
                       column={col}
                       sortBy={tableSortBy}
                       sortOrder={tableSortOrder}
@@ -414,139 +599,64 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
                       <td className="px-4 py-3"><div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3"><div className="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3"><div className="w-48 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3"><div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3"><div className="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3"><div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3"><div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
-                      <td className="px-4 py-3"><div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      {visibleColumns.map((col) => (
+                        <td key={col.fieldId} className="px-4 py-3">
+                          <div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                        </td>
+                      ))}
                     </tr>
                   ))
                 ) : tableItems.length === 0 ? (
                   <tr>
-                    <td colSpan={TABLE_COLUMNS.length + 1} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
-                      {activeFilterCount > 0 ? 'Нет заявок, подходящих под фильтры' : 'Нет заявок'}
+                    <td colSpan={visibleColumns.length + 1} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                      {activeFilterCount > 0 ? 'Нет записей, подходящих под фильтры' : 'Нет записей'}
                     </td>
                   </tr>
                 ) : (
-                  tableItems.map((entity) => {
-                    const statusOption = statusMap.get(entity.status);
-                    const priorityInfo = entity.priority ? PRIORITY_LABELS[entity.priority] : null;
+                  tableItems.map((entity) => (
+                    <tr
+                      key={entity.id}
+                      onClick={() => openEntity(entity.id)}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${
+                        selectedEntity?.id === entity.id ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(entity.id)}
+                          onChange={() => toggleSelect(entity.id)}
+                          className="rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500"
+                        />
+                      </td>
 
-                    return (
-                      <tr
-                        key={entity.id}
-                        onClick={() => openEntity(entity.id)}
-                        className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${
-                          selectedEntity?.id === entity.id ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''
-                        }`}
-                      >
-                        {/* Checkbox */}
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(entity.id)}
-                            onChange={() => toggleSelect(entity.id)}
-                            className="rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500"
+                      {/* Dynamic columns */}
+                      {visibleColumns.map((col) => (
+                        <td
+                          key={col.fieldId}
+                          className="px-4 py-3"
+                          style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                          onClick={
+                            col.fieldId === 'status' || col.fieldId === 'assignee'
+                              ? (e) => e.stopPropagation()
+                              : undefined
+                          }
+                        >
+                          <TableCell
+                            column={col}
+                            entity={entity}
+                            users={users}
+                            statuses={statuses}
+                            statusMap={statusMap}
+                            canEditEntities={canEditEntities}
+                            onStatusChange={handleStatusChange}
+                            onAssigneeChange={handleAssigneeChange}
                           />
                         </td>
-
-                        {/* Custom ID */}
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
-                            {entity.customId}
-                          </span>
-                        </td>
-
-                        {/* Title */}
-                        <td className="px-4 py-3">
-                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
-                            {entity.title}
-                          </span>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          {canEditEntities ? (
-                            <select
-                              value={entity.status}
-                              onChange={(e) => handleStatusChange(entity.id, e.target.value)}
-                              className="text-xs font-medium border rounded-lg px-2 py-1 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                              style={statusOption?.color ? {
-                                backgroundColor: statusOption.color + '20',
-                                color: statusOption.color,
-                                borderColor: statusOption.color + '40',
-                              } : undefined}
-                            >
-                              {statuses.map((s) => (
-                                <option key={s.id} value={s.id}>{s.label}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                              style={statusOption?.color ? {
-                                backgroundColor: statusOption.color + '20',
-                                color: statusOption.color,
-                              } : undefined}
-                            >
-                              {statusOption?.label || entity.status}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Priority */}
-                        <td className="px-4 py-3">
-                          {priorityInfo ? (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${priorityInfo.color}`}>
-                              {priorityInfo.label}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400 dark:text-gray-500">&mdash;</span>
-                          )}
-                        </td>
-
-                        {/* Assignee */}
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          {canEditEntities ? (
-                            <SearchableUserSelect
-                              value={entity.assigneeId || null}
-                              onChange={(userId) => handleAssigneeChange(entity.id, userId)}
-                              users={users}
-                              placeholder="Не назначен"
-                              emptyLabel="Не назначен"
-                              compact
-                            />
-                          ) : (
-                            <span className="text-sm text-gray-700 dark:text-gray-300">
-                              {entity.assignee
-                                ? `${entity.assignee.firstName} ${entity.assignee.lastName}`
-                                : <span className="text-gray-400 dark:text-gray-500">&mdash;</span>
-                              }
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Created At */}
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatDate(entity.createdAt)}
-                          </span>
-                        </td>
-
-                        {/* Comment Count */}
-                        <td className="px-4 py-3">
-                          {(entity as any).commentCount > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                              <MessageSquare className="w-3 h-3" />
-                              {(entity as any).commentCount}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
+                      ))}
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -570,6 +680,17 @@ export function TableView({ workspaceId, categoryId }: TableViewProps) {
           onFiltersChange={handleFiltersChange}
           onClose={() => setShowFilters(false)}
           facets={facets}
+        />
+      )}
+
+      {/* Column Settings Panel */}
+      {showColumnSettings && (
+        <ColumnSettingsPanel
+          columns={allColumns}
+          onToggleVisibility={toggleVisibility}
+          onReorder={reorder}
+          onReset={resetToDefaults}
+          onClose={() => setShowColumnSettings(false)}
         />
       )}
 

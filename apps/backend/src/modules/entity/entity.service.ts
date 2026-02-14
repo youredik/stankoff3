@@ -264,7 +264,7 @@ export class EntityService {
       qb.andWhere('entity.status IN (:...statuses)', { statuses: query.status });
     }
 
-    this.applyTableSort(qb, query.sortBy || 'createdAt', query.sortOrder || 'DESC');
+    this.applyTableSort(qb, query.sortBy || 'createdAt', query.sortOrder || 'DESC', query.sortFieldType);
 
     qb.skip((page - 1) * perPage).take(perPage);
 
@@ -278,6 +278,7 @@ export class EntityService {
     qb: SelectQueryBuilder<WorkspaceEntity>,
     sortBy: string,
     sortOrder: 'ASC' | 'DESC',
+    sortFieldType?: string,
   ): void {
     const sortMap: Record<string, string> = {
       createdAt: 'entity.createdAt',
@@ -296,6 +297,29 @@ export class EntityService {
       );
     } else if (sortBy === 'assignee') {
       qb.orderBy('assignee.firstName', sortOrder, 'NULLS LAST');
+    } else if (sortBy.startsWith('data.')) {
+      // Динамическая сортировка по JSONB-полям (data.price, data.inn и т.д.)
+      const fieldName = sortBy.slice(5);
+      if (!/^[a-zA-Z0-9_-]+$/.test(fieldName)) {
+        // Невалидное имя поля — fallback на createdAt
+        qb.orderBy('entity.createdAt', sortOrder, 'NULLS LAST');
+        return;
+      }
+
+      if (sortFieldType === 'number') {
+        // Числовые поля — cast к numeric для корректной сортировки
+        qb.addSelect(`COALESCE(("entity"."data"->>:sortField)::numeric, 0)`, 'sortVal')
+          .orderBy('sortVal', sortOrder, 'NULLS LAST')
+          .setParameter('sortField', fieldName);
+      } else if (sortFieldType === 'date') {
+        qb.addSelect(`("entity"."data"->>:sortField)::timestamptz`, 'sortVal')
+          .orderBy('sortVal', sortOrder, 'NULLS LAST')
+          .setParameter('sortField', fieldName);
+      } else {
+        qb.addSelect(`"entity"."data"->>:sortField`, 'sortVal')
+          .orderBy('sortVal', sortOrder, 'NULLS LAST')
+          .setParameter('sortField', fieldName);
+      }
     } else {
       const column = sortMap[sortBy] || 'entity.createdAt';
       qb.orderBy(column, sortOrder, 'NULLS LAST');

@@ -35,6 +35,7 @@ export interface TableQueryParams extends EntityFilters {
   perPage?: number;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';
+  sortFieldType?: string;
   status?: string[];
 }
 

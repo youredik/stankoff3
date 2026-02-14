@@ -1,4 +1,4 @@
-import type { Field, User, FieldFacet } from '@/types';
+import type { Field, User, Entity, FieldFacet } from '@/types';
 
 // Props для рендеринга поля в EntityDetailPanel (view/edit mode)
 export interface FieldRendererProps {
@@ -32,9 +32,19 @@ export interface FieldFilterRendererProps {
   facetData?: FieldFacet;
 }
 
+// Props для компактного рендеринга в ячейке таблицы (read-only)
+export interface FieldCellRendererProps {
+  field: Field;
+  value: any;
+  users: User[];
+  entity: Entity;
+}
+
 // Интерфейс рендерера поля — каждый тип реализует этот интерфейс
 export interface FieldRenderer {
   Renderer: React.FC<FieldRendererProps>;
   Form: React.FC<FieldFormRendererProps>;
   Filter?: React.FC<FieldFilterRendererProps>;
+  /** Компактный рендерер для ячейки таблицы. Fallback: Renderer с canEdit=false */
+  CellRenderer?: React.FC<FieldCellRendererProps>;
 }

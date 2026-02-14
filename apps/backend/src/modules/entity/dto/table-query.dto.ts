@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min, Max, IsIn, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, Max, IsIn, Matches, IsDateString } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class TableQueryDto {
@@ -20,13 +20,18 @@ export class TableQueryDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['createdAt', 'updatedAt', 'title', 'customId', 'priority', 'status', 'assignee', 'commentCount', 'lastActivityAt'])
+  @Matches(/^[a-zA-Z0-9_.:-]+$/, { message: 'sortBy must contain only alphanumeric characters, dots, underscores, colons and hyphens' })
   sortBy?: string = 'createdAt';
 
   @IsOptional()
   @IsString()
   @IsIn(['ASC', 'DESC'])
   sortOrder?: 'ASC' | 'DESC' = 'DESC';
+
+  /** Тип поля для data.* сортировки (number → ::numeric cast) */
+  @IsOptional()
+  @IsString()
+  sortFieldType?: string;
 
   @IsOptional()
   @IsString()
