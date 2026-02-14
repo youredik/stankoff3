@@ -6,7 +6,6 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle,
-  Clock,
   Inbox,
   TrendingUp,
   RefreshCw,
@@ -16,23 +15,26 @@ import {
   Timer,
   BarChart3,
 } from 'lucide-react';
-import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppShell } from '@/components/layout/AppShell';
-import { bpmnApi } from '@/lib/api/bpmn';
-import { tasksApi } from '@/lib/api/tasks';
-import * as slaApi from '@/lib/api/sla';
-import type { Workspace, SlaDashboard } from '@/types';
+import { apiClient } from '@/lib/api/client';
 
 interface WorkspaceSummary {
-  workspace: Workspace;
+  workspaceId: string;
+  workspaceName: string;
   taskStats: {
     total: number;
     byStatus: Record<string, number>;
     overdue: number;
     avgCompletionTimeMs: number | null;
   } | null;
-  sla: SlaDashboard | null;
+  sla: {
+    total: number;
+    pending: number;
+    met: number;
+    breached: number;
+    atRisk: number;
+  } | null;
   processStats: {
     totalDefinitions: number;
     totalInstances: number;
@@ -40,6 +42,11 @@ interface WorkspaceSummary {
     avgDurationMinutes: number;
     statusDistribution: { status: string; count: number }[];
   } | null;
+}
+
+interface DashboardSummaryResponse {
+  inboxCount: number;
+  summaries: WorkspaceSummary[];
 }
 
 interface DashboardData {
@@ -50,7 +57,6 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { workspaces, fetchWorkspaces } = useWorkspaceStore();
   const { user } = useAuthStore();
   const [data, setData] = useState<DashboardData>({
     summaries: [],
@@ -60,67 +66,23 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadDashboard = useCallback(async () => {
-    const activeWorkspaces = workspaces.filter(
-      (w) => !w.isArchived && !w.isSystem,
-    );
-
-    if (activeWorkspaces.length === 0) {
-      setData({ summaries: [], myInboxCount: 0, loading: false });
-      return;
-    }
-
-    // Загружаем inbox count первым
-    const myInboxCount = await tasksApi
-      .getInbox({ perPage: 1 })
-      .then((r) => r.total)
-      .catch(() => 0);
-
-    // Показываем layout сразу, данные подгрузим прогрессивно
-    setData((prev) => ({ ...prev, myInboxCount, loading: false }));
-
-    // Загружаем по 2 workspace за батч (6 запросов) с задержкой 300ms
-    // чтобы не перебить nginx rate limit (30r/s burst=60)
-    const BATCH_SIZE = 2;
-    const BATCH_DELAY_MS = 300;
-    const allSummaries: WorkspaceSummary[] = [];
-
-    for (let i = 0; i < activeWorkspaces.length; i += BATCH_SIZE) {
-      if (i > 0) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
-
-      const batch = activeWorkspaces.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(async (workspace) => {
-          const [taskStats, slaDashboard, processStats] = await Promise.allSettled([
-            tasksApi.getStatistics(workspace.id),
-            slaApi.getDashboard(workspace.id),
-            bpmnApi.getMiningWorkspaceStats(workspace.id),
-          ]);
-
-          return {
-            workspace,
-            taskStats:
-              taskStats.status === 'fulfilled' ? taskStats.value : null,
-            sla: slaDashboard.status === 'fulfilled' ? slaDashboard.value : null,
-            processStats:
-              processStats.status === 'fulfilled' ? processStats.value : null,
-          } as WorkspaceSummary;
-        }),
+    try {
+      const response = await apiClient.get<DashboardSummaryResponse>(
+        '/dashboard/summary',
       );
-      allSummaries.push(...batchResults);
-      // Прогрессивное обновление — данные появляются по мере загрузки
-      setData((prev) => ({ ...prev, summaries: [...allSummaries] }));
+      setData({
+        summaries: response.data.summaries,
+        myInboxCount: response.data.inboxCount,
+        loading: false,
+      });
+    } catch {
+      setData({ summaries: [], myInboxCount: 0, loading: false });
     }
-  }, [workspaces]);
+  }, []);
 
   useEffect(() => {
-    fetchWorkspaces();
-  }, [fetchWorkspaces]);
-
-  useEffect(() => {
-    if (workspaces.length > 0) {
-      loadDashboard();
-    }
-  }, [workspaces, loadDashboard]);
+    loadDashboard();
+  }, [loadDashboard]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -508,15 +470,15 @@ export default function DashboardPage() {
                       (d) => d.status === 'active',
                     )?.count || 0;
                   return (
-                    <tr key={s.workspace.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <tr key={s.workspaceId} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
                       <td className="py-3">
                         <button
                           onClick={() =>
-                            router.push(`/workspace/${s.workspace.id}`)
+                            router.push(`/workspace/${s.workspaceId}`)
                           }
                           className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                         >
-                          {s.workspace.name}
+                          {s.workspaceName}
                         </button>
                       </td>
                       <td className="py-3 text-center text-gray-700 dark:text-gray-300">

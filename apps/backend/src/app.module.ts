@@ -30,6 +30,7 @@ import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.mod
 import { SeedModule } from './seed/seed.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PermissionGuard } from './modules/rbac/rbac.guard';
 
@@ -69,6 +70,7 @@ import { PermissionGuard } from './modules/rbac/rbac.guard';
     ChatModule,
     KnowledgeBaseModule,
     InvitationModule,
+    DashboardModule,
   ],
   providers: [
     // Глобальные guards - порядок важен: сначала JWT, потом Permission
