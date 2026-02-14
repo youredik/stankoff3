@@ -317,16 +317,16 @@ export function Sidebar() {
       <div
         key={workspace.id}
         data-testid="sidebar-workspace-item"
-        className={`group relative flex items-center rounded transition-colors ${
+        className={`group relative flex items-center rounded-md transition-colors ${
           selectedWorkspace === workspace.id
-            ? 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-500/30'
-            : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 border border-transparent'
+            ? 'bg-primary-50 dark:bg-primary-900/30'
+            : 'hover:bg-gray-100 dark:hover:bg-gray-800/50'
         }`}
       >
         <button
           onClick={() => handleWorkspaceChange(workspace.id)}
           data-testid="sidebar-workspace-button"
-          className={`flex-1 flex items-center gap-3 px-3 py-2 cursor-pointer ${
+          className={`flex-1 flex items-center gap-2.5 px-3 py-1.5 cursor-pointer ${
             selectedWorkspace === workspace.id
               ? 'text-primary-600 dark:text-primary-400'
               : 'text-gray-700 dark:text-gray-300'
@@ -454,9 +454,9 @@ export function Sidebar() {
     const isEditing = editingSectionId === section.id;
 
     return (
-      <div key={section.id} data-testid="sidebar-section" className="mb-2">
+      <div key={section.id} data-testid="sidebar-section" className="mb-1">
         {/* Заголовок раздела */}
-        <div className="group flex items-center gap-1 px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800/50">
+        <div className="group flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800/50">
           {isEditing ? (
             <>
               <span className="p-0.5 text-gray-400">
@@ -638,10 +638,10 @@ export function Sidebar() {
           </button>
         </div>
 
-        <nav ref={navRef} onScroll={handleNavScroll} className="p-4 flex-1 overflow-y-auto">
+        <nav ref={navRef} onScroll={handleNavScroll} className="p-3 flex-1 overflow-y-auto">
           {/* Create buttons - только для пользователей с правами создания */}
           {(canCreateWorkspace || canCreateSection) && (
-            <div className="mb-4 flex gap-2">
+            <div className="mb-3 flex gap-2">
               <button
                 onClick={() => handleCreateWorkspace()}
                 disabled={creating}
@@ -664,7 +664,7 @@ export function Sidebar() {
 
           {/* Форма создания раздела */}
           {creatingSectionName !== null && (
-            <div className="mb-4 flex gap-2">
+            <div className="mb-3 flex gap-2">
               <input
                 type="text"
                 value={creatingSectionName}
@@ -695,7 +695,7 @@ export function Sidebar() {
           )}
 
           {/* Навигация */}
-          <div className="mb-4">
+          <div className="mb-3 space-y-0.5">
             {/* Dashboard */}
             <button
               onClick={() => {
@@ -703,14 +703,14 @@ export function Sidebar() {
                 close();
               }}
               data-testid="sidebar-dashboard-button"
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 pathname === '/dashboard'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
-              <LayoutDashboard className="w-5 h-5" />
-              <span className="font-medium">Дашборд</span>
+              <LayoutDashboard className="w-[18px] h-[18px] flex-shrink-0" />
+              <span className="text-sm font-medium">Дашборд</span>
             </button>
 
             {/* Входящие задания */}
@@ -720,21 +720,21 @@ export function Sidebar() {
                 close();
               }}
               data-testid="sidebar-inbox-button"
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer mt-1 ${
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 pathname === '/tasks'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
-              <div className="relative">
-                <Inbox className="w-5 h-5" />
+              <div className="relative flex-shrink-0">
+                <Inbox className="w-[18px] h-[18px]" />
                 {inboxCount > 0 && (
                   <span data-testid="sidebar-inbox-count" className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary-500 text-white text-[10px] font-semibold flex items-center justify-center rounded-full px-1">
                     {inboxCount > 9 ? '9+' : inboxCount}
                   </span>
                 )}
               </div>
-              <span className="font-medium">Входящие задания</span>
+              <span className="text-sm font-medium">Входящие задания</span>
             </button>
 
             {/* Чат */}
@@ -743,21 +743,21 @@ export function Sidebar() {
                 router.push('/chat');
                 close();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer mt-1 ${
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 pathname === '/chat'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
-              <div className="relative">
-                <MessageCircle className="w-5 h-5" />
+              <div className="relative flex-shrink-0">
+                <MessageCircle className="w-[18px] h-[18px]" />
                 {totalChatUnread > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-primary-500 text-white text-[10px] font-semibold flex items-center justify-center rounded-full px-1">
                     {totalChatUnread > 9 ? '9+' : totalChatUnread}
                   </span>
                 )}
               </div>
-              <span className="font-medium">Чат</span>
+              <span className="text-sm font-medium">Чат</span>
             </button>
 
             {/* База знаний */}
@@ -766,14 +766,14 @@ export function Sidebar() {
                 router.push('/knowledge-base');
                 close();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer mt-1 ${
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 pathname === '/knowledge-base'
-                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
-              <BookOpen className="w-5 h-5" />
-              <span className="font-medium">База знаний</span>
+              <BookOpen className="w-[18px] h-[18px] flex-shrink-0" />
+              <span className="text-sm font-medium">База знаний</span>
             </button>
           </div>
 
@@ -827,10 +827,10 @@ export function Sidebar() {
 
           {/* CRM — системные workspace (контакты, контрагенты, товары) */}
           {systemWorkspaces.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
               <button
                 onClick={toggleCrmCollapsed}
-                className="w-full flex items-center gap-1 px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer"
+                className="w-full flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer"
               >
                 <span className="p-0.5 text-gray-400">
                   {crmCollapsed ? (
@@ -845,7 +845,7 @@ export function Sidebar() {
                 </span>
               </button>
               {!crmCollapsed && (
-                <div className="mt-0.5 space-y-0.5">
+                <div className="mt-0.5 ml-3 space-y-0.5">
                   {systemWorkspaces.map((ws) => {
                     const Icon = getCrmIcon(ws.systemType);
                     const isActive = selectedWorkspace === ws.id;
@@ -858,13 +858,13 @@ export function Sidebar() {
                           router.push(`/workspace/${ws.id}`);
                           close();
                         }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                           isActive
-                            ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
-                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent'
+                            ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                         }`}
                       >
-                        <Icon className="w-5 h-5 flex-shrink-0" />
+                        <Icon className="w-[18px] h-[18px] flex-shrink-0" />
                         <span className="flex-1 font-medium truncate text-sm text-left">{ws.name}</span>
                         {count != null && count > 0 && (
                           <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
@@ -881,38 +881,40 @@ export function Sidebar() {
 
           {/* Bottom section - только для пользователей с правами администрирования */}
           {(canManageUsers || canManageRoles) && (
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-              <div className="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800">
+              <div className="px-3 py-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                 Администрирование
               </div>
-              {canManageUsers && (
-                <button
-                  onClick={() => router.push('/admin/users')}
-                  data-testid="sidebar-admin-link"
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
-                >
-                  <Users className="w-5 h-5" />
-                  <span className="font-medium">Пользователи</span>
-                </button>
-              )}
-              {canManageUsers && (
-                <button
-                  onClick={() => router.push('/admin/invitations')}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
-                >
-                  <Mail className="w-5 h-5" />
-                  <span className="font-medium">Приглашения</span>
-                </button>
-              )}
-              {canManageRoles && (
-                <button
-                  onClick={() => router.push('/admin/roles')}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded transition-colors cursor-pointer"
-                >
-                  <Shield className="w-5 h-5" />
-                  <span className="font-medium">Роли и права</span>
-                </button>
-              )}
+              <div className="space-y-0.5">
+                {canManageUsers && (
+                  <button
+                    onClick={() => router.push('/admin/users')}
+                    data-testid="sidebar-admin-link"
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded-md transition-colors cursor-pointer"
+                  >
+                    <Users className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span className="text-sm font-medium">Пользователи</span>
+                  </button>
+                )}
+                {canManageUsers && (
+                  <button
+                    onClick={() => router.push('/admin/invitations')}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded-md transition-colors cursor-pointer"
+                  >
+                    <Mail className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span className="text-sm font-medium">Приглашения</span>
+                  </button>
+                )}
+                {canManageRoles && (
+                  <button
+                    onClick={() => router.push('/admin/roles')}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 rounded-md transition-colors cursor-pointer"
+                  >
+                    <Shield className="w-[18px] h-[18px] flex-shrink-0" />
+                    <span className="text-sm font-medium">Роли и права</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </nav>
