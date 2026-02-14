@@ -38,7 +38,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
 const NOTIFICATION_ACCENT: Record<NotificationType, string> = {
   entity: 'bg-blue-500',
   comment: 'bg-green-500',
-  status: 'bg-orange-500',
+  status: 'bg-sky-500',
   assignment: 'bg-purple-500',
   mention: 'bg-pink-500',
   workspace: 'bg-indigo-500',
@@ -50,7 +50,7 @@ const NOTIFICATION_ACCENT: Record<NotificationType, string> = {
 const NOTIFICATION_ICON_COLOR: Record<NotificationType, string> = {
   entity: 'text-blue-500',
   comment: 'text-green-500',
-  status: 'text-orange-500',
+  status: 'text-sky-500',
   assignment: 'text-purple-500',
   mention: 'text-pink-500',
   workspace: 'text-indigo-500',

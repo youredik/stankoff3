@@ -39,7 +39,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   entity: 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40',
   comment: 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/40',
-  status: 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40',
+  status: 'text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/40',
   assignment: 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40',
   mention: 'text-pink-600 dark:text-pink-400 bg-pink-100 dark:bg-pink-900/40',
   workspace: 'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40',
